@@ -2,8 +2,8 @@ import * as React from 'react';
 import { Alert, AlertActionCloseButton, AlertGroup, AlertVariant } from '@patternfly/react-core';
 
 interface IToastAlertGroup {
-  // Rising edge on 'add' appends a new alert; remember to reset it to false
-  // to avoid spawning alerts at every render
+  // A false-to-true transition of 'add' appends one alert. The caller must
+  // reset it to false before requesting the next one.
   add: boolean;
   title: string;
   variant: keyof typeof AlertVariant;

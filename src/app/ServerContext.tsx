@@ -59,9 +59,13 @@ export const useServer = (): ServerState => React.useContext(ServerContext);
  */
 export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = React.useState<ServerState>(initialState);
-  const pending = React.useRef(5);
+  const pending = React.useRef(0);
 
   React.useEffect(() => {
+    // Reset on every effect run: under React.StrictMode the effect fires
+    // twice in development and the counter must not go negative.
+    pending.current = 5;
+
     const merge = (partial: Partial<ServerState>) => {
       pending.current -= 1;
       const done = pending.current <= 0;

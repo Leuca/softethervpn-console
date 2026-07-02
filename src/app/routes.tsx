@@ -50,8 +50,8 @@ const routes: AppRouteConfig[] = [
     path: '/hubs',
     title: 'SoftEther VPN Console | Hubs',
   },
-  // We repeat the hub component to be able to have subpaths
-  // without rewriting too much code
+  // The Hubs component is mounted a second time for hub subpaths, so a
+  // selected hub resolves without a dedicated route per subsection.
   {
     element: <Hubs />,
     path: '/hubs/:hub',
