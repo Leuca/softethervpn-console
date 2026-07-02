@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`App tests > should render default App component 1`] = `
+<DocumentFragment>
+  <div
+    class="pf-v6-l-bullseye"
+  >
+    <svg
+      aria-label="Contents"
+      aria-valuetext="Loading..."
+      class="pf-v6-c-spinner pf-m-xl"
+      role="progressbar"
+      viewBox="0 0 100 100"
+    >
+      <circle
+        class="pf-v6-c-spinner__path"
+        cx="50"
+        cy="50"
+        fill="none"
+        r="45"
+      />
+    </svg>
+  </div>
+</DocumentFragment>
+`;
