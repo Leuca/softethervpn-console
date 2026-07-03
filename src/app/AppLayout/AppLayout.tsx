@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Masthead,
   MastheadBrand,
+  MastheadContent,
   MastheadLogo,
   MastheadMain,
   MastheadToggle,
@@ -64,11 +65,13 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             </button>
           </MastheadLogo>
         </MastheadBrand>
+      </MastheadMain>
+      <MastheadContent>
         <span className="se-user">
           <UserIcon />
           <span className="se-user__role">{user}</span>
         </span>
-      </MastheadMain>
+      </MastheadContent>
     </Masthead>
   );
 
