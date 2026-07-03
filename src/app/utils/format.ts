@@ -51,3 +51,33 @@ const hubTypeLabels: Record<number, string> = {
 export function hubTypeLabel(type: number): string {
   return hubTypeLabels[type] ?? `Type ${type}`;
 }
+
+const userAuthTypeLabels: Record<number, string> = {
+  [VPN.VpnRpcUserAuthType.Anonymous]: 'Anonymous',
+  [VPN.VpnRpcUserAuthType.Password]: 'Password',
+  [VPN.VpnRpcUserAuthType.UserCert]: 'User certificate',
+  [VPN.VpnRpcUserAuthType.RootCert]: 'Root certificate',
+  [VPN.VpnRpcUserAuthType.Radius]: 'RADIUS',
+  [VPN.VpnRpcUserAuthType.NTDomain]: 'NT domain',
+};
+
+/** Human-readable label for a VpnRpcUserAuthType value. */
+export function userAuthTypeLabel(type: number): string {
+  return userAuthTypeLabels[type] ?? `Type ${type}`;
+}
+
+/**
+ * SoftEther represents "no expiry" / "never logged in" as a sentinel timestamp
+ * around the Unix epoch. Render real dates as locale strings and the sentinel
+ * as a caller-supplied placeholder.
+ */
+export function formatOptionalDate(value: unknown, placeholder = 'Never'): string {
+  if (value === null || value === undefined) {
+    return placeholder;
+  }
+  const date = new Date(value as string | Date);
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1970) {
+    return placeholder;
+  }
+  return date.toLocaleString();
+}

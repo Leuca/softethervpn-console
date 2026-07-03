@@ -12,6 +12,7 @@ import {
 import { WrenchIcon } from '@patternfly/react-icons';
 import { AppPage } from '@app/components/AppPage';
 import { HubStatus } from '@app/Hubs/HubStatus';
+import { Users } from '@app/Hubs/Users';
 
 const ComingSoon: React.FunctionComponent<{ what: string }> = ({ what }) => (
   <EmptyState titleText={`${what} coming soon`} headingLevel="h2" icon={WrenchIcon}>
@@ -44,7 +45,7 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
             <ComingSoon what="Properties" />
           </Tab>
           <Tab eventKey="users" title={<TabTitleText>Users</TabTitleText>}>
-            <ComingSoon what="Users" />
+            <Users hub={name} />
           </Tab>
           <Tab eventKey="groups" title={<TabTitleText>Groups</TabTitleText>}>
             <ComingSoon what="Groups" />
