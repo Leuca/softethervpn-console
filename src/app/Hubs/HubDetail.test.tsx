@@ -38,8 +38,8 @@ describe('HubDetail', () => {
     );
     await screen.findByText('Standalone');
 
-    await user.click(screen.getByRole('tab', { name: 'Groups' }));
+    await user.click(screen.getByRole('tab', { name: 'Properties' }));
 
-    expect(await screen.findByText('Groups coming soon')).toBeInTheDocument();
+    expect(await screen.findByText('Properties coming soon')).toBeInTheDocument();
   });
 });
