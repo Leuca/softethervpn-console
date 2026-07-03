@@ -162,10 +162,7 @@ const routes: AppRouteConfig[] = [
   },
 ];
 
-const TitledRoute: React.FunctionComponent<{ title: string; children: React.ReactElement }> = ({
-  title,
-  children,
-}) => {
+const TitledRoute: React.FunctionComponent<{ title: string; children: React.ReactElement }> = ({ title, children }) => {
   useDocumentTitle(title);
   return children;
 };

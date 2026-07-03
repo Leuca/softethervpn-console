@@ -116,9 +116,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
       .then((response) =>
         api
           .GetAzureStatus()
-          .then((azure) =>
-            merge({ ddnsHostname: response.CurrentHostName_str, azure: azure.IsEnabled_bool }),
-          ),
+          .then((azure) => merge({ ddnsHostname: response.CurrentHostName_str, azure: azure.IsEnabled_bool })),
       )
       .catch((error) => {
         console.log(error);
