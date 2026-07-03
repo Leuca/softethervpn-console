@@ -26,10 +26,33 @@ interface IAppLayout {
   children: React.ReactNode;
 }
 
+const pageId = 'primary-app-container';
+
 const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels } = useServer();
+
+  // Control the sidebar ourselves so its collapse behaviour is uniform across
+  // viewports: any click anywhere in the viewport closes it, except clicks on
+  // the sidebar itself (and the toggle button, which opens/closes it on its
+  // own). We still pass onPageResize so PatternFly keeps its resize observer
+  // running - that's what feeds the responsive breakpoint and mobile-overlay
+  // behaviour; dropping it (as an earlier attempt did) breaks both the desktop
+  // collapse and the mobile toggle.
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+
+  React.useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest('#page-sidebar') || target?.closest('#nav-toggle')) {
+        return;
+      }
+      setIsSidebarOpen(false);
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
 
   const isRouteVisible = (route: IAppRoute): boolean =>
     !!route.label &&
@@ -45,7 +68,12 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     <Masthead className="se-masthead">
       <MastheadMain>
         <MastheadToggle>
-          <PageToggleButton variant="plain" aria-label="Global navigation">
+          <PageToggleButton
+            variant="plain"
+            aria-label="Global navigation"
+            isSidebarOpen={isSidebarOpen}
+            onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
+          >
             <BarsIcon />
           </PageToggleButton>
         </MastheadToggle>
@@ -105,12 +133,10 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   );
 
   const Sidebar = (
-    <PageSidebar className="se-sidebar">
+    <PageSidebar className="se-sidebar" isSidebarOpen={isSidebarOpen}>
       <PageSidebarBody>{Navigation}</PageSidebarBody>
     </PageSidebar>
   );
-
-  const pageId = 'primary-app-container';
 
   const PageSkipToContent = (
     <SkipToContent
@@ -128,9 +154,9 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     <Page
       mainContainerId={pageId}
       masthead={masthead}
-      isManagedSidebar
       sidebar={Sidebar}
       skipToContent={PageSkipToContent}
+      onPageResize={() => undefined}
     >
       {children}
     </Page>
