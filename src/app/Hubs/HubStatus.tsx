@@ -43,7 +43,10 @@ const HubStatus: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   return (
     <Stack hasGutter>
       <StackItem>
-        <Flex justifyContent={{ default: 'justifyContentFlexEnd' }}>
+        <Flex
+          justifyContent={{ default: 'justifyContentFlexEnd' }}
+          style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+        >
           <FlexItem>
             <Button
               variant="secondary"
