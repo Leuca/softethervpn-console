@@ -9,7 +9,18 @@ const PORT = process.env.PORT || '9000';
 
 module.exports = merge(common('development'), {
   mode: 'development',
-  devtool: 'eval-source-map',
+  // Cheaper source maps: correct file/line mapping without the per-column
+  // detail of eval-source-map, which is not worth its build-time cost here.
+  devtool: 'eval-cheap-module-source-map',
+  // Persist compiled modules across runs so restarting the dev server only
+  // rebuilds what changed. The cache is invalidated when the webpack configs
+  // or the dependency tree change.
+  cache: {
+    type: 'filesystem',
+    buildDependencies: {
+      config: [__filename, path.resolve(__dirname, 'webpack.common.js')],
+    },
+  },
   devServer: {
     host: HOST,
     port: PORT,
