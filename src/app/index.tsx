@@ -5,6 +5,7 @@ import { Bullseye, Spinner } from '@patternfly/react-core';
 import { AppLayout } from '@app/AppLayout/AppLayout';
 import { AppRoutes } from '@app/routes';
 import { ServerProvider, useServer } from '@app/ServerContext';
+import '@app/theme-dark-chrome.css';
 import '@app/app.css';
 
 const LoadingPage: React.FunctionComponent = () => (

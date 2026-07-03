@@ -4,8 +4,100 @@ body,
   height: 100%;
 }
 
-.pf-v6-c-content {
-  --pf-v6-c-content--small--Color: var(--pf-t--global--color--status--danger--default); /* changes all <small> color to the semantic token for danger */
-  --pf-v6-c-content--blockquote--BorderLeftColor: var(--pf-t--global--color--nonstatus--purple--default); /* changes all <blockquote> left border color to the semantic token for non-status (purple) */
-  --pf-v6-c-content--hr--BackgroundColor: var(--pf-t--global--color--nonstatus--yellow--default); /* changes a <hr> color to the semantic token for non-status (yellow) */
+/* ============================================================
+   SoftEther VPN Console - application design layer
+
+   Dark chrome (masthead + sidebar) around a light content area,
+   with SoftEther-blue (#0066cc, PatternFly blue-50) accents. The
+   masthead and sidebar carry the .pf-v6-theme-dark class in
+   AppLayout, so PatternFly resolves their tokens to the dark
+   palette automatically; this file only adds branding, the active
+   navigation accent, and the depth cues that separate the chrome
+   from the workspace.
+   ============================================================ */
+
+/* --- Brand lockup (masthead, left) --- */
+.se-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm);
+  text-decoration: none;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.se-brand__logo {
+  height: 34px;
+  width: 34px;
+  display: block;
+}
+.se-brand__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  text-align: start;
+}
+.se-brand__text strong {
+  font-size: var(--pf-t--global--font--size--body--lg);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+  letter-spacing: 0.01em;
+  color: var(--pf-t--global--text--color--regular);
+}
+.se-brand__text span {
+  font-size: var(--pf-t--global--font--size--body--sm);
+  color: var(--pf-t--global--text--color--subtle);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* --- User identity chip (masthead, right) --- */
+.se-user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm);
+  padding-block: var(--pf-t--global--spacer--xs);
+  padding-inline: var(--pf-t--global--spacer--md);
+  border-radius: var(--pf-t--global--border--radius--pill);
+  background-color: var(--pf-t--global--background--color--secondary--default);
+  color: var(--pf-t--global--text--color--regular);
+  font-size: var(--pf-t--global--font--size--body--default);
+}
+.se-user__role {
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+
+/* PatternFly paints the desktop sidebar with a "glass"/floating surface token
+   that the dark palette does not redefine, so it falls back to light. Pin the
+   sidebar background (all breakpoints) to the dark secondary surface - resolved
+   from the dark tokens scoped onto .se-sidebar - so it matches the masthead. */
+.se-sidebar {
+  --pf-v6-c-page__sidebar--BackgroundColor: var(--pf-t--global--background--color--secondary--default);
+  --pf-v6-c-page__sidebar--xl--BackgroundColor: var(--pf-t--global--background--color--secondary--default);
+}
+
+/* --- Sidebar navigation: SoftEther-blue active accent --- */
+.se-sidebar .pf-v6-c-nav__link {
+  border-inline-start: 3px solid transparent;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+/* Replace PatternFly's default current-item indicator with a full-height
+   blue rail so it reads clearly on the dark sidebar. */
+.se-sidebar .pf-v6-c-nav__link::before,
+.se-sidebar .pf-v6-c-nav__link::after {
+  display: none;
+}
+.se-sidebar .pf-v6-c-nav__link.pf-m-current,
+.se-sidebar .pf-v6-c-nav__link[aria-current='page'] {
+  border-inline-start-color: var(--pf-t--color--blue--40);
+  background-color: rgba(67, 148, 229, 0.16);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+
+/* --- Depth: lift the dark chrome above the light workspace --- */
+.se-masthead {
+  box-shadow: var(--pf-t--global--box-shadow--md--bottom);
+  z-index: var(--pf-t--global--z-index--md);
 }

@@ -7,56 +7,87 @@ import {
   DescriptionListDescription,
   DescriptionListGroup,
   DescriptionListTerm,
-  PageSection,
-  Title,
+  Gallery,
+  Label,
+  Stack,
+  StackItem,
 } from '@patternfly/react-core';
+import { NetworkIcon, OutlinedClockIcon, ServerIcon, UserIcon } from '@patternfly/react-icons';
 import { useServer } from '@app/ServerContext';
+import { AppPage } from '@app/components/AppPage';
+import { StatCard } from '@app/components/StatCard';
 
 const Dashboard: React.FunctionComponent = () => {
   const { user, ddnsHostname, azure, isBridgeMode, info } = useServer();
 
+  const str = (key: string): string => String(info[key] ?? '-');
+
   return (
-    <PageSection hasBodyWrapper={false}>
-      <Title headingLevel="h1" size="lg">
-        Dashboard
-      </Title>
-      <br />
-      <Card>
-        <CardTitle>Server Overview</CardTitle>
-        <CardBody>
-          <DescriptionList isHorizontal>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Connected as</DescriptionListTerm>
-              <DescriptionListDescription>{user}</DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Product</DescriptionListTerm>
-              <DescriptionListDescription>{String(info['ServerProductName_str'] ?? '-')}</DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Version</DescriptionListTerm>
-              <DescriptionListDescription>{String(info['ServerVersionString_str'] ?? '-')}</DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Hostname</DescriptionListTerm>
-              <DescriptionListDescription>{String(info['ServerHostName_str'] ?? '-')}</DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Dynamic DNS hostname</DescriptionListTerm>
-              <DescriptionListDescription>{ddnsHostname || '-'}</DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>VPN Azure</DescriptionListTerm>
-              <DescriptionListDescription>{azure ? 'Enabled' : 'Disabled'}</DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Mode</DescriptionListTerm>
-              <DescriptionListDescription>{isBridgeMode ? 'Bridge' : 'Server'}</DescriptionListDescription>
-            </DescriptionListGroup>
-          </DescriptionList>
-        </CardBody>
-      </Card>
-    </PageSection>
+    <AppPage title="Dashboard" description="At-a-glance status of this SoftEther VPN Server.">
+      <Stack hasGutter>
+        <StackItem>
+          <Gallery hasGutter minWidths={{ default: '240px' }}>
+            <StatCard icon={<UserIcon />} label="Signed in as" value={user} tone="brand" />
+            <StatCard
+              icon={<ServerIcon />}
+              label="Server mode"
+              value={isBridgeMode ? 'Bridge' : 'Server'}
+              tone="info"
+            />
+            <StatCard
+              icon={<NetworkIcon />}
+              label="VPN Azure"
+              value={azure ? 'Enabled' : 'Disabled'}
+              tone={azure ? 'success' : 'default'}
+            />
+            <StatCard
+              icon={<OutlinedClockIcon />}
+              label="Version"
+              value={str('ServerVersionString_str')}
+              tone="default"
+            />
+          </Gallery>
+        </StackItem>
+
+        <StackItem>
+          <Card>
+            <CardTitle>Server overview</CardTitle>
+            <CardBody>
+              <DescriptionList isHorizontal columnModifier={{ default: '2Col' }}>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Product</DescriptionListTerm>
+                  <DescriptionListDescription>{str('ServerProductName_str')}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Version</DescriptionListTerm>
+                  <DescriptionListDescription>{str('ServerVersionString_str')}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Hostname</DescriptionListTerm>
+                  <DescriptionListDescription>{str('ServerHostName_str')}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Dynamic DNS</DescriptionListTerm>
+                  <DescriptionListDescription>{ddnsHostname || '-'}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>VPN Azure</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <Label color={azure ? 'green' : 'grey'} isCompact>
+                      {azure ? 'Enabled' : 'Disabled'}
+                    </Label>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Mode</DescriptionListTerm>
+                  <DescriptionListDescription>{isBridgeMode ? 'Bridge' : 'Server'}</DescriptionListDescription>
+                </DescriptionListGroup>
+              </DescriptionList>
+            </CardBody>
+          </Card>
+        </StackItem>
+      </Stack>
+    </AppPage>
   );
 };
 

@@ -17,7 +17,7 @@ import {
   PageToggleButton,
   SkipToContent,
 } from '@patternfly/react-core';
-import { BarsIcon } from '@patternfly/react-icons';
+import { BarsIcon, UserIcon } from '@patternfly/react-icons';
 import { IAppRoute, IAppRouteGroup, routes } from '@app/routes';
 import { useServer } from '@app/ServerContext';
 import logo from '@app/bgimages/icons8-softether-vpn.svg';
@@ -42,7 +42,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     !hiddenLabels.has(group.label) && !(hideAdminOnly && group.isAdmin) && group.routes.some(isRouteVisible);
 
   const masthead = (
-    <Masthead>
+    <Masthead className="se-masthead">
       <MastheadMain>
         <MastheadToggle>
           <PageToggleButton variant="plain" aria-label="Global navigation">
@@ -51,16 +51,27 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
         </MastheadToggle>
         <MastheadBrand>
           <MastheadLogo>
-            <img
-              src={logo}
+            <button
+              type="button"
+              className="se-brand"
               onClick={() => navigate('/')}
-              alt="icons8 Softether logo"
-              style={{ height: '40px', cursor: 'pointer' }}
-            />
+              aria-label="SoftEther VPN Console home"
+            >
+              <img src={logo} className="se-brand__logo" alt="" />
+              <span className="se-brand__text">
+                <strong>SoftEther</strong>
+                <span>VPN Console</span>
+              </span>
+            </button>
           </MastheadLogo>
         </MastheadBrand>
       </MastheadMain>
-      <MastheadContent>{user}</MastheadContent>
+      <MastheadContent>
+        <span className="se-user">
+          <UserIcon />
+          <span className="se-user__role">{user}</span>
+        </span>
+      </MastheadContent>
     </Masthead>
   );
 
@@ -85,14 +96,16 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     <Nav id="nav-primary-simple">
       <NavList id="nav-list-simple">
         {routes.map((route, idx) =>
-          route.routes ? isGroupVisible(route) && renderNavGroup(route, idx) : isRouteVisible(route) && renderNavItem(route, idx),
+          route.routes
+            ? isGroupVisible(route) && renderNavGroup(route, idx)
+            : isRouteVisible(route) && renderNavItem(route, idx),
         )}
       </NavList>
     </Nav>
   );
 
   const Sidebar = (
-    <PageSidebar>
+    <PageSidebar className="se-sidebar">
       <PageSidebarBody>{Navigation}</PageSidebarBody>
     </PageSidebar>
   );
