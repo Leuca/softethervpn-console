@@ -1,5 +1,22 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 
+// The dev-server proxy pulls in the unmaintained http-proxy@1.18.1
+// (webpack-dev-server 5 -> http-proxy-middleware 2 -> http-proxy 1.18.1), which
+// still calls the deprecated util._extend and prints a DEP0060 warning on the
+// first proxied request. There is no fixed release in this dependency tree, so
+// filter out only that one warning here - every other deprecation still prints.
+// Remove once the proxy chain no longer depends on http-proxy@1.x.
+const originalEmitWarning = process.emitWarning.bind(process);
+process.emitWarning = (warning, ...args) => {
+  const options = args.find((arg) => arg && typeof arg === 'object');
+  const code = (options && options.code) || args.find((arg) => typeof arg === 'string' && arg.startsWith('DEP'));
+  const message = typeof warning === 'string' ? warning : warning && warning.message;
+  if (code === 'DEP0060' || (message && message.includes('util._extend'))) {
+    return undefined;
+  }
+  return originalEmitWarning(warning, ...args);
+};
+
 const path = require('path');
 const { merge } = require('webpack-merge');
 const common = require('./webpack.common.js');
