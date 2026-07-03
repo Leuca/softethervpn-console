@@ -26,6 +26,13 @@ interface DetailState {
   error: string | null;
 }
 
+// SoftEther returns error code 29 ("Object not found") when a connection has
+// already closed - the common case for the short-lived management RPC
+// connections, which close as soon as their request completes.
+function isConnectionGoneError(error: string): boolean {
+  return /code[=\s]*29\b/i.test(error) || /object not found/i.test(error);
+}
+
 const ConnectionsList: React.FunctionComponent = () => {
   const [connections, setConnections] = React.useState<VPN.VpnRpcEnumConnectionItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -137,9 +144,16 @@ const ConnectionsList: React.FunctionComponent = () => {
         <ModalHeader title={detail ? `Connection: ${detail.name}` : ''} />
         <ModalBody>
           {detail?.error ? (
-            <Alert variant="danger" title="Could not load connection details" isInline>
-              {detail.error}
-            </Alert>
+            isConnectionGoneError(detail.error) ? (
+              <Alert variant="info" title="Connection no longer active" isInline>
+                This connection has already closed, so its details are no longer available. Short-lived management
+                connections close as soon as their request completes.
+              </Alert>
+            ) : (
+              <Alert variant="danger" title="Could not load connection details" isInline>
+                {detail.error}
+              </Alert>
+            )
           ) : detail?.info ? (
             <KeyValueTable data={detail.info} ariaLabel={`Details for ${detail.name}`} />
           ) : (
