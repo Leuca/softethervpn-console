@@ -102,3 +102,12 @@ body,
   box-shadow: var(--pf-t--global--box-shadow--md--bottom);
   z-index: var(--pf-t--global--z-index--md);
 }
+
+/* PatternFly insets the main content container on the left and right (its
+   inline margins are the page inset) but leaves the top margin at 0, so the
+   content panel is flush against the masthead. Match the top margin to the
+   same inset so the gap is equal on top, left and right. The bottom is left
+   flush on purpose: the panel fills down to the window edge. */
+.pf-v6-c-page__main-container {
+  --pf-v6-c-page__main-container--MarginBlockStart: var(--pf-v6-c-page--inset);
+}
