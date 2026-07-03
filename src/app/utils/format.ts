@@ -40,3 +40,14 @@ const connectionTypeLabels: Record<number, string> = {
 export function connectionTypeLabel(type: number): string {
   return connectionTypeLabels[type] ?? `Type ${type}`;
 }
+
+const hubTypeLabels: Record<number, string> = {
+  [VPN.VpnRpcHubType.Standalone]: 'Standalone',
+  [VPN.VpnRpcHubType.FarmStatic]: 'Static',
+  [VPN.VpnRpcHubType.FarmDynamic]: 'Dynamic',
+};
+
+/** Human-readable label for a VpnRpcHubType value. */
+export function hubTypeLabel(type: number): string {
+  return hubTypeLabels[type] ?? `Type ${type}`;
+}
