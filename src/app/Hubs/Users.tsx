@@ -3,6 +3,7 @@ import {
   Alert,
   Bullseye,
   Button,
+  Checkbox,
   EmptyState,
   EmptyStateActions,
   EmptyStateBody,
@@ -13,6 +14,8 @@ import {
   FormGroup,
   FormSelect,
   FormSelectOption,
+  HelperText,
+  HelperTextItem,
   Icon,
   Modal,
   ModalBody,
@@ -28,12 +31,30 @@ import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { formatOptionalDate, userAuthTypeLabel } from '@app/utils/format';
 
-// Auth types offered when creating a user. The others (certificate, RADIUS, NT)
-// need extra server configuration and are left to the (upcoming) edit view.
+// Auth types offered when creating a user; the rest need extra config, set on edit.
 const CREATABLE_AUTH_TYPES = [
   { value: VPN.VpnRpcUserAuthType.Anonymous, label: 'Anonymous' },
   { value: VPN.VpnRpcUserAuthType.Password, label: 'Password' },
 ];
+
+// All auth types, selectable when editing.
+const ALL_AUTH_TYPES = [
+  { value: VPN.VpnRpcUserAuthType.Anonymous, label: 'Anonymous' },
+  { value: VPN.VpnRpcUserAuthType.Password, label: 'Password' },
+  { value: VPN.VpnRpcUserAuthType.UserCert, label: 'User certificate' },
+  { value: VPN.VpnRpcUserAuthType.RootCert, label: 'Root certificate' },
+  { value: VPN.VpnRpcUserAuthType.Radius, label: 'RADIUS' },
+  { value: VPN.VpnRpcUserAuthType.NTDomain, label: 'NT domain' },
+];
+
+// SoftEther stores "no expiry" as an epoch-era sentinel timestamp.
+const isNeverDate = (value: unknown): boolean => {
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1970;
+};
+const NEVER = new Date(0).toISOString();
+const toDateInput = (value: unknown): string =>
+  isNeverDate(value) ? '' : new Date(value as string).toISOString().slice(0, 10);
 
 const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [users, setUsers] = React.useState<VPN.VpnRpcEnumUserItem[] | null>(null);
@@ -47,6 +68,11 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [note, setNote] = React.useState('');
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
+
+  // Working copy of the user being edited (the full GetUser response) plus an
+  // optional new password (blank = keep the current one).
+  const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
+  const [newPassword, setNewPassword] = React.useState('');
 
   const load = React.useCallback(() => {
     setUsers(null);
@@ -91,6 +117,41 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       .catch((e) => {
         setError(String(e));
         setCreateOpen(false);
+      });
+  };
+
+  const openEdit = (userName: string) => {
+    setNewPassword('');
+    api
+      .GetUser(new VPN.VpnRpcSetUser({ HubName_str: hub, Name_str: userName }))
+      .then((response) => setEdit(response as unknown as Record<string, unknown>))
+      .catch((e) => setError(String(e)));
+  };
+
+  const setEditField = (key: string, value: unknown) => setEdit((prev) => (prev ? { ...prev, [key]: value } : prev));
+
+  const saveEdit = () => {
+    if (!edit) {
+      return;
+    }
+    // Build the class instance first (correct _bin serialization), then set the
+    // password only when changing it - otherwise delete the key so it is not
+    // serialized and the server keeps the current password.
+    const obj = new VPN.VpnRpcSetUser(edit as Partial<VPN.VpnRpcSetUser>);
+    if (Number(obj.AuthType_u32) === VPN.VpnRpcUserAuthType.Password && newPassword) {
+      obj.Auth_Password_str = newPassword;
+    } else {
+      delete (obj as { Auth_Password_str?: string }).Auth_Password_str;
+    }
+    api
+      .SetUser(obj)
+      .then(() => {
+        setEdit(null);
+        load();
+      })
+      .catch((e) => {
+        setError(String(e));
+        setEdit(null);
       });
   };
 
@@ -184,7 +245,13 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <Td dataLabel="Last login">{formatOptionalDate(user.LastLoginTime_dt, '-')}</Td>
                 <Td dataLabel="Expiration">{formatOptionalDate(user.Expires_dt, 'Never')}</Td>
                 <Td isActionCell>
-                  <ActionsColumn items={[{ title: 'Delete', onClick: () => setPendingDelete(user.Name_str) }]} />
+                  <ActionsColumn
+                    items={[
+                      { title: 'Edit', onClick: () => openEdit(user.Name_str) },
+                      { isSeparator: true },
+                      { title: 'Delete', onClick: () => setPendingDelete(user.Name_str) },
+                    ]}
+                  />
                 </Td>
               </Tr>
             ))}
@@ -247,6 +314,131 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             Create
           </Button>
           <Button variant="link" onClick={() => setCreateOpen(false)}>
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit user */}
+      <Modal variant={ModalVariant.medium} isOpen={edit !== null} onClose={() => setEdit(null)}>
+        <ModalHeader title={edit ? `Edit ${String(edit.Name_str)}` : ''} />
+        <ModalBody>
+          {edit && (
+            <Form>
+              <FormGroup label="Real name" fieldId="edit-realname">
+                <TextInput
+                  id="edit-realname"
+                  value={String(edit.Realname_utf ?? '')}
+                  onChange={(_event, value) => setEditField('Realname_utf', value)}
+                  aria-label="Real name"
+                />
+              </FormGroup>
+              <FormGroup label="Note" fieldId="edit-note">
+                <TextInput
+                  id="edit-note"
+                  value={String(edit.Note_utf ?? '')}
+                  onChange={(_event, value) => setEditField('Note_utf', value)}
+                  aria-label="Note"
+                />
+              </FormGroup>
+              <FormGroup label="Group" fieldId="edit-group">
+                <TextInput
+                  id="edit-group"
+                  value={String(edit.GroupName_str ?? '')}
+                  onChange={(_event, value) => setEditField('GroupName_str', value)}
+                  aria-label="Group"
+                />
+              </FormGroup>
+              <FormGroup label="Authentication" fieldId="edit-auth">
+                <FormSelect
+                  id="edit-auth"
+                  value={Number(edit.AuthType_u32)}
+                  onChange={(_event, value) => setEditField('AuthType_u32', Number(value))}
+                  aria-label="Authentication method"
+                >
+                  {ALL_AUTH_TYPES.map((option) => (
+                    <FormSelectOption key={option.value} value={option.value} label={option.label} />
+                  ))}
+                </FormSelect>
+              </FormGroup>
+              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.Password && (
+                <FormGroup label="New password" fieldId="edit-password">
+                  <TextInput
+                    type="password"
+                    id="edit-password"
+                    value={newPassword}
+                    onChange={(_event, value) => setNewPassword(value)}
+                    placeholder="Leave blank to keep the current password"
+                    aria-label="New password"
+                  />
+                </FormGroup>
+              )}
+              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.UserCert && (
+                <HelperText>
+                  <HelperTextItem>Certificate management is not available yet.</HelperTextItem>
+                </HelperText>
+              )}
+              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.RootCert && (
+                <FormGroup label="Common name (CN)" fieldId="edit-cn">
+                  <TextInput
+                    id="edit-cn"
+                    value={String(edit.CommonName_utf ?? '')}
+                    onChange={(_event, value) => setEditField('CommonName_utf', value)}
+                    aria-label="Common name"
+                  />
+                </FormGroup>
+              )}
+              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.Radius && (
+                <FormGroup label="RADIUS username" fieldId="edit-radius">
+                  <TextInput
+                    id="edit-radius"
+                    value={String(edit.RadiusUsername_utf ?? '')}
+                    onChange={(_event, value) => setEditField('RadiusUsername_utf', value)}
+                    aria-label="RADIUS username"
+                  />
+                </FormGroup>
+              )}
+              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.NTDomain && (
+                <FormGroup label="NT domain username" fieldId="edit-nt">
+                  <TextInput
+                    id="edit-nt"
+                    value={String(edit.NtUsername_utf ?? '')}
+                    onChange={(_event, value) => setEditField('NtUsername_utf', value)}
+                    aria-label="NT domain username"
+                  />
+                </FormGroup>
+              )}
+              <FormGroup fieldId="edit-expires">
+                <Checkbox
+                  id="edit-expires"
+                  label="Account expires"
+                  isChecked={!isNeverDate(edit.ExpireTime_dt)}
+                  onChange={(_event, checked) =>
+                    setEditField('ExpireTime_dt', checked ? new Date(Date.now() + 365 * 864e5).toISOString() : NEVER)
+                  }
+                />
+              </FormGroup>
+              {!isNeverDate(edit.ExpireTime_dt) && (
+                <FormGroup label="Expiration date" fieldId="edit-expiredate">
+                  <TextInput
+                    type="date"
+                    id="edit-expiredate"
+                    value={toDateInput(edit.ExpireTime_dt)}
+                    onChange={(_event, value) =>
+                      setEditField('ExpireTime_dt', value ? new Date(`${value}T00:00:00Z`).toISOString() : NEVER)
+                    }
+                    aria-label="Expiration date"
+                  />
+                </FormGroup>
+              )}
+            </Form>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="primary" onClick={saveEdit}>
+            Save
+          </Button>
+          <Button variant="link" onClick={() => setEdit(null)}>
             Cancel
           </Button>
         </ModalFooter>

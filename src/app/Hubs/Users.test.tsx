@@ -10,12 +10,16 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
     EnumUser: vi.fn(),
     CreateUser: vi.fn(),
     DeleteUser: vi.fn(),
+    GetUser: vi.fn(),
+    SetUser: vi.fn(),
   },
 }));
 
 const enumUser = api.EnumUser as unknown as Mock;
 const createUser = api.CreateUser as unknown as Mock;
 const deleteUser = api.DeleteUser as unknown as Mock;
+const getUser = api.GetUser as unknown as Mock;
+const setUser = api.SetUser as unknown as Mock;
 
 const alice = {
   Name_str: 'alice',
@@ -94,6 +98,48 @@ describe('Users', () => {
       AuthType_u32: 1,
       Auth_Password_str: 's3cret',
     });
+  });
+
+  it('edits a user and keeps the password when the field is blank', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({ HubName_str: 'DEFAULT', Name_str: 'alice', Realname_utf: 'Alice A', AuthType_u32: 1 });
+    setUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    const realname = within(dialog).getByLabelText('Real name');
+    await user.clear(realname);
+    await user.type(realname, 'Alice B');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(setUser).toHaveBeenCalledOnce();
+    const sent = setUser.mock.calls[0][0];
+    expect(sent.Realname_utf).toBe('Alice B');
+    // password left blank -> key omitted so the server keeps the current one
+    expect(Object.prototype.hasOwnProperty.call(sent, 'Auth_Password_str')).toBe(false);
+  });
+
+  it('sends a new password when one is entered while editing', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({ HubName_str: 'DEFAULT', Name_str: 'alice', AuthType_u32: 1 });
+    setUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('New password'), 'newpass');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(setUser.mock.calls[0][0].Auth_Password_str).toBe('newpass');
   });
 
   it('deletes a user after confirmation', async () => {
