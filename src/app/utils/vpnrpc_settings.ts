@@ -11,6 +11,16 @@ if (process.env.NODE_ENV !== 'development') {
   // as the web browser already knows it (the console is served by the VPN server itself).
   api = new VPN.VpnServerRpc();
 } else {
+  // vpnrpc hardcodes keepalive:true on its fetch calls. Chromium handles
+  // keepalive requests in a separate code path that is unreliable for
+  // cross-origin calls requiring a CORS preflight, failing them with
+  // net::ERR_EMPTY_RESPONSE. Development is the only cross-origin case
+  // (production is served same-origin by the VPN server), and the flag is
+  // useless here, so drop it before the client issues any request.
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) =>
+    realFetch(input, init ? { ...init, keepalive: false } : init);
+
   // During development the target VPN Server's hostname, port and credentials
   // are taken from the environment (.env / .env.defaults, see dotenv-webpack).
   api = new VPN.VpnServerRpc(
