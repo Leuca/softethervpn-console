@@ -53,7 +53,7 @@ const Dashboard: React.FunctionComponent = () => {
           <Card>
             <CardTitle>Server overview</CardTitle>
             <CardBody>
-              <DescriptionList isHorizontal columnModifier={{ default: '2Col' }}>
+              <DescriptionList isHorizontal columnModifier={{ default: '1Col', lg: '2Col' }}>
                 <DescriptionListGroup>
                   <DescriptionListTerm>Product</DescriptionListTerm>
                   <DescriptionListDescription>{str('ServerProductName_str')}</DescriptionListDescription>
