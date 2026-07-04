@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClusteringStatus } from './ClusteringStatus';
 import { api } from '@app/utils/vpnrpc_settings';
+import { SELF_SIGNED_CERT_DER } from '@app/utils/x509.fixture';
 
 vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: {
@@ -73,7 +74,7 @@ describe('ClusteringStatus', () => {
     getFarmInfo.mockResolvedValue({
       Id_u32: 42,
       Point_u32: 55,
-      ServerCert_bin: new Uint8Array([1, 2, 3]),
+      ServerCert_bin: SELF_SIGNED_CERT_DER(),
       HubsList: [{ HubName_str: 'DEFAULT', DynamicHub_bool: true }],
     });
     const user = userEvent.setup();
@@ -89,8 +90,11 @@ describe('ClusteringStatus', () => {
     expect(getFarmInfo.mock.calls[0][0].Id_u32).toBe(42);
     // hub label rendered from HubsList
     expect(screen.getByText('DEFAULT (Dynamic)')).toBeInTheDocument();
-    // cert deferral note is shown
-    expect(screen.getByText('Server certificate viewing is not available yet.')).toBeInTheDocument();
+
+    // the server certificate can now be viewed
+    await user.click(screen.getByRole('button', { name: 'View server certificate' }));
+    expect(await screen.findByText('Certificate: test.example.com')).toBeInTheDocument();
+    expect(screen.getByText('Self-signed')).toBeInTheDocument();
   });
 
   it('shows the controller connection status on a cluster member', async () => {

@@ -6,8 +6,6 @@ import {
   Content,
   EmptyState,
   EmptyStateBody,
-  HelperText,
-  HelperTextItem,
   Label,
   LabelGroup,
   Modal,
@@ -24,6 +22,7 @@ import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/reac
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
+import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { formatOptionalDate } from '@app/utils/format';
 
@@ -34,6 +33,7 @@ interface MemberDetail {
   hostname: string;
   info: Record<string, unknown> | null; // null while loading
   hubs: VPN.VpnRpcFarmHub[];
+  cert: Uint8Array | null;
   error: string | null;
 }
 
@@ -42,6 +42,7 @@ const ControllerView: React.FunctionComponent = () => {
   const [members, setMembers] = React.useState<VPN.VpnRpcEnumFarmItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<MemberDetail | null>(null);
+  const [certOpen, setCertOpen] = React.useState(false);
 
   const load = React.useCallback(() => {
     setMembers(null);
@@ -57,7 +58,7 @@ const ControllerView: React.FunctionComponent = () => {
   }, [load]);
 
   const openDetail = (member: VPN.VpnRpcEnumFarmItem) => {
-    setDetail({ hostname: member.Hostname_str, info: null, hubs: [], error: null });
+    setDetail({ hostname: member.Hostname_str, info: null, hubs: [], cert: null, error: null });
     api
       .GetFarmInfo(new VPN.VpnRpcFarmInfo({ Id_u32: member.Id_u32 }))
       .then((response) => {
@@ -67,9 +68,17 @@ const ControllerView: React.FunctionComponent = () => {
             info[key] = (response as unknown as Record<string, unknown>)[key];
           }
         });
-        setDetail({ hostname: member.Hostname_str, info, hubs: response.HubsList ?? [], error: null });
+        setDetail({
+          hostname: member.Hostname_str,
+          info,
+          hubs: response.HubsList ?? [],
+          cert: response.ServerCert_bin ?? null,
+          error: null,
+        });
       })
-      .catch((e) => setDetail({ hostname: member.Hostname_str, info: null, hubs: [], error: String(e) }));
+      .catch((e) =>
+        setDetail({ hostname: member.Hostname_str, info: null, hubs: [], cert: null, error: String(e) }),
+      );
   };
 
   const refresh = (
@@ -158,9 +167,9 @@ const ControllerView: React.FunctionComponent = () => {
                 </StackItem>
               )}
               <StackItem>
-                <HelperText>
-                  <HelperTextItem>Server certificate viewing is not available yet.</HelperTextItem>
-                </HelperText>
+                <Button variant="secondary" onClick={() => setCertOpen(true)} isDisabled={detail.cert === null}>
+                  View server certificate
+                </Button>
               </StackItem>
             </Stack>
           )}
@@ -171,6 +180,8 @@ const ControllerView: React.FunctionComponent = () => {
           </Button>
         </ModalFooter>
       </Modal>
+
+      <CertificateModal certBin={detail?.cert ?? null} isOpen={certOpen} onClose={() => setCertOpen(false)} />
     </AppPage>
   );
 };
