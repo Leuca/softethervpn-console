@@ -47,16 +47,29 @@ const name = (cert: X509Certificate, which: 'subjectName' | 'issuerName'): Certi
   };
 };
 
+// The API returns some certs as raw DER (cluster server cert) and some as the
+// UTF-8 bytes of a PEM block (user certs). Detect PEM so one entry point covers
+// both: X509Certificate parses a PEM string but treats a Uint8Array as DER.
+const PEM_HEADER = '-----BEGIN CERTIFICATE-----';
+
+const asCertificate = (bytes: Uint8Array): X509Certificate => {
+  const text = new TextDecoder().decode(bytes.subarray(0, PEM_HEADER.length));
+  if (text === PEM_HEADER) {
+    return new X509Certificate(new TextDecoder().decode(bytes));
+  }
+  return new X509Certificate(bytes);
+};
+
 /**
- * Parse a DER-encoded X.509 certificate (the raw `*_bin` field returned by the
- * JSON-RPC API) into the fields the console displays. Throws if the bytes are
- * not a valid certificate; callers render a fallback.
+ * Parse an X.509 certificate (the raw `*_bin` field returned by the JSON-RPC
+ * API, DER or PEM-text bytes) into the fields the console displays. Throws if
+ * the bytes are not a valid certificate; callers render a fallback.
  *
  * Reading fields is pure ASN.1 decoding and needs no WebCrypto engine, so this
  * stays synchronous and safe to call during render.
  */
-export function parseCertificate(der: Uint8Array): ParsedCertificate {
-  const cert = new X509Certificate(der);
+export function parseCertificate(bytes: Uint8Array): ParsedCertificate {
+  const cert = asCertificate(bytes);
   return {
     subject: name(cert, 'subjectName'),
     issuer: name(cert, 'issuerName'),

@@ -8,6 +8,7 @@ import {
   EmptyStateActions,
   EmptyStateBody,
   EmptyStateFooter,
+  FileUpload,
   Flex,
   FlexItem,
   Form,
@@ -29,7 +30,13 @@ import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/reac
 import { BanIcon, PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
+import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { formatOptionalDate, userAuthTypeLabel } from '@app/utils/format';
+import { parseCertificate } from '@app/utils/x509';
+
+// A UserCert user's registered certificate (DER or PEM-text bytes), if any.
+const certBytes = (value: unknown): Uint8Array | null =>
+  value instanceof Uint8Array && value.length > 0 ? value : null;
 
 // Auth types offered when creating a user; the rest need extra config, set on edit.
 const CREATABLE_AUTH_TYPES = [
@@ -73,6 +80,9 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // optional new password (blank = keep the current one).
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
   const [newPassword, setNewPassword] = React.useState('');
+  const [certOpen, setCertOpen] = React.useState(false);
+  const [certFilename, setCertFilename] = React.useState('');
+  const [certError, setCertError] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
     setUsers(null);
@@ -122,6 +132,8 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   const openEdit = (userName: string) => {
     setNewPassword('');
+    setCertFilename('');
+    setCertError(null);
     api
       .GetUser(new VPN.VpnRpcSetUser({ HubName_str: hub, Name_str: userName }))
       .then((response) => setEdit(response as unknown as Record<string, unknown>))
@@ -129,6 +141,32 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   };
 
   const setEditField = (key: string, value: unknown) => setEdit((prev) => (prev ? { ...prev, [key]: value } : prev));
+
+  // Read an uploaded certificate file, validate it parses, and stage its bytes
+  // as the user's UserX_bin (the server accepts DER or PEM).
+  const onCertSelected = (_event: unknown, file: File) => {
+    setCertError(null);
+    setCertFilename(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const bytes = new Uint8Array(reader.result as ArrayBuffer);
+        parseCertificate(bytes); // throws if not a certificate
+        setEditField('UserX_bin', bytes);
+      } catch {
+        setCertError('The file is not a valid certificate (PEM or DER).');
+        setEditField('UserX_bin', new Uint8Array());
+      }
+    };
+    reader.onerror = () => setCertError('The certificate file could not be read.');
+    reader.readAsArrayBuffer(file);
+  };
+
+  const clearCert = () => {
+    setCertFilename('');
+    setCertError(null);
+    setEditField('UserX_bin', new Uint8Array());
+  };
 
   const saveEdit = () => {
     if (!edit) {
@@ -374,9 +412,41 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 </FormGroup>
               )}
               {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.UserCert && (
-                <HelperText>
-                  <HelperTextItem>Certificate management is not available yet.</HelperTextItem>
-                </HelperText>
+                <FormGroup label="User certificate" fieldId="edit-usercert">
+                  <HelperText>
+                    <HelperTextItem>
+                      The user may connect only with an SSL client certificate that exactly matches the one registered
+                      here.
+                    </HelperTextItem>
+                  </HelperText>
+                  <FileUpload
+                    id="edit-usercert"
+                    type="dataURL"
+                    filename={certFilename}
+                    filenamePlaceholder="Drag and drop or upload a certificate"
+                    browseButtonText="Upload"
+                    hideDefaultPreview
+                    onFileInputChange={onCertSelected}
+                    onClearClick={clearCert}
+                    dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
+                    filenameAriaLabel="Certificate file name"
+                  />
+                  {certError && (
+                    <HelperText>
+                      <HelperTextItem variant="error">{certError}</HelperTextItem>
+                    </HelperText>
+                  )}
+                  {certBytes(edit.UserX_bin) && !certError && (
+                    <Button
+                      variant="link"
+                      isInline
+                      style={{ marginBlockStart: 'var(--pf-t--global--spacer--sm)' }}
+                      onClick={() => setCertOpen(true)}
+                    >
+                      View registered certificate
+                    </Button>
+                  )}
+                </FormGroup>
               )}
               {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.RootCert && (
                 <FormGroup label="Common name (CN)" fieldId="edit-cn">
@@ -459,6 +529,12 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </Button>
         </ModalFooter>
       </Modal>
+
+      <CertificateModal
+        certBin={edit ? certBytes(edit.UserX_bin) : null}
+        isOpen={certOpen}
+        onClose={() => setCertOpen(false)}
+      />
     </Flex>
   );
 };

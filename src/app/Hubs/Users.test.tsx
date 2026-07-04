@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Users } from './Users';
 import { api } from '@app/utils/vpnrpc_settings';
+import { SELF_SIGNED_CERT_DER } from '@app/utils/x509.fixture';
 
 vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: {
@@ -140,6 +141,60 @@ describe('Users', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(setUser.mock.calls[0][0].Auth_Password_str).toBe('newpass');
+  });
+
+  it('shows the registered certificate for a user-certificate user', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({
+      HubName_str: 'DEFAULT',
+      Name_str: 'alice',
+      AuthType_u32: 2, // UserCert
+      UserX_bin: SELF_SIGNED_CERT_DER(),
+    });
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'View registered certificate' }));
+
+    expect(await screen.findByText('Certificate: test.example.com')).toBeInTheDocument();
+  });
+
+  it('uploads a certificate and sends its bytes on save', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({
+      HubName_str: 'DEFAULT',
+      Name_str: 'alice',
+      AuthType_u32: 2, // UserCert, none registered yet
+      UserX_bin: new Uint8Array(),
+    });
+    setUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('button', { name: 'View registered certificate' })).not.toBeInTheDocument();
+
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([SELF_SIGNED_CERT_DER()], 'user.cer', { type: 'application/x-x509-ca-cert' });
+    await user.upload(fileInput, file);
+
+    // parse succeeded: the view button appears once bytes are staged
+    expect(await within(dialog).findByRole('button', { name: 'View registered certificate' })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    const sent = setUser.mock.calls[0][0];
+    expect(sent.UserX_bin).toBeInstanceOf(Uint8Array);
+    expect(sent.UserX_bin.length).toBeGreaterThan(0);
   });
 
   it('deletes a user after confirmation', async () => {
