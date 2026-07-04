@@ -35,6 +35,21 @@ describe('Radius', () => {
     expect(getHubRadius.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
   });
 
+  it('shows SoftEther default port and retry when unconfigured (0)', async () => {
+    getHubRadius.mockResolvedValue({
+      RadiusServerName_str: '',
+      RadiusPort_u32: 0,
+      RadiusSecret_str: '',
+      RadiusRetryInterval_u32: 0,
+    });
+
+    render(<Radius hub="DEFAULT" />);
+
+    // 0 from the server must not surface as the field value
+    expect(await screen.findByLabelText('Port')).toHaveValue(1812);
+    expect(screen.getByLabelText('Retry interval (ms)')).toHaveValue(1000);
+  });
+
   it('saves the server and keeps the secret when blank', async () => {
     getHubRadius.mockResolvedValue({ ...radius });
     setHubRadius.mockResolvedValue({});

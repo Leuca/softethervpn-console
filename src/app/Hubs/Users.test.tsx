@@ -77,6 +77,8 @@ describe('Users', () => {
       Name_str: 'bob',
       AuthType_u32: 0, // Anonymous
     });
+    // new accounts must not expire: ExpireTime is the epoch-era "never" sentinel
+    expect(new Date(createUser.mock.calls[0][0].ExpireTime_dt).getUTCFullYear()).toBeLessThanOrEqual(1970);
   });
 
   it('reveals the password field and sends the password for password auth', async () => {

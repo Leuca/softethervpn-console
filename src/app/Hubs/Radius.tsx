@@ -17,6 +17,11 @@ import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 
+// SoftEther's defaults (Radius.h), shown when RADIUS is unconfigured, matching
+// the native Server Manager dialog.
+const DEFAULT_PORT = 1812;
+const DEFAULT_RETRY_INTERVAL = 1000;
+
 const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the full GetHubRadius response, plus an optional new secret.
   const [config, setConfig] = React.useState<Record<string, unknown> | null>(null);
@@ -30,7 +35,18 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setNewSecret('');
     api
       .GetHubRadius(new VPN.VpnRpcRadius({ HubName_str: hub }))
-      .then((response) => setConfig(response as unknown as Record<string, unknown>))
+      .then((response) => {
+        const r = response as unknown as Record<string, unknown>;
+        // Port/retry come back as 0 when unconfigured; fall back to SoftEther's
+        // defaults so the form shows (and saves) sensible values.
+        if (!r.RadiusPort_u32) {
+          r.RadiusPort_u32 = DEFAULT_PORT;
+        }
+        if (!r.RadiusRetryInterval_u32) {
+          r.RadiusRetryInterval_u32 = DEFAULT_RETRY_INTERVAL;
+        }
+        setConfig(r);
+      })
       .catch((e) => setError(String(e)));
   }, [hub]);
 
@@ -120,7 +136,7 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               id="radius-port"
               min={1}
               max={65535}
-              value={String(config.RadiusPort_u32 ?? 1812)}
+              value={String(config.RadiusPort_u32 ?? DEFAULT_PORT)}
               onChange={(_event, value) => setField('RadiusPort_u32', Number(value) || 0)}
               aria-label="Port"
             />
@@ -140,7 +156,7 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               type="number"
               id="radius-retry"
               min={0}
-              value={String(config.RadiusRetryInterval_u32 ?? 0)}
+              value={String(config.RadiusRetryInterval_u32 ?? DEFAULT_RETRY_INTERVAL)}
               onChange={(_event, value) => setField('RadiusRetryInterval_u32', Number(value) || 0)}
               aria-label="Retry interval (ms)"
             />

@@ -115,6 +115,9 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           Auth_Password_str: authType === VPN.VpnRpcUserAuthType.Password ? password : '',
           Realname_utf: realname,
           Note_utf: note,
+          // The constructor defaults ExpireTime_dt to now; use the epoch-era
+          // "never" sentinel so new accounts do not expire immediately.
+          ExpireTime_dt: new Date(0),
         }),
       )
       .then(() => {
