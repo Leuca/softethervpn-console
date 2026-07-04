@@ -16,6 +16,7 @@ import { Users } from '@app/Hubs/Users';
 import { Groups } from '@app/Hubs/Groups';
 import { AccessList } from '@app/Hubs/AccessList';
 import { Properties } from '@app/Hubs/Properties';
+import { Radius } from '@app/Hubs/Radius';
 
 const ComingSoon: React.FunctionComponent<{ what: string }> = ({ what }) => (
   <EmptyState titleText={`${what} coming soon`} headingLevel="h2" icon={WrenchIcon}>
@@ -60,7 +61,7 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
             <ComingSoon what="Security Policy" />
           </Tab>
           <Tab eventKey="radius" title={<TabTitleText>RADIUS</TabTitleText>}>
-            <ComingSoon what="RADIUS" />
+            <Radius hub={name} />
           </Tab>
         </Tabs>
       </AppPage>
