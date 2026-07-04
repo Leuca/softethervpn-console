@@ -22,6 +22,10 @@ import { api } from '@app/utils/vpnrpc_settings';
 const DEFAULT_PORT = 1812;
 const DEFAULT_RETRY_INTERVAL = 1000;
 
+// Accepted retry interval range, in milliseconds.
+const MIN_RETRY_INTERVAL = 500;
+const MAX_RETRY_INTERVAL = 10000;
+
 const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the full GetHubRadius response, plus an optional new secret.
   const [config, setConfig] = React.useState<Record<string, unknown> | null>(null);
@@ -86,6 +90,9 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   const isLoading = config === null && error === null;
 
+  const retry = config ? Number(config.RadiusRetryInterval_u32 ?? DEFAULT_RETRY_INTERVAL) : DEFAULT_RETRY_INTERVAL;
+  const retryValid = retry >= MIN_RETRY_INTERVAL && retry <= MAX_RETRY_INTERVAL;
+
   return (
     <Flex
       direction={{ default: 'column' }}
@@ -99,7 +106,12 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </Button>
         </FlexItem>
         <FlexItem>
-          <Button variant="primary" onClick={save} isDisabled={config === null || saving} isLoading={saving}>
+          <Button
+            variant="primary"
+            onClick={save}
+            isDisabled={config === null || saving || !retryValid}
+            isLoading={saving}
+          >
             Save
           </Button>
         </FlexItem>
@@ -155,11 +167,22 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             <TextInput
               type="number"
               id="radius-retry"
-              min={0}
+              min={MIN_RETRY_INTERVAL}
+              max={MAX_RETRY_INTERVAL}
               value={String(config.RadiusRetryInterval_u32 ?? DEFAULT_RETRY_INTERVAL)}
               onChange={(_event, value) => setField('RadiusRetryInterval_u32', Number(value) || 0)}
+              validated={retryValid ? 'default' : 'error'}
               aria-label="Retry interval (ms)"
             />
+            {!retryValid && (
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant="error">
+                    Enter a value between {MIN_RETRY_INTERVAL} and {MAX_RETRY_INTERVAL} milliseconds.
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            )}
           </FormGroup>
         </Form>
       ) : null}

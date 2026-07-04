@@ -83,6 +83,24 @@ describe('Radius', () => {
     expect(sent.RadiusServerName_str).toBe('');
   });
 
+  it('rejects a retry interval outside 500-10000 ms and blocks saving', async () => {
+    getHubRadius.mockResolvedValue({ ...radius });
+    const user = userEvent.setup();
+
+    render(<Radius hub="DEFAULT" />);
+    const retry = await screen.findByLabelText('Retry interval (ms)');
+
+    await user.clear(retry);
+    await user.type(retry, '100'); // below the minimum
+    expect(screen.getByText(/between 500 and 10000 milliseconds/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    await user.clear(retry);
+    await user.type(retry, '2000'); // valid
+    expect(screen.queryByText(/between 500 and 10000 milliseconds/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
   it('sends a new secret when one is entered', async () => {
     getHubRadius.mockResolvedValue({ ...radius });
     setHubRadius.mockResolvedValue({});
