@@ -14,6 +14,7 @@ import { AppPage } from '@app/components/AppPage';
 import { HubStatus } from '@app/Hubs/HubStatus';
 import { Users } from '@app/Hubs/Users';
 import { Groups } from '@app/Hubs/Groups';
+import { AccessList } from '@app/Hubs/AccessList';
 
 const ComingSoon: React.FunctionComponent<{ what: string }> = ({ what }) => (
   <EmptyState titleText={`${what} coming soon`} headingLevel="h2" icon={WrenchIcon}>
@@ -52,7 +53,7 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
             <Groups hub={name} />
           </Tab>
           <Tab eventKey="accesslist" title={<TabTitleText>Access List</TabTitleText>}>
-            <ComingSoon what="Access List" />
+            <AccessList hub={name} />
           </Tab>
           <Tab eventKey="securitypolicy" title={<TabTitleText>Security Policy</TabTitleText>}>
             <ComingSoon what="Security Policy" />
