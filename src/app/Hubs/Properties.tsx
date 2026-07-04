@@ -49,6 +49,7 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     // Keep the current password unless a new one is entered (GetHub never
     // returns it; the constructor would otherwise send an empty one).
     const obj = new VPN.VpnRpcCreateHub(config as Partial<VPN.VpnRpcCreateHub>);
+    obj.HubName_str = hub; // ensure the save targets this hub even if GetHub omits it
     if (newPassword) {
       obj.AdminPasswordPlainText_str = newPassword;
     } else {

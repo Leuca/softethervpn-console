@@ -12,8 +12,8 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
 const getHub = api.GetHub as unknown as Mock;
 const setHub = api.SetHub as unknown as Mock;
 
+// GetHub is not relied on to echo HubName_str; the save sets it from the prop.
 const hubConfig = {
-  HubName_str: 'DEFAULT',
   Online_bool: true,
   HubType_u32: 0,
   MaxSession_u32: 0,
@@ -46,6 +46,7 @@ describe('Properties', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     const sent = setHub.mock.calls[0][0];
+    expect(sent.HubName_str).toBe('DEFAULT');
     expect(sent.MaxSession_u32).toBe(5);
     // whole object round-tripped so online/type survive
     expect(sent.HubType_u32).toBe(0);

@@ -70,7 +70,8 @@ describe('Groups', () => {
 
   it('edits a group name-less (real name / note) and saves', async () => {
     enumGroup.mockResolvedValue({ GroupList: [sales] });
-    getGroup.mockResolvedValue({ HubName_str: 'DEFAULT', Name_str: 'sales', Realname_utf: 'Sales team', Note_utf: '' });
+    // GetGroup may not echo HubName_str; the save must still target the hub.
+    getGroup.mockResolvedValue({ Name_str: 'sales', Realname_utf: 'Sales team', Note_utf: '' });
     setGroup.mockResolvedValue({});
     const user = userEvent.setup();
 
@@ -84,7 +85,7 @@ describe('Groups', () => {
     await user.type(note, 'EMEA');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-    expect(setGroup.mock.calls[0][0]).toMatchObject({ Name_str: 'sales', Note_utf: 'EMEA' });
+    expect(setGroup.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Name_str: 'sales', Note_utf: 'EMEA' });
   });
 
   it('deletes a group after confirmation', async () => {

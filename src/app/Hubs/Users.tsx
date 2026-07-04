@@ -173,6 +173,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     // password only when changing it - otherwise delete the key so it is not
     // serialized and the server keeps the current password.
     const obj = new VPN.VpnRpcSetUser(edit as Partial<VPN.VpnRpcSetUser>);
+    obj.HubName_str = hub; // ensure the save targets this hub even if GetUser omits it
     if (Number(obj.AuthType_u32) === VPN.VpnRpcUserAuthType.Password && newPassword) {
       obj.Auth_Password_str = newPassword;
     } else {

@@ -45,9 +45,12 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       return;
     }
     setSaving(true);
+    const obj = new VPN.VpnRpcRadius(config as Partial<VPN.VpnRpcRadius>);
+    // GetHubRadius does not echo the hub name back, so set it explicitly or
+    // SetHubRadius targets no hub and the change is silently lost.
+    obj.HubName_str = hub;
     // Keep the current secret unless a new one is entered (GetHubRadius does not
     // return it; the constructor would otherwise send an empty one).
-    const obj = new VPN.VpnRpcRadius(config as Partial<VPN.VpnRpcRadius>);
     if (newSecret) {
       obj.RadiusSecret_str = newSecret;
     } else {

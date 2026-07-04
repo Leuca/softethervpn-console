@@ -103,7 +103,8 @@ describe('Users', () => {
 
   it('edits a user and keeps the password when the field is blank', async () => {
     enumUser.mockResolvedValue({ UserList: [alice] });
-    getUser.mockResolvedValue({ HubName_str: 'DEFAULT', Name_str: 'alice', Realname_utf: 'Alice A', AuthType_u32: 1 });
+    // GetUser may not echo HubName_str; the save must still target the hub.
+    getUser.mockResolvedValue({ Name_str: 'alice', Realname_utf: 'Alice A', AuthType_u32: 1 });
     setUser.mockResolvedValue({});
     const user = userEvent.setup();
 
@@ -120,6 +121,7 @@ describe('Users', () => {
 
     expect(setUser).toHaveBeenCalledOnce();
     const sent = setUser.mock.calls[0][0];
+    expect(sent.HubName_str).toBe('DEFAULT');
     expect(sent.Realname_utf).toBe('Alice B');
     // password left blank -> key omitted so the server keeps the current one
     expect(Object.prototype.hasOwnProperty.call(sent, 'Auth_Password_str')).toBe(false);

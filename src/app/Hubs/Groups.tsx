@@ -86,8 +86,10 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     if (!edit) {
       return;
     }
+    const obj = new VPN.VpnRpcSetGroup(edit as Partial<VPN.VpnRpcSetGroup>);
+    obj.HubName_str = hub; // ensure the save targets this hub even if GetGroup omits it
     api
-      .SetGroup(new VPN.VpnRpcSetGroup(edit as Partial<VPN.VpnRpcSetGroup>))
+      .SetGroup(obj)
       .then(() => {
         setEdit(null);
         load();

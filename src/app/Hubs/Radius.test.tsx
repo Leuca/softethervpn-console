@@ -12,8 +12,8 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
 const getHubRadius = api.GetHubRadius as unknown as Mock;
 const setHubRadius = api.SetHubRadius as unknown as Mock;
 
+// GetHubRadius does not echo HubName_str back in its response.
 const radius = {
-  HubName_str: 'DEFAULT',
   RadiusServerName_str: 'radius.example.com',
   RadiusPort_u32: 1812,
   RadiusSecret_str: '',
@@ -47,8 +47,25 @@ describe('Radius', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     const sent = setHubRadius.mock.calls[0][0];
+    // the hub name must be set on the payload or SetHubRadius targets no hub
+    expect(sent.HubName_str).toBe('DEFAULT');
     expect(sent.RadiusServerName_str).toBe('auth.corp.net');
     expect(Object.prototype.hasOwnProperty.call(sent, 'RadiusSecret_str')).toBe(false);
+  });
+
+  it('disables RADIUS by clearing the server and still targets the hub', async () => {
+    getHubRadius.mockResolvedValue({ ...radius });
+    setHubRadius.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Radius hub="DEFAULT" />);
+    const server = await screen.findByLabelText('RADIUS server');
+    await user.clear(server);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const sent = setHubRadius.mock.calls[0][0];
+    expect(sent.HubName_str).toBe('DEFAULT');
+    expect(sent.RadiusServerName_str).toBe('');
   });
 
   it('sends a new secret when one is entered', async () => {
