@@ -103,11 +103,15 @@ body,
   z-index: var(--pf-t--global--z-index--md);
 }
 
-/* PatternFly insets the main content container on the left and right (its
-   inline margins are the page inset) but leaves the top margin at 0, so the
-   content panel is flush against the masthead. Match the top margin to the
-   same inset so the gap is equal on top, left and right. The bottom is left
-   flush on purpose: the panel fills down to the window edge. */
-.pf-v6-c-page__main-container {
-  --pf-v6-c-page__main-container--MarginBlockStart: var(--pf-v6-c-page--inset);
+/* PatternFly's floating content panel (inset margins, border radius) only
+   applies at the xl breakpoint (75rem); below it the panel is flush edge to
+   edge. PatternFly insets the panel left and right there but leaves the top
+   margin at 0, so match the top margin to the same inset for an equal gap on
+   top, left and right. Gate it to the same breakpoint: on narrower viewports
+   the horizontal insets collapse to 0, so a top inset would leave an orphaned
+   grey strip under the masthead. The bottom stays flush on purpose. */
+@media screen and (min-width: 75rem) {
+  .pf-v6-c-page__main-container {
+    --pf-v6-c-page__main-container--MarginBlockStart: var(--pf-v6-c-page--inset);
+  }
 }

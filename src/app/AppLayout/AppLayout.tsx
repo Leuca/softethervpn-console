@@ -40,7 +40,11 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   // running - that's what feeds the responsive breakpoint and mobile-overlay
   // behaviour; dropping it (as an earlier attempt did) breaks both the desktop
   // collapse and the mobile toggle.
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  // Start open only where the sidebar docks (the PatternFly xl breakpoint,
+  // 1200px); on narrower viewports it overlays the content, so start closed.
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1200,
+  );
 
   React.useEffect(() => {
     const handleClick = (event: MouseEvent) => {

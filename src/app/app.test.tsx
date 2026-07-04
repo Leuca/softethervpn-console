@@ -21,11 +21,14 @@ vi.mock('@app/utils/vpnrpc_settings', () => {
 });
 
 // PatternFly decides mobile vs desktop from the page element's clientWidth,
-// which jsdom reports as 0 (-> "mobile"). Stub a desktop width for the duration
-// of a test so the sidebar starts open and we exercise the desktop path.
+// which jsdom reports as 0 (-> "mobile"); the layout also seeds the initial
+// sidebar state from window.innerWidth. Stub a desktop width for both for the
+// duration of a test so the sidebar starts open and we exercise the desktop path.
 async function withDesktopWidth(fn: () => Promise<void>) {
   const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalInner = window.innerWidth;
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 1920 });
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1920 });
   try {
     await fn();
   } finally {
@@ -34,6 +37,7 @@ async function withDesktopWidth(fn: () => Promise<void>) {
     } else {
       delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth;
     }
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInner });
   }
 }
 
