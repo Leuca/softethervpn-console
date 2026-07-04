@@ -1,3 +1,21 @@
+// The vpnrpc client parses responses with plain JSON.parse, so binary (`*_bin`)
+// fields arrive as base64 strings rather than the Uint8Array their TS types
+// claim. Values we set locally (e.g. an uploaded certificate) are already
+// Uint8Array. Normalize either form to bytes, or null when empty/unreadable.
+export const binToBytes = (value: unknown): Uint8Array | null => {
+  if (value instanceof Uint8Array) {
+    return value.length > 0 ? value : null;
+  }
+  if (typeof value === 'string' && value.length > 0) {
+    try {
+      return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
 export const b64toBlob = (b64Data: string, contentType = '', sliceSize = 512) => {
   const byteCharacters = atob(b64Data);
   const byteArrays: Uint8Array[] = [];

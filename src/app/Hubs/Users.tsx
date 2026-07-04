@@ -31,12 +31,9 @@ import { BanIcon, PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
+import { binToBytes } from '@app/utils/blob_utils';
 import { formatOptionalDate, userAuthTypeLabel } from '@app/utils/format';
 import { parseCertificate } from '@app/utils/x509';
-
-// A UserCert user's registered certificate (DER or PEM-text bytes), if any.
-const certBytes = (value: unknown): Uint8Array | null =>
-  value instanceof Uint8Array && value.length > 0 ? value : null;
 
 // Auth types offered when creating a user; the rest need extra config, set on edit.
 const CREATABLE_AUTH_TYPES = [
@@ -180,6 +177,15 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       obj.Auth_Password_str = newPassword;
     } else {
       delete (obj as { Auth_Password_str?: string }).Auth_Password_str;
+    }
+    // UserX_bin arrives from GetUser as a base64 string; the client base64-
+    // encodes _bin fields on send, so hand it real bytes to avoid double
+    // encoding (and drop it entirely when there is no certificate to keep).
+    const certBin = binToBytes(edit.UserX_bin);
+    if (Number(obj.AuthType_u32) === VPN.VpnRpcUserAuthType.UserCert && certBin) {
+      obj.UserX_bin = certBin;
+    } else {
+      delete (obj as { UserX_bin?: Uint8Array }).UserX_bin;
     }
     api
       .SetUser(obj)
@@ -436,7 +442,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                       <HelperTextItem variant="error">{certError}</HelperTextItem>
                     </HelperText>
                   )}
-                  {certBytes(edit.UserX_bin) && !certError && (
+                  {binToBytes(edit.UserX_bin) && !certError && (
                     <Button
                       variant="link"
                       isInline
@@ -531,7 +537,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Modal>
 
       <CertificateModal
-        certBin={edit ? certBytes(edit.UserX_bin) : null}
+        certBin={edit ? (edit.UserX_bin as Uint8Array | string | undefined) ?? null : null}
         isOpen={certOpen}
         onClose={() => setCertOpen(false)}
       />

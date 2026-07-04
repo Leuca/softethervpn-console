@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Users } from './Users';
 import { api } from '@app/utils/vpnrpc_settings';
-import { SELF_SIGNED_CERT_DER } from '@app/utils/x509.fixture';
+import { SELF_SIGNED_CERT_B64, SELF_SIGNED_CERT_DER } from '@app/utils/x509.fixture';
 
 vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: {
@@ -149,7 +149,7 @@ describe('Users', () => {
       HubName_str: 'DEFAULT',
       Name_str: 'alice',
       AuthType_u32: 2, // UserCert
-      UserX_bin: SELF_SIGNED_CERT_DER(),
+      UserX_bin: SELF_SIGNED_CERT_B64, // RPC returns _bin fields as base64 strings
     });
     const user = userEvent.setup();
 
@@ -162,6 +162,32 @@ describe('Users', () => {
     await user.click(within(dialog).getByRole('button', { name: 'View registered certificate' }));
 
     expect(await screen.findByText('Certificate: test.example.com')).toBeInTheDocument();
+  });
+
+  it('keeps the existing certificate as bytes when saving without re-upload', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({
+      HubName_str: 'DEFAULT',
+      Name_str: 'alice',
+      AuthType_u32: 2, // UserCert
+      UserX_bin: SELF_SIGNED_CERT_B64,
+    });
+    setUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    // Sent as decoded bytes, not the base64 string (which the client would
+    // otherwise base64-encode a second time and corrupt).
+    const sent = setUser.mock.calls[0][0];
+    expect(sent.UserX_bin).toBeInstanceOf(Uint8Array);
+    expect(sent.UserX_bin.length).toBe(SELF_SIGNED_CERT_DER().length);
   });
 
   it('uploads a certificate and sends its bytes on save', async () => {

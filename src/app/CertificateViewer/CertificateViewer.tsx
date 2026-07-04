@@ -15,12 +15,15 @@ import {
   Stack,
   StackItem,
 } from '@patternfly/react-core';
-import { downloadBlob } from '@app/utils/blob_utils';
+import { binToBytes, downloadBlob } from '@app/utils/blob_utils';
 import { type CertificateName, type ParsedCertificate, parseCertificate } from '@app/utils/x509';
 
 interface CertificateModalProps {
-  /** DER-encoded certificate, or null while none is selected. */
-  certBin: Uint8Array | null;
+  /**
+   * The certificate as returned by the RPC API (a base64 string) or staged
+   * locally (Uint8Array), DER or PEM; null while none is selected.
+   */
+  certBin: Uint8Array | string | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -65,16 +68,17 @@ const HexBlock: React.FunctionComponent<{ children: React.ReactNode }> = ({ chil
  * the pages that expose a certificate (cluster member server cert, user certs).
  */
 const CertificateModal: React.FunctionComponent<CertificateModalProps> = ({ certBin, isOpen, onClose }) => {
+  const bytes = React.useMemo(() => binToBytes(certBin), [certBin]);
   const parsed = React.useMemo<ParsedCertificate | null>(() => {
-    if (!certBin) {
+    if (!bytes) {
       return null;
     }
     try {
-      return parseCertificate(certBin);
+      return parseCertificate(bytes);
     } catch {
       return null;
     }
-  }, [certBin]);
+  }, [bytes]);
 
   const download = () => {
     if (!parsed) {
@@ -90,7 +94,7 @@ const CertificateModal: React.FunctionComponent<CertificateModalProps> = ({ cert
     <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={onClose}>
       <ModalHeader title={title} />
       <ModalBody>
-        {certBin && parsed === null ? (
+        {bytes !== null && parsed === null ? (
           <Alert variant="danger" title="Could not read certificate" isInline>
             The certificate could not be parsed.
           </Alert>

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClusteringStatus } from './ClusteringStatus';
 import { api } from '@app/utils/vpnrpc_settings';
-import { SELF_SIGNED_CERT_DER } from '@app/utils/x509.fixture';
+import { SELF_SIGNED_CERT_B64 } from '@app/utils/x509.fixture';
 
 vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: {
@@ -74,7 +74,7 @@ describe('ClusteringStatus', () => {
     getFarmInfo.mockResolvedValue({
       Id_u32: 42,
       Point_u32: 55,
-      ServerCert_bin: SELF_SIGNED_CERT_DER(),
+      ServerCert_bin: SELF_SIGNED_CERT_B64, // RPC returns _bin fields as base64 strings
       HubsList: [{ HubName_str: 'DEFAULT', DynamicHub_bool: true }],
     });
     const user = userEvent.setup();

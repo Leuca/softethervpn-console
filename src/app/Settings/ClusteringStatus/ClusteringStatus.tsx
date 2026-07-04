@@ -24,6 +24,7 @@ import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { KeyValueTable } from '@app/components/KeyValueTable';
+import { binToBytes } from '@app/utils/blob_utils';
 import { formatOptionalDate } from '@app/utils/format';
 
 // Fields rendered outside the flat KeyValueTable (binary cert, or nested lists).
@@ -33,7 +34,8 @@ interface MemberDetail {
   hostname: string;
   info: Record<string, unknown> | null; // null while loading
   hubs: VPN.VpnRpcFarmHub[];
-  cert: Uint8Array | null;
+  // The server cert as returned by the API (base64 string), normalized on use.
+  cert: Uint8Array | string | null;
   error: string | null;
 }
 
@@ -167,7 +169,7 @@ const ControllerView: React.FunctionComponent = () => {
                 </StackItem>
               )}
               <StackItem>
-                <Button variant="secondary" onClick={() => setCertOpen(true)} isDisabled={detail.cert === null}>
+                <Button variant="secondary" onClick={() => setCertOpen(true)} isDisabled={binToBytes(detail.cert) === null}>
                   View server certificate
                 </Button>
               </StackItem>
