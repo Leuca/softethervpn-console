@@ -88,6 +88,38 @@ describe('Groups', () => {
     expect(setGroup.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Name_str: 'sales', Note_utf: 'EMEA' });
   });
 
+  it('edits the security policy and sends it with the group on save', async () => {
+    enumGroup.mockResolvedValue({ GroupList: [sales] });
+    getGroup.mockResolvedValue({
+      Name_str: 'sales',
+      Realname_utf: '',
+      Note_utf: '',
+      UsePolicy_bool: false,
+      'policy:Access_bool': true,
+      'policy:NoRouting_bool': false,
+    });
+    setGroup.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Groups hub="DEFAULT" />);
+    await screen.findByText('sales');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    await user.click(await screen.findByRole('button', { name: 'Add security policy' }));
+    expect(await screen.findByText('Security policy: sales')).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: /apply a security policy/i }));
+    await user.click(screen.getByRole('switch', { name: 'Deny routing operation (IPv4)' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const sent = setGroup.mock.calls[0][0];
+    expect(sent.HubName_str).toBe('DEFAULT');
+    expect(sent.UsePolicy_bool).toBe(true);
+    expect(sent['policy:NoRouting_bool']).toBe(true);
+  });
+
   it('deletes a group after confirmation', async () => {
     enumGroup.mockResolvedValue({ GroupList: [sales] });
     deleteGroup.mockResolvedValue({});

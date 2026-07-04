@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HubDetail } from './HubDetail';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -29,8 +28,7 @@ describe('HubDetail', () => {
     expect(getHubStatus.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
   });
 
-  it('switches to another tab showing its placeholder', async () => {
-    const user = userEvent.setup();
+  it('shows the ported management tabs and no placeholder Security Policy tab', async () => {
     render(
       <MemoryRouter>
         <HubDetail name="DEFAULT" />
@@ -38,8 +36,11 @@ describe('HubDetail', () => {
     );
     await screen.findByText('Standalone');
 
-    await user.click(screen.getByRole('tab', { name: 'Security Policy' }));
-
-    expect(await screen.findByText('Security Policy coming soon')).toBeInTheDocument();
+    for (const name of ['Status', 'Properties', 'Users', 'Groups', 'Access List', 'RADIUS']) {
+      expect(screen.getByRole('tab', { name })).toBeInTheDocument();
+    }
+    // Security policy is edited per user/group, not at the hub level, so there
+    // is no hub Security Policy tab.
+    expect(screen.queryByRole('tab', { name: 'Security Policy' })).not.toBeInTheDocument();
   });
 });

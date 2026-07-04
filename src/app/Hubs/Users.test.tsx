@@ -227,6 +227,37 @@ describe('Users', () => {
     expect(sent.UserX_bin.length).toBeGreaterThan(0);
   });
 
+  it('edits the security policy and sends it with the user on save', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({
+      Name_str: 'alice',
+      AuthType_u32: 1,
+      UsePolicy_bool: false,
+      'policy:Access_bool': true,
+      'policy:NoBridge_bool': false,
+    });
+    setUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    await user.click(await screen.findByRole('button', { name: 'Add security policy' }));
+    expect(await screen.findByText('Security policy: alice')).toBeInTheDocument();
+    await user.click(await screen.findByRole('switch', { name: /apply a security policy/i }));
+    await user.click(screen.getByRole('switch', { name: 'Deny bridge operation' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const sent = setUser.mock.calls[0][0];
+    expect(sent.UsePolicy_bool).toBe(true);
+    expect(sent['policy:NoBridge_bool']).toBe(true);
+    expect(sent['policy:Access_bool']).toBe(true);
+  });
+
   it('deletes a user after confirmation', async () => {
     enumUser.mockResolvedValue({ UserList: [alice] });
     deleteUser.mockResolvedValue({});

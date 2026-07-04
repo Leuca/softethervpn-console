@@ -31,6 +31,7 @@ import { BanIcon, PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
+import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 import { binToBytes } from '@app/utils/blob_utils';
 import { formatOptionalDate, userAuthTypeLabel } from '@app/utils/format';
 import { parseCertificate } from '@app/utils/x509';
@@ -80,6 +81,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [certOpen, setCertOpen] = React.useState(false);
   const [certFilename, setCertFilename] = React.useState('');
   const [certError, setCertError] = React.useState<string | null>(null);
+  const [policyOpen, setPolicyOpen] = React.useState(false);
 
   const load = React.useCallback(() => {
     setUsers(null);
@@ -368,7 +370,14 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Modal>
 
       {/* Edit user */}
-      <Modal variant={ModalVariant.medium} isOpen={edit !== null} onClose={() => setEdit(null)}>
+      {/* Step aside while a sub-modal (certificate / policy) is open so only one
+          modal is active at a time - stacked modals hide each other from screen
+          readers. The edit state is preserved, so it reappears on return. */}
+      <Modal
+        variant={ModalVariant.medium}
+        isOpen={edit !== null && !certOpen && !policyOpen}
+        onClose={() => setEdit(null)}
+      >
         <ModalHeader title={edit ? `Edit ${String(edit.Name_str)}` : ''} />
         <ModalBody>
           {edit && (
@@ -488,6 +497,11 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   />
                 </FormGroup>
               )}
+              <FormGroup label="Security policy" fieldId="edit-policy">
+                <Button variant="secondary" onClick={() => setPolicyOpen(true)}>
+                  {edit.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
+                </Button>
+              </FormGroup>
               <FormGroup fieldId="edit-expires">
                 <Checkbox
                   id="edit-expires"
@@ -544,6 +558,17 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         certBin={edit ? (edit.UserX_bin as Uint8Array | string | undefined) ?? null : null}
         isOpen={certOpen}
         onClose={() => setCertOpen(false)}
+      />
+
+      <SecurityPolicyModal
+        title={edit ? `Security policy: ${String(edit.Name_str ?? '')}` : 'Security policy'}
+        subject={edit}
+        isOpen={policyOpen}
+        onClose={() => setPolicyOpen(false)}
+        onSave={(updated) => {
+          setEdit(updated);
+          setPolicyOpen(false);
+        }}
       />
     </Flex>
   );

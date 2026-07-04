@@ -24,6 +24,7 @@ import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/reac
 import { BanIcon, PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
+import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 
 const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [groups, setGroups] = React.useState<VPN.VpnRpcEnumGroupItem[] | null>(null);
@@ -36,6 +37,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   // Working copy of the group being edited (the full GetGroup response).
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
+  const [policyOpen, setPolicyOpen] = React.useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
@@ -236,7 +238,9 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Modal>
 
       {/* Edit group */}
-      <Modal variant={ModalVariant.small} isOpen={edit !== null} onClose={() => setEdit(null)}>
+      {/* Step aside while the policy sub-modal is open (stacked modals hide each
+          other from screen readers); the edit state is preserved on return. */}
+      <Modal variant={ModalVariant.small} isOpen={edit !== null && !policyOpen} onClose={() => setEdit(null)}>
         <ModalHeader title={edit ? `Edit ${String(edit.Name_str)}` : ''} />
         <ModalBody>
           {edit && (
@@ -256,6 +260,11 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   onChange={(_event, value) => setEditField('Note_utf', value)}
                   aria-label="Note"
                 />
+              </FormGroup>
+              <FormGroup label="Security policy" fieldId="edit-group-policy">
+                <Button variant="secondary" onClick={() => setPolicyOpen(true)}>
+                  {edit.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
+                </Button>
               </FormGroup>
             </Form>
           )}
@@ -286,6 +295,17 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </Button>
         </ModalFooter>
       </Modal>
+
+      <SecurityPolicyModal
+        title={edit ? `Security policy: ${String(edit.Name_str ?? '')}` : 'Security policy'}
+        subject={edit}
+        isOpen={policyOpen}
+        onClose={() => setPolicyOpen(false)}
+        onSave={(updated) => {
+          setEdit(updated);
+          setPolicyOpen(false);
+        }}
+      />
     </Flex>
   );
 };

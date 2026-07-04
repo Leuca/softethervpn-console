@@ -1,15 +1,6 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  EmptyState,
-  EmptyStateBody,
-  Tab,
-  TabTitleText,
-  Tabs,
-} from '@patternfly/react-core';
-import { WrenchIcon } from '@patternfly/react-icons';
+import { Breadcrumb, BreadcrumbItem, Tab, TabTitleText, Tabs } from '@patternfly/react-core';
 import { AppPage } from '@app/components/AppPage';
 import { HubStatus } from '@app/Hubs/HubStatus';
 import { Users } from '@app/Hubs/Users';
@@ -18,15 +9,8 @@ import { AccessList } from '@app/Hubs/AccessList';
 import { Properties } from '@app/Hubs/Properties';
 import { Radius } from '@app/Hubs/Radius';
 
-const ComingSoon: React.FunctionComponent<{ what: string }> = ({ what }) => (
-  <EmptyState titleText={`${what} coming soon`} headingLevel="h2" icon={WrenchIcon}>
-    <EmptyStateBody>This view is still being ported. See PORTING.md for progress.</EmptyStateBody>
-  </EmptyState>
-);
-
 /**
- * Management views for a single Virtual Hub, laid out as tabs. Status is ported;
- * the remaining tabs are placeholders until their views land (see PORTING.md).
+ * Management views for a single Virtual Hub, laid out as tabs.
  */
 const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
   const navigate = useNavigate();
@@ -56,9 +40,6 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
           </Tab>
           <Tab eventKey="accesslist" title={<TabTitleText>Access List</TabTitleText>}>
             <AccessList hub={name} />
-          </Tab>
-          <Tab eventKey="securitypolicy" title={<TabTitleText>Security Policy</TabTitleText>}>
-            <ComingSoon what="Security Policy" />
           </Tab>
           <Tab eventKey="radius" title={<TabTitleText>RADIUS</TabTitleText>}>
             <Radius hub={name} />
