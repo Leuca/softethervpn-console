@@ -44,6 +44,10 @@ const isValidHostname = (value: string): boolean => value.length >= MIN_HOSTNAME
 // shows only the leading summary.
 const errorSummary = (value: string): string => value.split('.')[0];
 
+// Some builds advertise the DDNS proxy capability but reject the proxy RPCs
+// with error code 33 (Unsupported); handled as an informational note.
+const isUnsupportedError = (error: string): boolean => /code[=\s]*33\b/i.test(error) || /unsupported/i.test(error);
+
 // This server's connection to the SoftEther DDNS service, plus a change form.
 const DdnsSection: React.FunctionComponent = () => {
   const [status, setStatus] = React.useState<VPN.VpnDDnsClientStatus | null>(null);
@@ -209,6 +213,7 @@ const DdnsSection: React.FunctionComponent = () => {
 const ProxySection: React.FunctionComponent = () => {
   const [loaded, setLoaded] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [unsupported, setUnsupported] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [proxyType, setProxyType] = React.useState<number>(VPN.VpnRpcProxyType.Direct);
   const [host, setHost] = React.useState('');
@@ -219,6 +224,7 @@ const ProxySection: React.FunctionComponent = () => {
   const load = React.useCallback(() => {
     setLoaded(false);
     setError(null);
+    setUnsupported(false);
     api
       .GetDDnsInternetSettng()
       .then((response) => {
@@ -229,7 +235,13 @@ const ProxySection: React.FunctionComponent = () => {
         setPassword(response.ProxyPassword_str);
         setLoaded(true);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        if (isUnsupportedError(String(e))) {
+          setUnsupported(true);
+        } else {
+          setError(String(e));
+        }
+      });
   }, []);
 
   React.useEffect(() => {
@@ -256,8 +268,12 @@ const ProxySection: React.FunctionComponent = () => {
         load();
       })
       .catch((e) => {
-        setError(String(e));
         setSaving(false);
+        if (isUnsupportedError(String(e))) {
+          setUnsupported(true);
+        } else {
+          setError(String(e));
+        }
       });
   };
 
@@ -277,7 +293,11 @@ const ProxySection: React.FunctionComponent = () => {
             {error}
           </Alert>
         )}
-        {!loaded ? (
+        {unsupported ? (
+          <Alert variant="info" title="Proxy configuration is not supported by this server" isInline>
+            This server reports the Dynamic DNS client cannot be configured to use a proxy.
+          </Alert>
+        ) : !loaded ? (
           <Bullseye>
             <Spinner size="lg" aria-label="Loading proxy settings" />
           </Bullseye>
