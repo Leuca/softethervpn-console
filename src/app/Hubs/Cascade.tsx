@@ -30,6 +30,7 @@ import { PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { KeyValueTable } from '@app/components/KeyValueTable';
+import { binToBytes } from '@app/utils/blob_utils';
 import { formatOptionalDate } from '@app/utils/format';
 import { hashSoftEtherPassword } from '@app/utils/sha0';
 import { parseCertificate } from '@app/utils/x509';
@@ -43,6 +44,20 @@ const LINK_AUTH_TYPES = [
   { value: VPN.VpnRpcClientAuthType.PlainPassword, label: 'RADIUS / NT domain (plain password)' },
   { value: VPN.VpnRpcClientAuthType.Cert, label: 'Client certificate' },
 ];
+
+const authTypeLabel = (t: unknown): string =>
+  LINK_AUTH_TYPES.find((a) => a.value === Number(t))?.label ?? `Type ${t}`;
+
+const PROXY_TYPE_LABELS: Record<number, string> = {
+  [VPN.VpnRpcProxyType.Direct]: 'Direct (none)',
+  [VPN.VpnRpcProxyType.HTTP]: 'HTTP',
+  [VPN.VpnRpcProxyType.SOCKS]: 'SOCKS',
+};
+const proxyTypeLabel = (t: unknown): string => PROXY_TYPE_LABELS[Number(t)] ?? `Type ${t}`;
+
+// _bin fields round-tripped from GetLink arrive as base64 strings; convert to
+// real bytes before SetLink so the client does not double-encode them.
+const LINK_BIN_KEYS = ['HashedPassword_bin', 'ClientX_bin', 'ClientK_bin', 'ServerCert_bin'];
 
 // GetLinkStatus returns many fields; surface the connection summary only.
 const STATUS_KEYS = [
@@ -101,6 +116,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<StatusState | null>(null);
+  // Working copy of the cascade being edited (the full GetLink response).
+  const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
 
   const load = React.useCallback(() => {
     setLinks(null);
@@ -259,6 +276,46 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       .catch((e) => setStatus({ name: accountName, status: null, error: String(e) }));
   };
 
+  // Load the full cascade config for inspection / editing. GetLink is keyed by
+  // the local hub (HubName_Ex_str) and the account name.
+  const openEdit = (accountName: string) => {
+    api
+      .GetLink(new VPN.VpnRpcCreateLink({ HubName_Ex_str: hub, AccountName_utf: accountName }))
+      .then((response) => setEdit(response as unknown as Record<string, unknown>))
+      .catch((e) => setError(String(e)));
+  };
+
+  const setEditField = (key: string, value: unknown) => setEdit((prev) => (prev ? { ...prev, [key]: value } : prev));
+
+  const saveEdit = () => {
+    if (!edit) {
+      return;
+    }
+    // Round-trip the full object so auth secrets, proxy, advanced options and
+    // policy survive; only the destination fields are edited here. Normalize the
+    // _bin fields (base64 on read) back to bytes so they are not double-encoded.
+    const obj = new VPN.VpnRpcCreateLink(edit as Partial<VPN.VpnRpcCreateLink>);
+    obj.HubName_Ex_str = hub;
+    for (const key of LINK_BIN_KEYS) {
+      const bytes = binToBytes(edit[key]);
+      if (bytes) {
+        (obj as unknown as Record<string, unknown>)[key] = bytes;
+      } else {
+        delete (obj as unknown as Record<string, unknown>)[key];
+      }
+    }
+    api
+      .SetLink(obj)
+      .then(() => {
+        setEdit(null);
+        load();
+      })
+      .catch((e) => {
+        setError(String(e));
+        setEdit(null);
+      });
+  };
+
   const confirmDelete = () => {
     if (pendingDelete === null) {
       return;
@@ -347,6 +404,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   <Td isActionCell>
                     <ActionsColumn
                       items={[
+                        { title: 'Edit settings', onClick: () => openEdit(l.AccountName_utf) },
                         { title: 'Connection status', onClick: () => openStatus(l.AccountName_utf) },
                         l.Online_bool
                           ? { title: 'Set offline', onClick: () => setOnline(l.AccountName_utf, false) }
@@ -497,6 +555,98 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             Create
           </Button>
           <Button variant="link" onClick={() => setCreateOpen(false)}>
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit / inspect cascade */}
+      <Modal variant={ModalVariant.medium} isOpen={edit !== null} onClose={() => setEdit(null)}>
+        <ModalHeader title={edit ? `Cascade settings: ${String(edit.AccountName_utf ?? '')}` : ''} />
+        <ModalBody>
+          {edit && (
+            <Form>
+              <FormGroup label="Destination server host" isRequired fieldId="edit-host">
+                <TextInput
+                  isRequired
+                  id="edit-host"
+                  value={String(edit.Hostname_str ?? '')}
+                  onChange={(_event, value) => setEditField('Hostname_str', value)}
+                  aria-label="Destination server host"
+                />
+              </FormGroup>
+              <FormGroup label="Port" isRequired fieldId="edit-port">
+                <TextInput
+                  isRequired
+                  type="number"
+                  id="edit-port"
+                  value={String(edit.Port_u32 ?? '')}
+                  onChange={(_event, value) => setEditField('Port_u32', Number(value) || 0)}
+                  aria-label="Port"
+                />
+              </FormGroup>
+              <FormGroup label="Destination virtual hub" isRequired fieldId="edit-desthub">
+                <TextInput
+                  isRequired
+                  id="edit-desthub"
+                  value={String(edit.HubName_str ?? '')}
+                  onChange={(_event, value) => setEditField('HubName_str', value)}
+                  aria-label="Destination virtual hub"
+                />
+              </FormGroup>
+              <FormGroup label="Current configuration" fieldId="edit-inspect">
+                <Table aria-label="Cascade configuration" variant="compact" borders={false}>
+                  <Tbody>
+                    <Tr>
+                      <Td>Authentication</Td>
+                      <Td>{authTypeLabel(edit.AuthType_u32)}</Td>
+                    </Tr>
+                    <Tr>
+                      <Td>Username</Td>
+                      <Td>{String(edit.Username_str || '-')}</Td>
+                    </Tr>
+                    <Tr>
+                      <Td>Verify server certificate</Td>
+                      <Td>{edit.CheckServerCert_bool ? 'Yes' : 'No'}</Td>
+                    </Tr>
+                    <Tr>
+                      <Td>Proxy</Td>
+                      <Td>{proxyTypeLabel(edit.ProxyType_u32)}</Td>
+                    </Tr>
+                    <Tr>
+                      <Td>Max TCP connections</Td>
+                      <Td>{String(edit.MaxConnection_u32 ?? '-')}</Td>
+                    </Tr>
+                    <Tr>
+                      <Td>Encryption / compression</Td>
+                      <Td>{`${edit.UseEncrypt_bool ? 'On' : 'Off'} / ${edit.UseCompress_bool ? 'On' : 'Off'}`}</Td>
+                    </Tr>
+                  </Tbody>
+                </Table>
+                <HelperText>
+                  <HelperTextItem>
+                    Authentication, server certificate, proxy, advanced options and policy are preserved on save;
+                    editing them here is coming next.
+                  </HelperTextItem>
+                </HelperText>
+              </FormGroup>
+            </Form>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="primary"
+            onClick={saveEdit}
+            isDisabled={
+              !edit ||
+              String(edit.Hostname_str ?? '').trim().length === 0 ||
+              String(edit.HubName_str ?? '').trim().length === 0 ||
+              !(Number(edit.Port_u32) >= 1 && Number(edit.Port_u32) <= 65535)
+            }
+          >
+            Save
+          </Button>
+          <Button variant="link" onClick={() => setEdit(null)}>
             Cancel
           </Button>
         </ModalFooter>

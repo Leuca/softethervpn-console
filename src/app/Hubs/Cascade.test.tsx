@@ -18,6 +18,8 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: {
     EnumLink: vi.fn(),
     CreateLink: vi.fn(),
+    GetLink: vi.fn(),
+    SetLink: vi.fn(),
     SetLinkOnline: vi.fn(),
     SetLinkOffline: vi.fn(),
     DeleteLink: vi.fn(),
@@ -27,6 +29,8 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
 
 const enumLink = api.EnumLink as unknown as Mock;
 const createLink = api.CreateLink as unknown as Mock;
+const getLink = api.GetLink as unknown as Mock;
+const setLink = api.SetLink as unknown as Mock;
 const setLinkOnline = api.SetLinkOnline as unknown as Mock;
 const setLinkOffline = api.SetLinkOffline as unknown as Mock;
 const deleteLink = api.DeleteLink as unknown as Mock;
@@ -290,6 +294,55 @@ describe('Cascade', () => {
 
     expect(setLinkOnline).toHaveBeenCalledOnce();
     expect(setLinkOnline.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', AccountName_utf: 'to-branch' });
+  });
+
+  it('inspects and edits an existing cascade, preserving auth on save', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 2, // PlainPassword (RADIUS/NT)
+      Username_str: 'bob',
+      PlainPassword_str: 'secret',
+      CheckServerCert_bool: false,
+      ProxyType_u32: 0,
+      MaxConnection_u32: 1,
+      UseEncrypt_bool: true,
+      UseCompress_bool: false,
+      HashedPassword_bin: '',
+      ClientX_bin: '',
+      ClientK_bin: '',
+      ServerCert_bin: '',
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    // Inspection shows the config that is not directly editable yet.
+    expect(await within(dialog).findByText('RADIUS / NT domain (plain password)')).toBeInTheDocument();
+    expect(within(dialog).getByText('bob')).toBeInTheDocument();
+
+    const hostField = within(dialog).getByLabelText('Destination server host');
+    await user.clear(hostField);
+    await user.type(hostField, 'new.example.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(getLink.mock.calls[0][0]).toMatchObject({ HubName_Ex_str: 'DEFAULT', AccountName_utf: 'to-branch' });
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.Hostname_str).toBe('new.example.com');
+    expect(sent.HubName_Ex_str).toBe('DEFAULT');
+    // Auth preserved by round-tripping the full object.
+    expect(sent.AuthType_u32).toBe(2);
+    expect(sent.Username_str).toBe('bob');
+    expect(sent.PlainPassword_str).toBe('secret');
   });
 
   it('opens the connection status modal', async () => {
