@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Breadcrumb, BreadcrumbItem, Tab, TabTitleText, Tabs } from '@patternfly/react-core';
 import { AppPage } from '@app/components/AppPage';
 import { HubStatus } from '@app/Hubs/HubStatus';
+import { Sessions } from '@app/Hubs/Sessions';
 import { Users } from '@app/Hubs/Users';
 import { Groups } from '@app/Hubs/Groups';
 import { AccessList } from '@app/Hubs/AccessList';
@@ -28,6 +29,9 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
         <Tabs activeKey={activeTab} onSelect={(_event, key) => setActiveTab(String(key))} mountOnEnter unmountOnExit>
           <Tab eventKey="status" title={<TabTitleText>Status</TabTitleText>}>
             <HubStatus hub={name} />
+          </Tab>
+          <Tab eventKey="sessions" title={<TabTitleText>Sessions</TabTitleText>}>
+            <Sessions hub={name} />
           </Tab>
           <Tab eventKey="properties" title={<TabTitleText>Properties</TabTitleText>}>
             <Properties hub={name} />
