@@ -46,14 +46,20 @@ describe('EncryptionNetwork', () => {
     render(<EncryptionNetwork />);
 
     const pw = card('Server administrator password');
+    const changePassword = within(pw).getByRole('button', { name: 'Change password' });
+    expect(changePassword).toBeDisabled();
+
     await user.type(within(pw).getByLabelText('New password'), 's3cret');
+    expect(changePassword).toBeDisabled();
+
     await user.type(within(pw).getByLabelText('Confirm password'), 'nope');
     expect(within(pw).getByText('The passwords do not match.')).toBeInTheDocument();
-    expect(within(pw).getByRole('button', { name: 'Change password' })).toBeDisabled();
+    expect(changePassword).toBeDisabled();
 
     await user.clear(within(pw).getByLabelText('Confirm password'));
     await user.type(within(pw).getByLabelText('Confirm password'), 's3cret');
-    await user.click(within(pw).getByRole('button', { name: 'Change password' }));
+    expect(changePassword).toBeEnabled();
+    await user.click(changePassword);
 
     await waitFor(() => expect(m('SetServerPassword')).toHaveBeenCalledTimes(1));
     expect(m('SetServerPassword').mock.calls[0][0].PlainTextPassword_str).toBe('s3cret');

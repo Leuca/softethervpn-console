@@ -56,6 +56,7 @@ const AdminPasswordCard: React.FunctionComponent = () => {
   const [confirm, setConfirm] = React.useState('');
   const [status, setStatus] = React.useState<{ variant: 'success' | 'danger'; text: string } | null>(null);
   const mismatch = confirm !== '' && confirm !== password;
+  const canChange = password !== '' && confirm !== '' && confirm === password;
 
   const change = () => {
     api
@@ -96,7 +97,7 @@ const AdminPasswordCard: React.FunctionComponent = () => {
               </FormHelperText>
             )}
           </FormGroup>
-          <Button variant="primary" onClick={change} isDisabled={password === '' || mismatch}>
+          <Button variant="primary" onClick={change} isDisabled={!canChange}>
             Change password
           </Button>
         </Form>
