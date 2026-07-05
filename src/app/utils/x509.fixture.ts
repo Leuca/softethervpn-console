@@ -26,3 +26,6 @@ export const derFromBase64 = (b64: string): Uint8Array =>
   Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
 export const SELF_SIGNED_CERT_DER = (): Uint8Array => derFromBase64(SELF_SIGNED_CERT_B64);
+
+export const SELF_SIGNED_CERT_PEM = (): string =>
+  `-----BEGIN CERTIFICATE-----\n${SELF_SIGNED_CERT_B64.match(/.{1,64}/g)?.join('\n') ?? SELF_SIGNED_CERT_B64}\n-----END CERTIFICATE-----\n`;

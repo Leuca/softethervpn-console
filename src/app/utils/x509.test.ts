@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseCertificate } from './x509';
-import { SELF_SIGNED_CERT_DER } from './x509.fixture';
+import { certificateBytesToDer, parseCertificate } from './x509';
+import { SELF_SIGNED_CERT_DER, SELF_SIGNED_CERT_PEM } from './x509.fixture';
 
 describe('parseCertificate', () => {
   it('extracts subject, issuer, validity and self-issued flag', () => {
@@ -34,6 +34,11 @@ describe('parseCertificate', () => {
     const cert = parseCertificate(SELF_SIGNED_CERT_DER());
     expect(cert.pem).toContain('-----BEGIN CERTIFICATE-----');
     expect(cert.pem).toContain('-----END CERTIFICATE-----');
+  });
+
+  it('normalizes PEM certificate bytes to DER', () => {
+    const pemBytes = new TextEncoder().encode(SELF_SIGNED_CERT_PEM());
+    expect(Array.from(certificateBytesToDer(pemBytes))).toEqual(Array.from(SELF_SIGNED_CERT_DER()));
   });
 
   it('throws on invalid certificate bytes', () => {

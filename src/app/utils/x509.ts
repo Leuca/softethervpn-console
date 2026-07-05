@@ -60,6 +60,10 @@ const asCertificate = (bytes: Uint8Array): X509Certificate => {
   return new X509Certificate(bytes);
 };
 
+// Normalize a PEM or DER certificate to raw DER bytes. Several SoftEther RPC
+// paths call BufToX(..., false), so sending PEM text bytes is silently ignored.
+export const certificateBytesToDer = (bytes: Uint8Array): Uint8Array => new Uint8Array(asCertificate(bytes).rawData);
+
 /**
  * Parse an X.509 certificate (the raw `*_bin` field returned by the JSON-RPC
  * API, DER or PEM-text bytes) into the fields the console displays. Throws if

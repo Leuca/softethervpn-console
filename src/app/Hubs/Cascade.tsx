@@ -37,7 +37,7 @@ import { KeyValueTable } from '@app/components/KeyValueTable';
 import { binToBytes } from '@app/utils/blob_utils';
 import { formatOptionalDate } from '@app/utils/format';
 import { hashSoftEtherPassword } from '@app/utils/sha0';
-import { parseCertificate } from '@app/utils/x509';
+import { certificateBytesToDer } from '@app/utils/x509';
 
 // Cascade client-auth methods. RADIUS / NT domain auth is the plain-password
 // type (the server forwards the plaintext); "standard" password auth is SHA-0
@@ -55,8 +55,7 @@ const readCertBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m
   reader.onload = () => {
     try {
       const bytes = new Uint8Array(reader.result as ArrayBuffer);
-      parseCertificate(bytes); // throws if not a certificate
-      onBytes(bytes);
+      onBytes(certificateBytesToDer(bytes));
     } catch {
       onError('The file is not a valid certificate (PEM or DER).');
     }
@@ -264,6 +263,88 @@ const ProxyFields: React.FunctionComponent<{
         </>
       )}
     </ExpandableSection>
+  );
+};
+
+// Shared destination-server certificate verification editor. SoftEther stores a
+// boolean verification flag and an optional pinned server certificate.
+const ServerCertificateFields: React.FunctionComponent<{
+  idPrefix: string;
+  get: (key: string) => unknown;
+  set: (key: string, value: unknown) => void;
+  onViewCert: (cert: Uint8Array | string) => void;
+}> = ({ idPrefix, get, set, onViewCert }) => {
+  const [filename, setFilename] = React.useState('');
+  const [error, setError] = React.useState<string | null>(null);
+  const checkServerCert = Boolean(get('CheckServerCert_bool'));
+  const pinnedCert = binToBytes(get('ServerCert_bin'));
+  return (
+    <FormGroup label="Server certificate" fieldId={`${idPrefix}-servercert`}>
+      <Checkbox
+        id={`${idPrefix}-checkservercert`}
+        label="Always verify the destination server certificate"
+        isChecked={checkServerCert}
+        onChange={(_event, checked) => set('CheckServerCert_bool', checked)}
+      />
+      {checkServerCert && (
+        <>
+          {pinnedCert && (
+            <Flex gap={{ default: 'gapSm' }}>
+              <FlexItem>
+                <Button variant="link" isInline onClick={() => onViewCert(get('ServerCert_bin') as Uint8Array | string)}>
+                  View pinned certificate
+                </Button>
+              </FlexItem>
+              <FlexItem>
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => {
+                    setFilename('');
+                    setError(null);
+                    set('ServerCert_bin', undefined);
+                  }}
+                >
+                  Remove pinned certificate
+                </Button>
+              </FlexItem>
+            </Flex>
+          )}
+          <FileUpload
+            id={`${idPrefix}-servercert`}
+            type="dataURL"
+            filename={filename}
+            filenamePlaceholder={pinnedCert ? 'Replace pinned server certificate' : 'Optionally pin a specific server certificate'}
+            browseButtonText={pinnedCert ? 'Replace' : 'Upload'}
+            hideDefaultPreview
+            onFileInputChange={(_event, file) => {
+              setError(null);
+              setFilename(file.name);
+              readCertBytes(
+                file,
+                (bytes) => set('ServerCert_bin', bytes),
+                (message) => {
+                  setError(message);
+                  set('ServerCert_bin', undefined);
+                },
+              );
+            }}
+            onClearClick={() => {
+              setFilename('');
+              setError(null);
+              set('ServerCert_bin', undefined);
+            }}
+            dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
+            filenameAriaLabel="Server certificate file name"
+          />
+          <HelperText>
+            <HelperTextItem variant={error ? 'error' : 'default'}>
+              {error ?? 'If pinned, the server must present exactly this certificate.'}
+            </HelperTextItem>
+          </HelperText>
+        </>
+      )}
+    </FormGroup>
   );
 };
 
@@ -506,11 +587,11 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [password, setPassword] = React.useState('');
   // Plaintext password entered while editing (blank keeps the existing secret).
   const [editPassword, setEditPassword] = React.useState('');
-  // Server certificate verification (CheckServerCert + optional pinned ServerCert).
-  const [checkServerCert, setCheckServerCert] = React.useState(false);
-  const [serverCertFilename, setServerCertFilename] = React.useState('');
-  const [serverCertBytes, setServerCertBytes] = React.useState<Uint8Array | null>(null);
-  const [serverCertError, setServerCertError] = React.useState<string | null>(null);
+  // Server-certificate verification for a new cascade: CheckServerCert and
+  // optional pinned ServerCert live in this object.
+  const [serverCert, setServerCert] = React.useState<Record<string, unknown>>({
+    CheckServerCert_bool: false,
+  });
   // Certificate to show in the shared viewer (staged-create or loaded-edit bytes).
   const [viewCert, setViewCert] = React.useState<Uint8Array | string | null>(null);
   // Advanced tuning for a new cascade.
@@ -547,28 +628,11 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setDestHub('');
     setAuth({ AuthType_u32: VPN.VpnRpcClientAuthType.Anonymous });
     setPassword('');
-    setCheckServerCert(false);
-    setServerCertFilename('');
-    setServerCertBytes(null);
-    setServerCertError(null);
+    setServerCert({ CheckServerCert_bool: false });
     setAdvanced({ ...ADVANCED_DEFAULTS });
     setProxy({ ProxyType_u32: VPN.VpnRpcProxyType.Direct });
     setCreatePolicy({});
     setCreateOpen(true);
-  };
-
-  // Read a pinned server certificate; validate it parses before staging bytes.
-  const onServerCertSelected = (_event: unknown, file: File) => {
-    setServerCertError(null);
-    setServerCertFilename(file.name);
-    readCertBytes(
-      file,
-      (bytes) => setServerCertBytes(bytes),
-      (message) => {
-        setServerCertError(message);
-        setServerCertBytes(null);
-      },
-    );
   };
 
   const portNum = Number(port);
@@ -593,14 +657,17 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       Hostname_str: host.trim(),
       Port_u32: portNum,
       HubName_str: destHub.trim(),
-      CheckServerCert_bool: checkServerCert,
+      ...serverCert,
       ...advanced,
       ...proxy,
       ...createPolicy,
     });
     coerceLinkNumbers(link as unknown as Record<string, unknown>);
-    if (checkServerCert && serverCertBytes) {
+    const serverCertBytes = binToBytes(serverCert.ServerCert_bin);
+    if (serverCertBytes) {
       link.ServerCert_bin = serverCertBytes;
+    } else {
+      delete (link as unknown as Record<string, unknown>).ServerCert_bin;
     }
     applyAuth(link as unknown as Record<string, unknown>, (key) => auth[key], password);
     api
@@ -846,44 +913,12 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               setPassword={setPassword}
               onViewCert={setViewCert}
             />
-            <FormGroup label="Server certificate" fieldId="link-servercert">
-              <Checkbox
-                id="link-checkservercert"
-                label="Always verify the destination server certificate"
-                isChecked={checkServerCert}
-                onChange={(_event, checked) => setCheckServerCert(checked)}
-              />
-              {checkServerCert && (
-                <>
-                  <FileUpload
-                    id="link-servercert"
-                    type="dataURL"
-                    filename={serverCertFilename}
-                    filenamePlaceholder="Optionally pin a specific server certificate"
-                    browseButtonText="Upload"
-                    hideDefaultPreview
-                    onFileInputChange={onServerCertSelected}
-                    onClearClick={() => {
-                      setServerCertFilename('');
-                      setServerCertBytes(null);
-                      setServerCertError(null);
-                    }}
-                    dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
-                    filenameAriaLabel="Server certificate file name"
-                  />
-                  <HelperText>
-                    <HelperTextItem variant={serverCertError ? 'error' : 'default'}>
-                      {serverCertError ?? 'If pinned, the server must present exactly this certificate.'}
-                    </HelperTextItem>
-                  </HelperText>
-                  {serverCertBytes && !serverCertError && (
-                    <Button variant="link" isInline onClick={() => setViewCert(serverCertBytes)}>
-                      View certificate
-                    </Button>
-                  )}
-                </>
-              )}
-            </FormGroup>
+            <ServerCertificateFields
+              idPrefix="link"
+              get={(key) => serverCert[key]}
+              set={(key, value) => setServerCert((prev) => ({ ...prev, [key]: value }))}
+              onViewCert={setViewCert}
+            />
             <ProxyFields
               idPrefix="link"
               get={(key) => proxy[key]}
@@ -954,23 +989,12 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 passwordPlaceholder="Leave blank to keep the current password"
                 onViewCert={setViewCert}
               />
-              <FormGroup label="Server certificate" fieldId="edit-servercert">
-                <Checkbox
-                  id="edit-checkservercert"
-                  label="Always verify the destination server certificate"
-                  isChecked={Boolean(edit.CheckServerCert_bool)}
-                  onChange={(_event, checked) => setEditField('CheckServerCert_bool', checked)}
-                />
-                {binToBytes(edit.ServerCert_bin) && (
-                  <Button
-                    variant="link"
-                    isInline
-                    onClick={() => setViewCert(edit.ServerCert_bin as Uint8Array | string)}
-                  >
-                    View pinned certificate
-                  </Button>
-                )}
-              </FormGroup>
+              <ServerCertificateFields
+                idPrefix="edit"
+                get={(key) => edit[key]}
+                set={setEditField}
+                onViewCert={setViewCert}
+              />
               <ProxyFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <AdvancedFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <FormGroup label="Security policy" fieldId="edit-policy">

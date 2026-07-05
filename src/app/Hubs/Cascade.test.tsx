@@ -5,7 +5,7 @@ import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Cascade } from './Cascade';
 import { api } from '@app/utils/vpnrpc_settings';
 import { hashSoftEtherPassword } from '@app/utils/sha0';
-import { SELF_SIGNED_CERT_DER } from '@app/utils/x509.fixture';
+import { SELF_SIGNED_CERT_DER, SELF_SIGNED_CERT_PEM } from '@app/utils/x509.fixture';
 
 // Fill the four always-required fields of the create form.
 async function fillCommonFields(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
@@ -282,15 +282,15 @@ describe('Cascade', () => {
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(
       fileInput,
-      new File([SELF_SIGNED_CERT_DER()], 'server.cer', { type: 'application/x-x509-ca-cert' }),
+      new File([SELF_SIGNED_CERT_PEM()], 'server.pem', { type: 'application/x-pem-file' }),
     );
-    await within(dialog).findByRole('button', { name: 'View certificate' });
+    await within(dialog).findByRole('button', { name: 'View pinned certificate' });
     await user.click(within(dialog).getByRole('button', { name: 'Create' }));
 
     const sent = createLink.mock.calls[0][0];
     expect(sent.CheckServerCert_bool).toBe(true);
     expect(sent.ServerCert_bin).toBeInstanceOf(Uint8Array);
-    expect(sent.ServerCert_bin.length).toBeGreaterThan(0);
+    expect(Array.from(sent.ServerCert_bin)).toEqual(Array.from(SELF_SIGNED_CERT_DER()));
   });
 
   it('changes a cascade auth method when editing', async () => {
@@ -387,7 +387,7 @@ describe('Cascade', () => {
     expect(sent.Hostname_str).toBe('new.example.com');
   });
 
-  it('toggles server-certificate verification when editing', async () => {
+  it('edits server-certificate verification and pinned certificate', async () => {
     enumLink.mockResolvedValue({ LinkList: [connectedLink] });
     getLink.mockResolvedValue({
       HubName_Ex_str: 'DEFAULT',
@@ -410,9 +410,45 @@ describe('Cascade', () => {
 
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByLabelText('Always verify the destination server certificate'));
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(
+      fileInput,
+      new File([SELF_SIGNED_CERT_DER()], 'server.cer', { type: 'application/x-x509-ca-cert' }),
+    );
+    await within(dialog).findByRole('button', { name: 'View pinned certificate' });
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-    expect(setLink.mock.calls[0][0].CheckServerCert_bool).toBe(true);
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.CheckServerCert_bool).toBe(true);
+    expect(sent.ServerCert_bin).toBeInstanceOf(Uint8Array);
+  });
+
+  it('removes an existing pinned server certificate when editing', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 0,
+      Username_str: '',
+      CheckServerCert_bool: true,
+      ServerCert_bin: SELF_SIGNED_CERT_DER(),
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove pinned certificate' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(setLink.mock.calls[0][0].ServerCert_bin).toBeUndefined();
   });
 
   it('applies advanced tuning options on create', async () => {
