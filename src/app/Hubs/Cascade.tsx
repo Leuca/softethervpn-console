@@ -87,13 +87,18 @@ const readKeyBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m:
 // real bytes before SetLink so the client does not double-encode them.
 const LINK_BIN_KEYS = ['HashedPassword_bin', 'ClientX_bin', 'ClientK_bin', 'ServerCert_bin'];
 
+const MIN_TCP_CONNECTIONS = 1;
+const MAX_TCP_CONNECTIONS = 32;
+const NATIVE_CASCADE_TCP_CONNECTIONS = 8;
+
 // Advanced tuning defaults for a new cascade (mirror the native client).
 const ADVANCED_DEFAULTS: Record<string, number | boolean> = {
-  MaxConnection_u32: 1,
+  MaxConnection_u32: NATIVE_CASCADE_TCP_CONNECTIONS,
   UseEncrypt_bool: true,
   UseCompress_bool: false,
   HalfConnection_bool: false,
   DisableQoS_bool: false,
+  NoRoutingTracking_bool: true,
   NoUdpAcceleration_bool: false,
   AdditionalConnectionInterval_u32: 1,
   ConnectionDisconnectSpan_u32: 0,
@@ -130,11 +135,17 @@ const AdvancedFields: React.FunctionComponent<{
   );
   return (
     <ExpandableSection toggleText="Advanced settings">
-      {numField('MaxConnection_u32', 'Number of TCP connections', 1, 'Number of TCP connections')}
+      {numField(
+        'MaxConnection_u32',
+        'Number of TCP connections',
+        NATIVE_CASCADE_TCP_CONNECTIONS,
+        'Number of TCP connections',
+      )}
       {checkbox('UseEncrypt_bool', 'Encrypt the VPN communication')}
       {checkbox('UseCompress_bool', 'Compress the data')}
       {checkbox('HalfConnection_bool', 'Use half-duplex mode (with multiple connections)')}
       {checkbox('DisableQoS_bool', 'Disable VoIP / QoS control')}
+      {checkbox('NoRoutingTracking_bool', 'No adjustments of routing table')}
       {checkbox('NoUdpAcceleration_bool', 'Disable UDP acceleration')}
       {numField('AdditionalConnectionInterval_u32', 'Additional connection interval (seconds)', 1, 'Additional connection interval')}
       {numField('ConnectionDisconnectSpan_u32', 'Connection life of each TCP connection (seconds, 0 = no expiry)', 0, 'Connection life')}
@@ -143,17 +154,36 @@ const AdvancedFields: React.FunctionComponent<{
 };
 
 // Coerce the advanced numeric fields (held as strings while editing) to valid
-// integers before sending. MaxConnection and interval are at least 1; the
-// connection-life span may be 0 (no expiry).
+// integers before sending. MaxConnection is clamped to the native range (1..32),
+// interval is at least 1, and connection-life may be 0 (no expiry).
 const coerceLinkNumbers = (obj: Record<string, unknown>): void => {
-  const asInt = (value: unknown, min: number): number => {
+  const asInt = (value: unknown, min: number, max?: number): number => {
     const n = Math.floor(Number(value));
-    return Number.isFinite(n) && n >= min ? n : min;
+    if (!Number.isFinite(n)) {
+      return min;
+    }
+    return Math.min(Math.max(n, min), max ?? n);
   };
-  if ('MaxConnection_u32' in obj) obj.MaxConnection_u32 = asInt(obj.MaxConnection_u32, 1);
+  if ('MaxConnection_u32' in obj) obj.MaxConnection_u32 = asInt(obj.MaxConnection_u32, MIN_TCP_CONNECTIONS, MAX_TCP_CONNECTIONS);
   if ('AdditionalConnectionInterval_u32' in obj) obj.AdditionalConnectionInterval_u32 = asInt(obj.AdditionalConnectionInterval_u32, 1);
   if ('ConnectionDisconnectSpan_u32' in obj) obj.ConnectionDisconnectSpan_u32 = asInt(obj.ConnectionDisconnectSpan_u32, 0);
   if ('ProxyPort_u32' in obj) obj.ProxyPort_u32 = asInt(obj.ProxyPort_u32, 0);
+};
+
+const advancedComplete = (get: (key: string) => unknown): boolean => {
+  const maxConnection = Number(get('MaxConnection_u32') ?? NATIVE_CASCADE_TCP_CONNECTIONS);
+  const interval = Number(get('AdditionalConnectionInterval_u32') ?? 1);
+  const disconnectSpan = Number(get('ConnectionDisconnectSpan_u32') ?? 0);
+  return (
+    Number.isInteger(maxConnection) &&
+    maxConnection >= MIN_TCP_CONNECTIONS &&
+    maxConnection <= MAX_TCP_CONNECTIONS &&
+    (!get('HalfConnection_bool') || maxConnection > MIN_TCP_CONNECTIONS) &&
+    Number.isInteger(interval) &&
+    interval >= 1 &&
+    Number.isInteger(disconnectSpan) &&
+    disconnectSpan >= 0
+  );
 };
 
 const PROXY_TYPES = [
@@ -550,6 +580,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     portNum >= 1 &&
     portNum <= 65535 &&
     authComplete((key) => auth[key], password, false) &&
+    advancedComplete((key) => advanced[key]) &&
     proxyComplete((key) => proxy[key]);
 
   const create = () => {
@@ -959,6 +990,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               String(edit.Hostname_str ?? '').trim().length === 0 ||
               String(edit.HubName_str ?? '').trim().length === 0 ||
               !(Number(edit.Port_u32) >= 1 && Number(edit.Port_u32) <= 65535) ||
+              !advancedComplete((key) => edit[key]) ||
               !proxyComplete((key) => edit[key]) ||
               !authComplete((key) => edit[key], editPassword, editHasSecret)
             }

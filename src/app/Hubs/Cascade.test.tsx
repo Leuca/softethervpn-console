@@ -429,16 +429,40 @@ describe('Cascade', () => {
     await user.click(within(dialog).getByRole('button', { name: /advanced settings/i }));
 
     const maxConn = within(dialog).getByLabelText('Number of TCP connections');
+    expect(maxConn).toHaveValue(8);
+    expect(within(dialog).getByLabelText('No adjustments of routing table')).toBeChecked();
     await user.clear(maxConn);
     await user.type(maxConn, '4');
     await user.click(within(dialog).getByLabelText('Compress the data'));
     await user.click(within(dialog).getByLabelText('Encrypt the VPN communication')); // default on -> off
+    await user.click(within(dialog).getByLabelText('No adjustments of routing table'));
     await user.click(within(dialog).getByRole('button', { name: 'Create' }));
 
     const sent = createLink.mock.calls[0][0];
     expect(sent.MaxConnection_u32).toBe(4);
     expect(sent.UseCompress_bool).toBe(true);
     expect(sent.UseEncrypt_bool).toBe(false);
+    expect(sent.NoRoutingTracking_bool).toBe(false);
+  });
+
+  it('blocks half-duplex when only one TCP connection is selected', async () => {
+    enumLink.mockResolvedValue({ LinkList: [] });
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('No cascade connections');
+    await user.click(screen.getAllByRole('button', { name: /new cascade/i })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await fillCommonFields(user, dialog);
+    await user.click(within(dialog).getByRole('button', { name: /advanced settings/i }));
+
+    const maxConn = within(dialog).getByLabelText('Number of TCP connections');
+    await user.clear(maxConn);
+    await user.type(maxConn, '1');
+    await user.click(within(dialog).getByLabelText('Use half-duplex mode (with multiple connections)'));
+
+    expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
   });
 
   it('edits advanced tuning options', async () => {
@@ -453,6 +477,7 @@ describe('Cascade', () => {
       MaxConnection_u32: 1,
       UseEncrypt_bool: true,
       UseCompress_bool: false,
+      NoRoutingTracking_bool: true,
     });
     setLink.mockResolvedValue({});
     const user = userEvent.setup();
@@ -467,9 +492,11 @@ describe('Cascade', () => {
     const maxConn = within(dialog).getByLabelText('Number of TCP connections');
     await user.clear(maxConn);
     await user.type(maxConn, '8');
+    await user.click(within(dialog).getByLabelText('No adjustments of routing table'));
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(setLink.mock.calls[0][0].MaxConnection_u32).toBe(8);
+    expect(setLink.mock.calls[0][0].NoRoutingTracking_bool).toBe(false);
   });
 
   it('creates a cascade through an HTTP proxy', async () => {
