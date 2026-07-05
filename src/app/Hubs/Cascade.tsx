@@ -97,6 +97,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [certError, setCertError] = React.useState<string | null>(null);
   const [keyFilename, setKeyFilename] = React.useState('');
   const [keyBytes, setKeyBytes] = React.useState<Uint8Array | null>(null);
+  const [keyError, setKeyError] = React.useState<string | null>(null);
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<StatusState | null>(null);
@@ -127,6 +128,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setCertError(null);
     setKeyFilename('');
     setKeyBytes(null);
+    setKeyError(null);
     setCreateOpen(true);
   };
 
@@ -151,12 +153,28 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     reader.readAsArrayBuffer(file);
   };
 
-  // Read the private key; sent as-is (no client-side key parsing available).
+  // Read the private key and send its bytes as-is. The RPC decodes the key with
+  // no passphrase (InRpcClientAuth -> BufToK(..., NULL)), so an encrypted key
+  // would fail silently server-side; detect the PEM encryption markers and
+  // reject with a clear message. In-browser decryption is not yet supported.
   const onKeySelected = (_event: unknown, file: File) => {
+    setKeyError(null);
     setKeyFilename(file.name);
     const reader = new FileReader();
-    reader.onload = () => setKeyBytes(new Uint8Array(reader.result as ArrayBuffer));
-    reader.onerror = () => setKeyBytes(null);
+    reader.onload = () => {
+      const bytes = new Uint8Array(reader.result as ArrayBuffer);
+      const text = new TextDecoder('latin1').decode(bytes);
+      if (/ENCRYPTED PRIVATE KEY|Proc-Type:\s*4,\s*ENCRYPTED|DEK-Info:/i.test(text)) {
+        setKeyError('Encrypted (password-protected) private keys are not supported yet. Provide an unencrypted key.');
+        setKeyBytes(null);
+        return;
+      }
+      setKeyBytes(bytes);
+    };
+    reader.onerror = () => {
+      setKeyError('The private key file could not be read.');
+      setKeyBytes(null);
+    };
     reader.readAsArrayBuffer(file);
   };
 
@@ -459,10 +477,16 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     onClearClick={() => {
                       setKeyFilename('');
                       setKeyBytes(null);
+                      setKeyError(null);
                     }}
                     dropzoneProps={{ accept: { 'application/octet-stream': ['.key', '.pem', '.der'] } }}
                     filenameAriaLabel="Private key file name"
                   />
+                  {keyError && (
+                    <HelperText>
+                      <HelperTextItem variant="error">{keyError}</HelperTextItem>
+                    </HelperText>
+                  )}
                 </FormGroup>
               </>
             )}

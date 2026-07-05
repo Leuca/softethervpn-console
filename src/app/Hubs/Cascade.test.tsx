@@ -234,6 +234,34 @@ describe('Cascade', () => {
     expect(Array.from(sent.ClientK_bin)).toEqual([1, 2, 3, 4]);
   });
 
+  it('rejects an encrypted private key with a clear error', async () => {
+    enumLink.mockResolvedValue({ LinkList: [] });
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('No cascade connections');
+    await user.click(screen.getAllByRole('button', { name: /new cascade/i })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await fillCommonFields(user, dialog);
+    await user.selectOptions(within(dialog).getByLabelText('Authentication method'), 'Client certificate');
+    await user.type(within(dialog).getByLabelText('Username'), 'carol');
+
+    const fileInputs = dialog.querySelectorAll('input[type="file"]');
+    await user.upload(
+      fileInputs[0] as HTMLInputElement,
+      new File([SELF_SIGNED_CERT_DER()], 'client.cer', { type: 'application/x-x509-ca-cert' }),
+    );
+    const encryptedKey = '-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIF...\n-----END ENCRYPTED PRIVATE KEY-----\n';
+    await user.upload(
+      fileInputs[1] as HTMLInputElement,
+      new File([encryptedKey], 'client.key', { type: 'application/octet-stream' }),
+    );
+
+    expect(await within(dialog).findByText(/Encrypted .*private keys are not supported/i)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
+  });
+
   it('sets an online cascade offline', async () => {
     enumLink.mockResolvedValue({ LinkList: [connectedLink] });
     setLinkOffline.mockResolvedValue({});
