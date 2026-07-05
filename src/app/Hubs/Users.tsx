@@ -37,13 +37,6 @@ import { recordChanged } from '@app/utils/dirty';
 import { formatOptionalDate, userAuthTypeLabel } from '@app/utils/format';
 import { parseCertificate } from '@app/utils/x509';
 
-// Auth types offered when creating a user; the rest need extra config, set on edit.
-const CREATABLE_AUTH_TYPES = [
-  { value: VPN.VpnRpcUserAuthType.Anonymous, label: 'Anonymous' },
-  { value: VPN.VpnRpcUserAuthType.Password, label: 'Password' },
-];
-
-// All auth types, selectable when editing.
 const ALL_AUTH_TYPES = [
   { value: VPN.VpnRpcUserAuthType.Anonymous, label: 'Anonymous' },
   { value: VPN.VpnRpcUserAuthType.Password, label: 'Password' },
@@ -61,17 +54,352 @@ const isNeverDate = (value: unknown): boolean => {
 const NEVER = new Date(0).toISOString();
 const toDateInput = (value: unknown): string =>
   isNeverDate(value) ? '' : new Date(value as string).toISOString().slice(0, 10);
+const hexFromBytes = (value: unknown): string => {
+  const bytes = binToBytes(value);
+  return bytes
+    ? Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, '0').toUpperCase())
+        .join(' ')
+    : '';
+};
+const compactHex = (value: string): string => value.replace(/[\s:.-]/g, '');
+const parseSerial = (value: string): { bytes: Uint8Array; error: string | null } => {
+  const hex = compactHex(value);
+  if (!hex) {
+    return { bytes: new Uint8Array(), error: null };
+  }
+  if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) {
+    return { bytes: new Uint8Array(), error: 'Serial number must be hexadecimal byte pairs.' };
+  }
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return { bytes, error: null };
+};
+const defaultPolicy = (): Record<string, unknown> => ({
+  UsePolicy_bool: false,
+  'policy:Access_bool': true,
+  'policy:Ver3_bool': true,
+});
+const emptyUserDraft = (): Record<string, unknown> => ({
+  ...defaultPolicy(),
+  Name_str: '',
+  GroupName_str: '',
+  Realname_utf: '',
+  Note_utf: '',
+  AuthType_u32: VPN.VpnRpcUserAuthType.Anonymous,
+  UserX_bin: new Uint8Array(),
+  Serial_bin: new Uint8Array(),
+  CommonName_utf: '',
+  RadiusUsername_utf: '',
+  NtUsername_utf: '',
+  ExpireTime_dt: NEVER,
+});
+
+const userAuthValid = (
+  user: Record<string, unknown>,
+  certError: string | null,
+  rootCommonNameEnabled: boolean,
+  rootSerialEnabled: boolean,
+  rootSerial: string,
+): boolean => {
+  const authType = Number(user.AuthType_u32) || 0;
+  if (authType === VPN.VpnRpcUserAuthType.UserCert) {
+    return binToBytes(user.UserX_bin) !== null && certError === null;
+  }
+  if (authType === VPN.VpnRpcUserAuthType.RootCert) {
+    const serialResult = parseSerial(rootSerial);
+    return (
+      (!rootCommonNameEnabled || String(user.CommonName_utf ?? '').trim().length > 0) &&
+      (!rootSerialEnabled || (serialResult.error === null && serialResult.bytes.length > 0))
+    );
+  }
+  return true;
+};
+
+interface UserSettingsModalProps {
+  mode: 'create' | 'edit';
+  user: Record<string, unknown>;
+  password: string;
+  certFilename: string;
+  certError: string | null;
+  rootCommonNameEnabled: boolean;
+  rootSerialEnabled: boolean;
+  rootSerial: string;
+  isOpen: boolean;
+  isSubmitDisabled: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+  onField: (key: string, value: unknown) => void;
+  onPassword: (value: string) => void;
+  onCertSelected: (_event: unknown, file: File) => void;
+  onClearCert: () => void;
+  onViewCert: () => void;
+  onRootCommonNameEnabled: (enabled: boolean) => void;
+  onRootSerialEnabled: (enabled: boolean) => void;
+  onRootSerial: (value: string) => void;
+  onPolicy: () => void;
+}
+
+const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
+  mode,
+  user,
+  password,
+  certFilename,
+  certError,
+  rootCommonNameEnabled,
+  rootSerialEnabled,
+  rootSerial,
+  isOpen,
+  isSubmitDisabled,
+  onClose,
+  onSubmit,
+  onField,
+  onPassword,
+  onCertSelected,
+  onClearCert,
+  onViewCert,
+  onRootCommonNameEnabled,
+  onRootSerialEnabled,
+  onRootSerial,
+  onPolicy,
+}) => {
+  const isCreate = mode === 'create';
+  const authType = Number(user.AuthType_u32) || 0;
+  const idPrefix = isCreate ? 'user' : 'edit';
+  const certBytes = binToBytes(user.UserX_bin);
+  const serialResult = parseSerial(rootSerial);
+  const serialError =
+    rootSerialEnabled && rootSerial.trim().length === 0
+      ? 'Serial number is required when enabled.'
+      : rootSerialEnabled
+        ? serialResult.error
+        : null;
+
+  return (
+    <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={onClose}>
+      <ModalHeader title={isCreate ? 'New user' : `Edit ${String(user.Name_str)}`} />
+      <ModalBody>
+        <Form>
+          {isCreate && (
+            <FormGroup label="User name" isRequired fieldId={`${idPrefix}-name`}>
+              <TextInput
+                isRequired
+                id={`${idPrefix}-name`}
+                value={String(user.Name_str ?? '')}
+                onChange={(_event, value) => onField('Name_str', value)}
+                aria-label="User name"
+              />
+            </FormGroup>
+          )}
+          <FormGroup label="Real name" fieldId={`${idPrefix}-realname`}>
+            <TextInput
+              id={`${idPrefix}-realname`}
+              value={String(user.Realname_utf ?? '')}
+              onChange={(_event, value) => onField('Realname_utf', value)}
+              aria-label="Real name"
+            />
+          </FormGroup>
+          <FormGroup label="Note" fieldId={`${idPrefix}-note`}>
+            <TextInput
+              id={`${idPrefix}-note`}
+              value={String(user.Note_utf ?? '')}
+              onChange={(_event, value) => onField('Note_utf', value)}
+              aria-label="Note"
+            />
+          </FormGroup>
+          <FormGroup label="Group" fieldId={`${idPrefix}-group`}>
+            <TextInput
+              id={`${idPrefix}-group`}
+              value={String(user.GroupName_str ?? '')}
+              onChange={(_event, value) => onField('GroupName_str', value)}
+              aria-label="Group"
+            />
+          </FormGroup>
+          <FormGroup label="Authentication" fieldId={`${idPrefix}-auth`}>
+            <FormSelect
+              id={`${idPrefix}-auth`}
+              value={authType}
+              onChange={(_event, value) => onField('AuthType_u32', Number(value))}
+              aria-label="Authentication method"
+            >
+              {ALL_AUTH_TYPES.map((option) => (
+                <FormSelectOption key={option.value} value={option.value} label={option.label} />
+              ))}
+            </FormSelect>
+          </FormGroup>
+          {authType === VPN.VpnRpcUserAuthType.Password && (
+            <FormGroup label={isCreate ? 'Password' : 'New password'} fieldId={`${idPrefix}-password`}>
+              <TextInput
+                type="password"
+                id={`${idPrefix}-password`}
+                value={password}
+                onChange={(_event, value) => onPassword(value)}
+                placeholder={isCreate ? undefined : 'Leave blank to keep the current password'}
+                aria-label={isCreate ? 'Password' : 'New password'}
+              />
+            </FormGroup>
+          )}
+          {authType === VPN.VpnRpcUserAuthType.UserCert && (
+            <FormGroup label="User certificate" fieldId={`${idPrefix}-usercert`}>
+              <HelperText>
+                <HelperTextItem>
+                  The user may connect only with an SSL client certificate that exactly matches the one registered here.
+                </HelperTextItem>
+              </HelperText>
+              <FileUpload
+                id={`${idPrefix}-usercert`}
+                type="dataURL"
+                filename={certFilename}
+                filenamePlaceholder="Drag and drop or upload a certificate"
+                browseButtonText="Upload"
+                hideDefaultPreview
+                onFileInputChange={onCertSelected}
+                onClearClick={onClearCert}
+                dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
+                filenameAriaLabel="Certificate file name"
+              />
+              {certError && (
+                <HelperText>
+                  <HelperTextItem variant="error">{certError}</HelperTextItem>
+                </HelperText>
+              )}
+              {certBytes && !certError && (
+                <Button
+                  variant="link"
+                  isInline
+                  style={{ marginBlockStart: 'var(--pf-t--global--spacer--sm)' }}
+                  onClick={onViewCert}
+                >
+                  View registered certificate
+                </Button>
+              )}
+            </FormGroup>
+          )}
+          {authType === VPN.VpnRpcUserAuthType.RootCert && (
+            <>
+              <FormGroup fieldId={`${idPrefix}-cn-enabled`}>
+                <Checkbox
+                  id={`${idPrefix}-cn-enabled`}
+                  label="Set common name (CN)"
+                  isChecked={rootCommonNameEnabled}
+                  onChange={(_event, checked) => onRootCommonNameEnabled(checked)}
+                />
+              </FormGroup>
+              <FormGroup label="Common name (CN)" fieldId={`${idPrefix}-cn`}>
+                <TextInput
+                  id={`${idPrefix}-cn`}
+                  value={String(user.CommonName_utf ?? '')}
+                  onChange={(_event, value) => onField('CommonName_utf', value)}
+                  aria-label="Common name"
+                  isDisabled={!rootCommonNameEnabled}
+                  validated={rootCommonNameEnabled && String(user.CommonName_utf ?? '').trim().length === 0 ? 'error' : 'default'}
+                />
+                {rootCommonNameEnabled && String(user.CommonName_utf ?? '').trim().length === 0 && (
+                  <HelperText>
+                    <HelperTextItem variant="error">Common name is required when enabled.</HelperTextItem>
+                  </HelperText>
+                )}
+              </FormGroup>
+              <FormGroup fieldId={`${idPrefix}-serial-enabled`}>
+                <Checkbox
+                  id={`${idPrefix}-serial-enabled`}
+                  label="Set serial number"
+                  isChecked={rootSerialEnabled}
+                  onChange={(_event, checked) => onRootSerialEnabled(checked)}
+                />
+              </FormGroup>
+              <FormGroup label="Serial number" fieldId={`${idPrefix}-serial`}>
+                <TextInput
+                  id={`${idPrefix}-serial`}
+                  value={rootSerial}
+                  onChange={(_event, value) => onRootSerial(value)}
+                  aria-label="Serial number"
+                  isDisabled={!rootSerialEnabled}
+                  validated={serialError ? 'error' : 'default'}
+                />
+                {serialError && (
+                  <HelperText>
+                    <HelperTextItem variant="error">{serialError}</HelperTextItem>
+                  </HelperText>
+                )}
+              </FormGroup>
+            </>
+          )}
+          {authType === VPN.VpnRpcUserAuthType.Radius && (
+            <FormGroup label="RADIUS username" fieldId={`${idPrefix}-radius`}>
+              <TextInput
+                id={`${idPrefix}-radius`}
+                value={String(user.RadiusUsername_utf ?? '')}
+                onChange={(_event, value) => onField('RadiusUsername_utf', value)}
+                aria-label="RADIUS username"
+              />
+            </FormGroup>
+          )}
+          {authType === VPN.VpnRpcUserAuthType.NTDomain && (
+            <FormGroup label="NT domain username" fieldId={`${idPrefix}-nt`}>
+              <TextInput
+                id={`${idPrefix}-nt`}
+                value={String(user.NtUsername_utf ?? '')}
+                onChange={(_event, value) => onField('NtUsername_utf', value)}
+                aria-label="NT domain username"
+              />
+            </FormGroup>
+          )}
+          <FormGroup label="Security policy" fieldId={`${idPrefix}-policy`}>
+            <Button variant="secondary" onClick={onPolicy}>
+              {user.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
+            </Button>
+          </FormGroup>
+          <FormGroup fieldId={`${idPrefix}-expires`}>
+            <Checkbox
+              id={`${idPrefix}-expires`}
+              label="Account expires"
+              isChecked={!isNeverDate(user.ExpireTime_dt)}
+              onChange={(_event, checked) =>
+                onField('ExpireTime_dt', checked ? new Date(Date.now() + 365 * 864e5).toISOString() : NEVER)
+              }
+            />
+          </FormGroup>
+          {!isNeverDate(user.ExpireTime_dt) && (
+            <FormGroup label="Expiration date" fieldId={`${idPrefix}-expiredate`}>
+              <TextInput
+                type="date"
+                id={`${idPrefix}-expiredate`}
+                value={toDateInput(user.ExpireTime_dt)}
+                onChange={(_event, value) =>
+                  onField('ExpireTime_dt', value ? new Date(`${value}T00:00:00Z`).toISOString() : NEVER)
+                }
+                aria-label="Expiration date"
+              />
+            </FormGroup>
+          )}
+        </Form>
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="primary" onClick={onSubmit} isDisabled={isSubmitDisabled}>
+          {isCreate ? 'Create' : 'Save'}
+        </Button>
+        <Button variant="link" onClick={onClose}>
+          Cancel
+        </Button>
+      </ModalFooter>
+    </Modal>
+  );
+};
 
 const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [users, setUsers] = React.useState<VPN.VpnRpcEnumUserItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  const [createOpen, setCreateOpen] = React.useState(false);
-  const [name, setName] = React.useState('');
-  const [authType, setAuthType] = React.useState<number>(VPN.VpnRpcUserAuthType.Anonymous);
-  const [password, setPassword] = React.useState('');
-  const [realname, setRealname] = React.useState('');
-  const [note, setNote] = React.useState('');
+  const [create, setCreate] = React.useState<Record<string, unknown> | null>(null);
+  const [createPassword, setCreatePassword] = React.useState('');
+  const [createCertFilename, setCreateCertFilename] = React.useState('');
+  const [createCertError, setCreateCertError] = React.useState<string | null>(null);
+  const [createRootCommonNameEnabled, setCreateRootCommonNameEnabled] = React.useState(false);
+  const [createRootSerialEnabled, setCreateRootSerialEnabled] = React.useState(false);
+  const [createRootSerial, setCreateRootSerial] = React.useState('');
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
 
@@ -80,10 +408,13 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
   const [editOriginal, setEditOriginal] = React.useState<Record<string, unknown> | null>(null);
   const [newPassword, setNewPassword] = React.useState('');
-  const [certOpen, setCertOpen] = React.useState(false);
-  const [certFilename, setCertFilename] = React.useState('');
-  const [certError, setCertError] = React.useState<string | null>(null);
-  const [policyOpen, setPolicyOpen] = React.useState(false);
+  const [editCertFilename, setEditCertFilename] = React.useState('');
+  const [editCertError, setEditCertError] = React.useState<string | null>(null);
+  const [editRootCommonNameEnabled, setEditRootCommonNameEnabled] = React.useState(false);
+  const [editRootSerialEnabled, setEditRootSerialEnabled] = React.useState(false);
+  const [editRootSerial, setEditRootSerial] = React.useState('');
+  const [certOpen, setCertOpen] = React.useState<'create' | 'edit' | null>(null);
+  const [policyOpen, setPolicyOpen] = React.useState<'create' | 'edit' | null>(null);
 
   const load = React.useCallback(() => {
     setUsers(null);
@@ -99,80 +430,174 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   }, [load]);
 
   const openCreate = () => {
-    setName('');
-    setAuthType(VPN.VpnRpcUserAuthType.Anonymous);
-    setPassword('');
-    setRealname('');
-    setNote('');
-    setCreateOpen(true);
+    setCreate(emptyUserDraft());
+    setCreatePassword('');
+    setCreateCertFilename('');
+    setCreateCertError(null);
+    setCreateRootCommonNameEnabled(false);
+    setCreateRootSerialEnabled(false);
+    setCreateRootSerial('');
   };
 
-  const canCreate = name.trim().length > 0;
+  const canCreate =
+    !!create &&
+    String(create.Name_str ?? '').trim().length > 0 &&
+    userAuthValid(create, createCertError, createRootCommonNameEnabled, createRootSerialEnabled, createRootSerial);
 
-  const create = () => {
+  const createUser = () => {
+    if (!create) {
+      return;
+    }
+    const authType = Number(create.AuthType_u32) || 0;
+    const obj = new VPN.VpnRpcSetUser({
+      ...create,
+      HubName_str: hub,
+      Name_str: String(create.Name_str ?? '').trim(),
+      Auth_Password_str: authType === VPN.VpnRpcUserAuthType.Password ? createPassword : '',
+      UserX_bin: authType === VPN.VpnRpcUserAuthType.UserCert ? binToBytes(create.UserX_bin) ?? new Uint8Array() : new Uint8Array(),
+      CommonName_utf:
+        authType === VPN.VpnRpcUserAuthType.RootCert && createRootCommonNameEnabled ? String(create.CommonName_utf ?? '').trim() : '',
+      Serial_bin:
+        authType === VPN.VpnRpcUserAuthType.RootCert && createRootSerialEnabled ? parseSerial(createRootSerial).bytes : new Uint8Array(),
+      RadiusUsername_utf: authType === VPN.VpnRpcUserAuthType.Radius ? String(create.RadiusUsername_utf ?? '') : '',
+      NtUsername_utf: authType === VPN.VpnRpcUserAuthType.NTDomain ? String(create.NtUsername_utf ?? '') : '',
+      ExpireTime_dt: new Date(String(create.ExpireTime_dt ?? NEVER)),
+    });
     api
-      .CreateUser(
-        new VPN.VpnRpcSetUser({
-          HubName_str: hub,
-          Name_str: name.trim(),
-          AuthType_u32: authType,
-          Auth_Password_str: authType === VPN.VpnRpcUserAuthType.Password ? password : '',
-          Realname_utf: realname,
-          Note_utf: note,
-          // The constructor defaults ExpireTime_dt to now; use the epoch-era
-          // "never" sentinel so new accounts do not expire immediately.
-          ExpireTime_dt: new Date(0),
-        }),
-      )
+      .CreateUser(obj)
       .then(() => {
-        setCreateOpen(false);
+        setCreate(null);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setCreateOpen(false);
+        setCreate(null);
       });
   };
 
   const openEdit = (userName: string) => {
     setNewPassword('');
-    setCertFilename('');
-    setCertError(null);
+    setEditCertFilename('');
+    setEditCertError(null);
+    setEditRootCommonNameEnabled(false);
+    setEditRootSerialEnabled(false);
+    setEditRootSerial('');
     api
       .GetUser(new VPN.VpnRpcSetUser({ HubName_str: hub, Name_str: userName }))
       .then((response) => {
         const record = response as unknown as Record<string, unknown>;
         setEdit(record);
         setEditOriginal(record);
+        setEditRootCommonNameEnabled(String(record.CommonName_utf ?? '').trim().length > 0);
+        setEditRootSerialEnabled(binToBytes(record.Serial_bin) !== null);
+        setEditRootSerial(hexFromBytes(record.Serial_bin));
       })
       .catch((e) => setError(String(e)));
   };
 
+  const setCreateField = (key: string, value: unknown) => setCreate((prev) => (prev ? { ...prev, [key]: value } : prev));
   const setEditField = (key: string, value: unknown) => setEdit((prev) => (prev ? { ...prev, [key]: value } : prev));
+  const setCreateAuthType = (value: unknown) => {
+    if (Number(value) === VPN.VpnRpcUserAuthType.RootCert && Number(create?.AuthType_u32) !== VPN.VpnRpcUserAuthType.RootCert) {
+      setCreateRootCommonNameEnabled(false);
+      setCreateRootSerialEnabled(false);
+      setCreateRootSerial('');
+      setCreate((prev) => (prev ? { ...prev, AuthType_u32: value, CommonName_utf: '', Serial_bin: new Uint8Array() } : prev));
+      return;
+    }
+    setCreateField('AuthType_u32', value);
+  };
+  const setEditAuthType = (value: unknown) => {
+    if (Number(value) === VPN.VpnRpcUserAuthType.RootCert && Number(edit?.AuthType_u32) !== VPN.VpnRpcUserAuthType.RootCert) {
+      setEditRootCommonNameEnabled(false);
+      setEditRootSerialEnabled(false);
+      setEditRootSerial('');
+      setEdit((prev) => (prev ? { ...prev, AuthType_u32: value, CommonName_utf: '', Serial_bin: new Uint8Array() } : prev));
+      return;
+    }
+    setEditField('AuthType_u32', value);
+  };
+  const setCreateRootSerialField = (value: string) => {
+    setCreateRootSerial(value);
+    const result = parseSerial(value);
+    if (result.error === null) {
+      setCreateField('Serial_bin', result.bytes);
+    }
+  };
+  const setEditRootSerialField = (value: string) => {
+    setEditRootSerial(value);
+    const result = parseSerial(value);
+    if (result.error === null) {
+      setEditField('Serial_bin', result.bytes);
+    }
+  };
+  const toggleCreateRootCommonName = (enabled: boolean) => {
+    setCreateRootCommonNameEnabled(enabled);
+    if (!enabled) {
+      setCreateField('CommonName_utf', '');
+    }
+  };
+  const toggleEditRootCommonName = (enabled: boolean) => {
+    setEditRootCommonNameEnabled(enabled);
+    if (!enabled) {
+      setEditField('CommonName_utf', '');
+    }
+  };
+  const toggleCreateRootSerial = (enabled: boolean) => {
+    setCreateRootSerialEnabled(enabled);
+    if (!enabled) {
+      setCreateRootSerial('');
+      setCreateField('Serial_bin', new Uint8Array());
+    }
+  };
+  const toggleEditRootSerial = (enabled: boolean) => {
+    setEditRootSerialEnabled(enabled);
+    if (!enabled) {
+      setEditRootSerial('');
+      setEditField('Serial_bin', new Uint8Array());
+    }
+  };
 
-  // Read an uploaded certificate file, validate it parses, and stage its bytes
-  // as the user's UserX_bin (the server accepts DER or PEM).
-  const onCertSelected = (_event: unknown, file: File) => {
-    setCertError(null);
-    setCertFilename(file.name);
+  const readUserCertificate = (
+    file: File,
+    setFilename: (value: string) => void,
+    setFieldError: (value: string | null) => void,
+    setBytes: (value: Uint8Array) => void,
+  ) => {
+    setFieldError(null);
+    setFilename(file.name);
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const bytes = new Uint8Array(reader.result as ArrayBuffer);
         parseCertificate(bytes); // throws if not a certificate
-        setEditField('UserX_bin', bytes);
+        setBytes(bytes);
       } catch {
-        setCertError('The file is not a valid certificate (PEM or DER).');
-        setEditField('UserX_bin', new Uint8Array());
+        setFieldError('The file is not a valid certificate (PEM or DER).');
+        setBytes(new Uint8Array());
       }
     };
-    reader.onerror = () => setCertError('The certificate file could not be read.');
+    reader.onerror = () => setFieldError('The certificate file could not be read.');
     reader.readAsArrayBuffer(file);
   };
 
-  const clearCert = () => {
-    setCertFilename('');
-    setCertError(null);
+  const onCreateCertSelected = (_event: unknown, file: File) =>
+    readUserCertificate(file, setCreateCertFilename, setCreateCertError, (bytes) => setCreateField('UserX_bin', bytes));
+
+  // Read an uploaded certificate file, validate it parses, and stage its bytes
+  // as the user's UserX_bin (the server accepts DER or PEM).
+  const onEditCertSelected = (_event: unknown, file: File) =>
+    readUserCertificate(file, setEditCertFilename, setEditCertError, (bytes) => setEditField('UserX_bin', bytes));
+
+  const clearCreateCert = () => {
+    setCreateCertFilename('');
+    setCreateCertError(null);
+    setCreateField('UserX_bin', new Uint8Array());
+  };
+
+  const clearEditCert = () => {
+    setEditCertFilename('');
+    setEditCertError(null);
     setEditField('UserX_bin', new Uint8Array());
   };
 
@@ -198,6 +623,13 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       obj.UserX_bin = certBin;
     } else {
       delete (obj as { UserX_bin?: Uint8Array }).UserX_bin;
+    }
+    if (Number(obj.AuthType_u32) === VPN.VpnRpcUserAuthType.RootCert) {
+      obj.CommonName_utf = editRootCommonNameEnabled ? String(edit.CommonName_utf ?? '').trim() : '';
+      obj.Serial_bin = editRootSerialEnabled ? parseSerial(editRootSerial).bytes : new Uint8Array();
+    } else {
+      delete (obj as { CommonName_utf?: string }).CommonName_utf;
+      delete (obj as { Serial_bin?: Uint8Array }).Serial_bin;
     }
     api
       .SetUser(obj)
@@ -225,6 +657,8 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   const isLoading = users === null && error === null;
   const editDirty = recordChanged(editOriginal, edit, newPassword.length > 0);
+  const editValid =
+    !edit || userAuthValid(edit, editCertError, editRootCommonNameEnabled, editRootSerialEnabled, editRootSerial);
 
   return (
     <Flex
@@ -316,234 +750,57 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </Table>
       ) : null}
 
-      {/* Create user */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={() => setCreateOpen(false)}>
-        <ModalHeader title="New user" />
-        <ModalBody>
-          <Form>
-            <FormGroup label="User name" isRequired fieldId="user-name">
-              <TextInput
-                isRequired
-                id="user-name"
-                value={name}
-                onChange={(_event, value) => setName(value)}
-                aria-label="User name"
-              />
-            </FormGroup>
-            <FormGroup label="Authentication" fieldId="user-auth">
-              <FormSelect
-                id="user-auth"
-                value={authType}
-                onChange={(_event, value) => setAuthType(Number(value))}
-                aria-label="Authentication method"
-              >
-                {CREATABLE_AUTH_TYPES.map((option) => (
-                  <FormSelectOption key={option.value} value={option.value} label={option.label} />
-                ))}
-              </FormSelect>
-            </FormGroup>
-            {authType === VPN.VpnRpcUserAuthType.Password && (
-              <FormGroup label="Password" fieldId="user-password">
-                <TextInput
-                  type="password"
-                  id="user-password"
-                  value={password}
-                  onChange={(_event, value) => setPassword(value)}
-                  aria-label="Password"
-                />
-              </FormGroup>
-            )}
-            <FormGroup label="Real name" fieldId="user-realname">
-              <TextInput
-                id="user-realname"
-                value={realname}
-                onChange={(_event, value) => setRealname(value)}
-                aria-label="Real name"
-              />
-            </FormGroup>
-            <FormGroup label="Note" fieldId="user-note">
-              <TextInput id="user-note" value={note} onChange={(_event, value) => setNote(value)} aria-label="Note" />
-            </FormGroup>
-          </Form>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="primary" onClick={create} isDisabled={!canCreate}>
-            Create
-          </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)}>
-            Cancel
-          </Button>
-        </ModalFooter>
-      </Modal>
+      {create && (
+        <UserSettingsModal
+          mode="create"
+          user={create}
+          password={createPassword}
+          certFilename={createCertFilename}
+          certError={createCertError}
+          rootCommonNameEnabled={createRootCommonNameEnabled}
+          rootSerialEnabled={createRootSerialEnabled}
+          rootSerial={createRootSerial}
+          isOpen={certOpen === null && policyOpen === null}
+          isSubmitDisabled={!canCreate}
+          onClose={() => setCreate(null)}
+          onSubmit={createUser}
+          onField={(key, value) => (key === 'AuthType_u32' ? setCreateAuthType(value) : setCreateField(key, value))}
+          onPassword={setCreatePassword}
+          onCertSelected={onCreateCertSelected}
+          onClearCert={clearCreateCert}
+          onViewCert={() => setCertOpen('create')}
+          onRootCommonNameEnabled={toggleCreateRootCommonName}
+          onRootSerialEnabled={toggleCreateRootSerial}
+          onRootSerial={setCreateRootSerialField}
+          onPolicy={() => setPolicyOpen('create')}
+        />
+      )}
 
-      {/* Edit user */}
-      {/* Step aside while a sub-modal (certificate / policy) is open so only one
-          modal is active at a time - stacked modals hide each other from screen
-          readers. The edit state is preserved, so it reappears on return. */}
-      <Modal
-        variant={ModalVariant.medium}
-        isOpen={edit !== null && !certOpen && !policyOpen}
-        onClose={() => setEdit(null)}
-      >
-        <ModalHeader title={edit ? `Edit ${String(edit.Name_str)}` : ''} />
-        <ModalBody>
-          {edit && (
-            <Form>
-              <FormGroup label="Real name" fieldId="edit-realname">
-                <TextInput
-                  id="edit-realname"
-                  value={String(edit.Realname_utf ?? '')}
-                  onChange={(_event, value) => setEditField('Realname_utf', value)}
-                  aria-label="Real name"
-                />
-              </FormGroup>
-              <FormGroup label="Note" fieldId="edit-note">
-                <TextInput
-                  id="edit-note"
-                  value={String(edit.Note_utf ?? '')}
-                  onChange={(_event, value) => setEditField('Note_utf', value)}
-                  aria-label="Note"
-                />
-              </FormGroup>
-              <FormGroup label="Group" fieldId="edit-group">
-                <TextInput
-                  id="edit-group"
-                  value={String(edit.GroupName_str ?? '')}
-                  onChange={(_event, value) => setEditField('GroupName_str', value)}
-                  aria-label="Group"
-                />
-              </FormGroup>
-              <FormGroup label="Authentication" fieldId="edit-auth">
-                <FormSelect
-                  id="edit-auth"
-                  value={Number(edit.AuthType_u32)}
-                  onChange={(_event, value) => setEditField('AuthType_u32', Number(value))}
-                  aria-label="Authentication method"
-                >
-                  {ALL_AUTH_TYPES.map((option) => (
-                    <FormSelectOption key={option.value} value={option.value} label={option.label} />
-                  ))}
-                </FormSelect>
-              </FormGroup>
-              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.Password && (
-                <FormGroup label="New password" fieldId="edit-password">
-                  <TextInput
-                    type="password"
-                    id="edit-password"
-                    value={newPassword}
-                    onChange={(_event, value) => setNewPassword(value)}
-                    placeholder="Leave blank to keep the current password"
-                    aria-label="New password"
-                  />
-                </FormGroup>
-              )}
-              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.UserCert && (
-                <FormGroup label="User certificate" fieldId="edit-usercert">
-                  <HelperText>
-                    <HelperTextItem>
-                      The user may connect only with an SSL client certificate that exactly matches the one registered
-                      here.
-                    </HelperTextItem>
-                  </HelperText>
-                  <FileUpload
-                    id="edit-usercert"
-                    type="dataURL"
-                    filename={certFilename}
-                    filenamePlaceholder="Drag and drop or upload a certificate"
-                    browseButtonText="Upload"
-                    hideDefaultPreview
-                    onFileInputChange={onCertSelected}
-                    onClearClick={clearCert}
-                    dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
-                    filenameAriaLabel="Certificate file name"
-                  />
-                  {certError && (
-                    <HelperText>
-                      <HelperTextItem variant="error">{certError}</HelperTextItem>
-                    </HelperText>
-                  )}
-                  {binToBytes(edit.UserX_bin) && !certError && (
-                    <Button
-                      variant="link"
-                      isInline
-                      style={{ marginBlockStart: 'var(--pf-t--global--spacer--sm)' }}
-                      onClick={() => setCertOpen(true)}
-                    >
-                      View registered certificate
-                    </Button>
-                  )}
-                </FormGroup>
-              )}
-              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.RootCert && (
-                <FormGroup label="Common name (CN)" fieldId="edit-cn">
-                  <TextInput
-                    id="edit-cn"
-                    value={String(edit.CommonName_utf ?? '')}
-                    onChange={(_event, value) => setEditField('CommonName_utf', value)}
-                    aria-label="Common name"
-                  />
-                </FormGroup>
-              )}
-              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.Radius && (
-                <FormGroup label="RADIUS username" fieldId="edit-radius">
-                  <TextInput
-                    id="edit-radius"
-                    value={String(edit.RadiusUsername_utf ?? '')}
-                    onChange={(_event, value) => setEditField('RadiusUsername_utf', value)}
-                    aria-label="RADIUS username"
-                  />
-                </FormGroup>
-              )}
-              {Number(edit.AuthType_u32) === VPN.VpnRpcUserAuthType.NTDomain && (
-                <FormGroup label="NT domain username" fieldId="edit-nt">
-                  <TextInput
-                    id="edit-nt"
-                    value={String(edit.NtUsername_utf ?? '')}
-                    onChange={(_event, value) => setEditField('NtUsername_utf', value)}
-                    aria-label="NT domain username"
-                  />
-                </FormGroup>
-              )}
-              <FormGroup label="Security policy" fieldId="edit-policy">
-                <Button variant="secondary" onClick={() => setPolicyOpen(true)}>
-                  {edit.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
-                </Button>
-              </FormGroup>
-              <FormGroup fieldId="edit-expires">
-                <Checkbox
-                  id="edit-expires"
-                  label="Account expires"
-                  isChecked={!isNeverDate(edit.ExpireTime_dt)}
-                  onChange={(_event, checked) =>
-                    setEditField('ExpireTime_dt', checked ? new Date(Date.now() + 365 * 864e5).toISOString() : NEVER)
-                  }
-                />
-              </FormGroup>
-              {!isNeverDate(edit.ExpireTime_dt) && (
-                <FormGroup label="Expiration date" fieldId="edit-expiredate">
-                  <TextInput
-                    type="date"
-                    id="edit-expiredate"
-                    value={toDateInput(edit.ExpireTime_dt)}
-                    onChange={(_event, value) =>
-                      setEditField('ExpireTime_dt', value ? new Date(`${value}T00:00:00Z`).toISOString() : NEVER)
-                    }
-                    aria-label="Expiration date"
-                  />
-                </FormGroup>
-              )}
-            </Form>
-          )}
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="primary" onClick={saveEdit} isDisabled={!editDirty}>
-            Save
-          </Button>
-          <Button variant="link" onClick={() => setEdit(null)}>
-            Cancel
-          </Button>
-        </ModalFooter>
-      </Modal>
+      {edit && (
+        <UserSettingsModal
+          mode="edit"
+          user={edit}
+          password={newPassword}
+          certFilename={editCertFilename}
+          certError={editCertError}
+          rootCommonNameEnabled={editRootCommonNameEnabled}
+          rootSerialEnabled={editRootSerialEnabled}
+          rootSerial={editRootSerial}
+          isOpen={certOpen === null && policyOpen === null}
+          isSubmitDisabled={!editDirty || !editValid}
+          onClose={() => setEdit(null)}
+          onSubmit={saveEdit}
+          onField={(key, value) => (key === 'AuthType_u32' ? setEditAuthType(value) : setEditField(key, value))}
+          onPassword={setNewPassword}
+          onCertSelected={onEditCertSelected}
+          onClearCert={clearEditCert}
+          onViewCert={() => setCertOpen('edit')}
+          onRootCommonNameEnabled={toggleEditRootCommonName}
+          onRootSerialEnabled={toggleEditRootSerial}
+          onRootSerial={setEditRootSerialField}
+          onPolicy={() => setPolicyOpen('edit')}
+        />
+      )}
 
       {/* Delete confirmation */}
       <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
@@ -562,19 +819,33 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Modal>
 
       <CertificateModal
-        certBin={edit ? (edit.UserX_bin as Uint8Array | string | undefined) ?? null : null}
-        isOpen={certOpen}
-        onClose={() => setCertOpen(false)}
+        certBin={
+          certOpen === 'create'
+            ? (create?.UserX_bin as Uint8Array | string | undefined) ?? null
+            : (edit?.UserX_bin as Uint8Array | string | undefined) ?? null
+        }
+        isOpen={certOpen !== null}
+        onClose={() => setCertOpen(null)}
       />
 
       <SecurityPolicyModal
-        title={edit ? `Security policy: ${String(edit.Name_str ?? '')}` : 'Security policy'}
-        subject={edit}
-        isOpen={policyOpen}
-        onClose={() => setPolicyOpen(false)}
+        title={
+          policyOpen === 'create'
+            ? `Security policy: ${String(create?.Name_str ?? '').trim() || 'New user'}`
+            : edit
+              ? `Security policy: ${String(edit.Name_str ?? '')}`
+              : 'Security policy'
+        }
+        subject={policyOpen === 'create' ? create : edit}
+        isOpen={policyOpen !== null}
+        onClose={() => setPolicyOpen(null)}
         onSave={(updated) => {
-          setEdit(updated);
-          setPolicyOpen(false);
+          if (policyOpen === 'create') {
+            setCreate(updated);
+          } else {
+            setEdit(updated);
+          }
+          setPolicyOpen(null);
         }}
       />
     </Flex>

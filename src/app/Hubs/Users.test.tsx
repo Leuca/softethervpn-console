@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Users } from './Users';
@@ -103,6 +103,131 @@ describe('Users', () => {
     });
   });
 
+  it('creates a user authenticated by a registered certificate', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    createUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(screen.getByRole('button', { name: /new user/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('User name'), 'cert-user');
+    await user.selectOptions(within(dialog).getByLabelText('Authentication method'), '2');
+    expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
+
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, new File([SELF_SIGNED_CERT_DER()], 'user.cer', { type: 'application/x-x509-ca-cert' }));
+    expect(await within(dialog).findByRole('button', { name: 'View registered certificate' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    const sent = createUser.mock.calls[0][0];
+    expect(sent).toMatchObject({ Name_str: 'cert-user', AuthType_u32: 2 });
+    expect(sent.UserX_bin).toBeInstanceOf(Uint8Array);
+    expect(sent.UserX_bin.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['RADIUS', '4', 'RADIUS username', 'RadiusUsername_utf', 'radius-user'],
+    ['NT domain', '5', 'NT domain username', 'NtUsername_utf', 'nt-user'],
+  ])('creates a user with %s authentication', async (_label, authValue, fieldLabel, payloadKey, fieldValue) => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    createUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(screen.getByRole('button', { name: /new user/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('User name'), 'external-user');
+    await user.selectOptions(within(dialog).getByLabelText('Authentication method'), authValue);
+    await user.type(within(dialog).getByLabelText(fieldLabel), fieldValue);
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    expect(createUser.mock.calls[0][0]).toMatchObject({
+      Name_str: 'external-user',
+      AuthType_u32: Number(authValue),
+      [payloadKey]: fieldValue,
+    });
+  });
+
+  it('creates a root-certificate user with optional common name and serial constraints', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    createUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(screen.getByRole('button', { name: /new user/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('User name'), 'root-user');
+    await user.selectOptions(within(dialog).getByLabelText('Authentication method'), '3');
+    const create = within(dialog).getByRole('button', { name: 'Create' });
+    expect(create).toBeEnabled();
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Set common name (CN)' }));
+    expect(create).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('Common name'), 'cert-user.example.com');
+    expect(create).toBeEnabled();
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Set serial number' }));
+    expect(create).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('Serial number'), '0G');
+    expect(create).toBeDisabled();
+    await user.clear(within(dialog).getByLabelText('Serial number'));
+    await user.type(within(dialog).getByLabelText('Serial number'), '01 AB');
+    expect(create).toBeEnabled();
+
+    await user.click(create);
+
+    const sent = createUser.mock.calls[0][0];
+    expect(sent).toMatchObject({
+      Name_str: 'root-user',
+      AuthType_u32: 3,
+      CommonName_utf: 'cert-user.example.com',
+    });
+    expect(Array.from(sent.Serial_bin)).toEqual([1, 171]);
+  });
+
+  it('creates a user with group, expiration and security policy settings', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    createUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(screen.getByRole('button', { name: /new user/i }));
+
+    let dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('User name'), 'managed-user');
+    await user.type(within(dialog).getByLabelText('Group'), 'sales');
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Account expires' }));
+    const expiration = await within(dialog).findByLabelText('Expiration date');
+    fireEvent.change(expiration, { target: { value: '2027-03-04' } });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add security policy' }));
+    expect(await screen.findByText('Security policy: managed-user')).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: /apply a security policy/i }));
+    await user.click(screen.getByRole('switch', { name: 'Deny bridge operation' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    const sent = createUser.mock.calls[0][0];
+    expect(sent).toMatchObject({
+      Name_str: 'managed-user',
+      GroupName_str: 'sales',
+      UsePolicy_bool: true,
+      'policy:Access_bool': true,
+      'policy:NoBridge_bool': true,
+    });
+    expect(new Date(sent.ExpireTime_dt).toISOString()).toBe('2027-03-04T00:00:00.000Z');
+  });
+
   it('edits a user and keeps the password when the field is blank', async () => {
     enumUser.mockResolvedValue({ UserList: [alice] });
     // GetUser may not echo HubName_str; the save must still target the hub.
@@ -174,6 +299,39 @@ describe('Users', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(setUser.mock.calls[0][0].Auth_Password_str).toBe('newpass');
+  });
+
+  it('edits root-certificate serial constraints', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({
+      HubName_str: 'DEFAULT',
+      Name_str: 'alice',
+      AuthType_u32: 3,
+      CommonName_utf: 'alice.example.com',
+      Serial_bin: btoa(String.fromCharCode(1, 171)),
+    });
+    setUser.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    expect(within(dialog).getByRole('checkbox', { name: 'Set common name (CN)' })).toBeChecked();
+    expect(within(dialog).getByLabelText('Serial number')).toHaveValue('01 AB');
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Set serial number' }));
+    expect(save).toBeEnabled();
+    await user.click(save);
+
+    const sent = setUser.mock.calls[0][0];
+    expect(sent.CommonName_utf).toBe('alice.example.com');
+    expect(sent.Serial_bin).toBeInstanceOf(Uint8Array);
+    expect(sent.Serial_bin.length).toBe(0);
   });
 
   it('shows the registered certificate for a user-certificate user', async () => {
