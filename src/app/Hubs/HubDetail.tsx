@@ -4,6 +4,7 @@ import { Breadcrumb, BreadcrumbItem, Tab, TabTitleText, Tabs } from '@patternfly
 import { AppPage } from '@app/components/AppPage';
 import { HubStatus } from '@app/Hubs/HubStatus';
 import { Sessions } from '@app/Hubs/Sessions';
+import { Cascade } from '@app/Hubs/Cascade';
 import { Users } from '@app/Hubs/Users';
 import { Groups } from '@app/Hubs/Groups';
 import { AccessList } from '@app/Hubs/AccessList';
@@ -32,6 +33,9 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
           </Tab>
           <Tab eventKey="sessions" title={<TabTitleText>Sessions</TabTitleText>}>
             <Sessions hub={name} />
+          </Tab>
+          <Tab eventKey="cascade" title={<TabTitleText>Cascade</TabTitleText>}>
+            <Cascade hub={name} />
           </Tab>
           <Tab eventKey="properties" title={<TabTitleText>Properties</TabTitleText>}>
             <Properties hub={name} />
