@@ -64,7 +64,6 @@ const ADVANCED_DEFAULTS: Record<string, number | boolean> = {
   HalfConnection_bool: false,
   DisableQoS_bool: false,
   NoUdpAcceleration_bool: false,
-  NoTls1_bool: false,
   AdditionalConnectionInterval_u32: 1,
   ConnectionDisconnectSpan_u32: 0,
 };
@@ -106,7 +105,6 @@ const AdvancedFields: React.FunctionComponent<{
       {checkbox('HalfConnection_bool', 'Use half-duplex mode (with multiple connections)')}
       {checkbox('DisableQoS_bool', 'Disable VoIP / QoS control')}
       {checkbox('NoUdpAcceleration_bool', 'Disable UDP acceleration')}
-      {checkbox('NoTls1_bool', 'Do not use TLS 1.0')}
       {numField('AdditionalConnectionInterval_u32', 'Additional connection interval (seconds)', 1, 'Additional connection interval')}
       {numField('ConnectionDisconnectSpan_u32', 'Connection life of each TCP connection (seconds, 0 = no expiry)', 0, 'Connection life')}
     </ExpandableSection>
