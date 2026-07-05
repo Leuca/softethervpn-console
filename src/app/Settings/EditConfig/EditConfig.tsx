@@ -3,6 +3,7 @@ import {
   Alert,
   Bullseye,
   Button,
+  Content,
   Modal,
   ModalBody,
   ModalFooter,
@@ -16,6 +17,12 @@ import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
 import { binToBytes, downloadBlob } from '@app/utils/blob_utils';
+
+// After applying, the server restarts; wait a moment, then poll until it is
+// back rather than showing the transient connection error.
+const RESTART_WAIT_MS = 5000;
+const RETRY_INTERVAL_MS = 3000;
+const MAX_RETRIES = 12;
 
 // SoftEther config files are UTF-8 with a byte-order mark.
 const BOM = [0xef, 0xbb, 0xbf];
@@ -32,26 +39,59 @@ const EditConfig: React.FunctionComponent = () => {
   const [text, setText] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [applying, setApplying] = React.useState(false);
+  const [restarting, setRestarting] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
 
-  const load = React.useCallback(() => {
-    setText(null);
-    setError(null);
-    api
-      .GetConfig()
-      .then((response) => {
-        setFileName(response.FileName_str || 'vpn_server.config');
+  const timerRef = React.useRef<number | null>(null);
+  React.useEffect(() => () => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+    }
+  }, []);
+
+  const fetchConfig = React.useCallback(
+    () =>
+      api.GetConfig().then((response) => {
+        // SoftEther prefixes the internal config name with '$' (or '@'); strip
+        // it so the downloaded file is named vpn_server.config, not $vpn_...
+        const name = (response.FileName_str || '').replace(/^[$@]/, '');
+        setFileName(name || 'vpn_server.config');
         const bytes = binToBytes(response.FileData_bin);
         // TextDecoder strips a leading BOM; guard in case one survives.
         const decoded = bytes ? new TextDecoder().decode(bytes) : '';
         setText(decoded.replace(/^\uFEFF/, ''));
-      })
-      .catch((e) => setError(String(e)));
-  }, []);
+      }),
+    [],
+  );
+
+  const load = React.useCallback(() => {
+    setText(null);
+    setError(null);
+    fetchConfig().catch((e) => setError(String(e)));
+  }, [fetchConfig]);
 
   React.useEffect(() => {
     load();
   }, [load]);
+
+  // Poll for the server coming back after a restart, then show the reloaded config.
+  const waitForRestart = React.useCallback(() => {
+    let attempts = 0;
+    const attempt = () => {
+      fetchConfig()
+        .then(() => setRestarting(false))
+        .catch(() => {
+          attempts += 1;
+          if (attempts >= MAX_RETRIES) {
+            setRestarting(false);
+            setError('The VPN server did not come back online in time. Use Refresh to reconnect.');
+          } else {
+            timerRef.current = window.setTimeout(attempt, RETRY_INTERVAL_MS);
+          }
+        });
+    };
+    timerRef.current = window.setTimeout(attempt, RESTART_WAIT_MS);
+  }, [fetchConfig]);
 
   const download = () => {
     downloadBlob(new Blob([toConfigBytes(text ?? '')], { type: 'text/plain' }), fileName);
@@ -64,9 +104,12 @@ const EditConfig: React.FunctionComponent = () => {
     api
       .SetConfig(new VPN.VpnRpcConfig({ FileName_str: fileName, FileData_bin: toConfigBytes(text ?? '') }))
       .then(() => {
-        // The server restarts on success; reload after a short delay.
+        // The server restarts on success; wait for it to come back instead of
+        // hitting it mid-restart and showing a transient error.
         setApplying(false);
-        load();
+        setText(null);
+        setRestarting(true);
+        waitForRestart();
       })
       .catch((e) => {
         setError(String(e));
@@ -74,7 +117,8 @@ const EditConfig: React.FunctionComponent = () => {
       });
   };
 
-  const isLoading = text === null && error === null;
+  const isLoading = text === null && error === null && !restarting;
+  const busy = isLoading || applying || restarting;
 
   const actions = (
     <>
@@ -82,7 +126,7 @@ const EditConfig: React.FunctionComponent = () => {
         variant="secondary"
         icon={<SyncAltIcon />}
         onClick={load}
-        isDisabled={isLoading || applying}
+        isDisabled={busy}
         style={{ marginInlineEnd: 'var(--pf-t--global--spacer--sm)' }}
       >
         Refresh
@@ -91,12 +135,12 @@ const EditConfig: React.FunctionComponent = () => {
         variant="secondary"
         icon={<DownloadIcon />}
         onClick={download}
-        isDisabled={isLoading}
+        isDisabled={busy}
         style={{ marginInlineEnd: 'var(--pf-t--global--spacer--sm)' }}
       >
         Download
       </Button>
-      <Button variant="primary" onClick={() => setConfirmOpen(true)} isDisabled={isLoading || applying} isLoading={applying}>
+      <Button variant="primary" onClick={() => setConfirmOpen(true)} isDisabled={busy} isLoading={applying}>
         Apply
       </Button>
     </>
@@ -124,7 +168,16 @@ const EditConfig: React.FunctionComponent = () => {
         </Alert>
       )}
 
-      {isLoading ? (
+      {restarting ? (
+        <Bullseye>
+          <div style={{ textAlign: 'center' }}>
+            <Spinner size="xl" aria-label="Waiting for the VPN server to restart" />
+            <Content component="p" style={{ marginBlockStart: 'var(--pf-t--global--spacer--md)' }}>
+              Configuration applied. Waiting for the VPN server to restart and come back online...
+            </Content>
+          </div>
+        </Bullseye>
+      ) : isLoading ? (
         <Bullseye>
           <Spinner size="xl" aria-label="Loading configuration" />
         </Bullseye>

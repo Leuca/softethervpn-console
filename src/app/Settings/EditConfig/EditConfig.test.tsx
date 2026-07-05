@@ -28,7 +28,8 @@ describe('EditConfig', () => {
   });
 
   it('applies edited config (with BOM) after confirming', async () => {
-    getConfig.mockResolvedValue({ FileName_str: 'vpn_server.config', FileData_bin: configBase64('declare root {\n}\n') });
+    // GetConfig returns the internal name with the SoftEther '$' prefix.
+    getConfig.mockResolvedValue({ FileName_str: '$vpn_server.config', FileData_bin: configBase64('declare root {\n}\n') });
     setConfig.mockResolvedValue({});
     const user = userEvent.setup();
 
@@ -42,10 +43,25 @@ describe('EditConfig', () => {
 
     await waitFor(() => expect(setConfig).toHaveBeenCalledTimes(1));
     const sent = setConfig.mock.calls[0][0];
+    // the '$' prefix is stripped from the file name
     expect(sent.FileName_str).toBe('vpn_server.config');
     // bytes start with the UTF-8 BOM and decode back to the edited text
     expect(Array.from(sent.FileData_bin.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
     expect(new TextDecoder().decode(sent.FileData_bin)).toBe('uint MaxSessions 99');
+  });
+
+  it('shows a restarting notice (not an error) after applying', async () => {
+    getConfig.mockResolvedValue({ FileName_str: 'vpn_server.config', FileData_bin: configBase64('declare root {}') });
+    setConfig.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<EditConfig />);
+    await screen.findByLabelText('VPN server configuration');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(await screen.findByRole('button', { name: 'Apply and restart' }));
+
+    expect(await screen.findByText(/Waiting for the VPN server to restart/i)).toBeInTheDocument();
+    expect(screen.queryByText('Configuration operation failed')).not.toBeInTheDocument();
   });
 
   it('does not apply when the confirmation is cancelled', async () => {
