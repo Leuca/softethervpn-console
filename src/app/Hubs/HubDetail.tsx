@@ -10,6 +10,7 @@ import { Groups } from '@app/Hubs/Groups';
 import { AccessList } from '@app/Hubs/AccessList';
 import { Properties } from '@app/Hubs/Properties';
 import { Radius } from '@app/Hubs/Radius';
+import { HubCertificates } from '@app/Hubs/HubCertificates';
 
 /**
  * Management views for a single Virtual Hub, laid out as tabs.
@@ -48,6 +49,9 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
           </Tab>
           <Tab eventKey="accesslist" title={<TabTitleText>Access List</TabTitleText>}>
             <AccessList hub={name} />
+          </Tab>
+          <Tab eventKey="certificates" title={<TabTitleText>Trusted CA</TabTitleText>}>
+            <HubCertificates hub={name} />
           </Tab>
           <Tab eventKey="radius" title={<TabTitleText>RADIUS</TabTitleText>}>
             <Radius hub={name} />

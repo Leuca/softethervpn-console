@@ -9,6 +9,8 @@ export interface CertificateName {
   organization: string;
   organizationalUnit: string;
   country: string;
+  state: string;
+  locality: string;
 }
 
 export interface ParsedCertificate {
@@ -44,6 +46,8 @@ const name = (cert: X509Certificate, which: 'subjectName' | 'issuerName'): Certi
     organization: first('O'),
     organizationalUnit: first('OU'),
     country: first('C'),
+    state: first('ST'),
+    locality: first('L'),
   };
 };
 

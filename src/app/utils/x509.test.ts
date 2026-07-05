@@ -11,6 +11,8 @@ describe('parseCertificate', () => {
       organization: 'TestOrg',
       organizationalUnit: 'TestUnit',
       country: 'US',
+      state: '',
+      locality: '',
     });
     // Self-signed: issuer equals subject
     expect(cert.issuer.commonName).toBe('test.example.com');
