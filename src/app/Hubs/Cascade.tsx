@@ -3,6 +3,7 @@ import {
   Alert,
   Bullseye,
   Button,
+  Checkbox,
   EmptyState,
   EmptyStateActions,
   EmptyStateBody,
@@ -29,6 +30,7 @@ import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/reac
 import { PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
+import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { binToBytes } from '@app/utils/blob_utils';
 import { formatOptionalDate } from '@app/utils/format';
@@ -113,6 +115,13 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [keyFilename, setKeyFilename] = React.useState('');
   const [keyBytes, setKeyBytes] = React.useState<Uint8Array | null>(null);
   const [keyError, setKeyError] = React.useState<string | null>(null);
+  // Server certificate verification (CheckServerCert + optional pinned ServerCert).
+  const [checkServerCert, setCheckServerCert] = React.useState(false);
+  const [serverCertFilename, setServerCertFilename] = React.useState('');
+  const [serverCertBytes, setServerCertBytes] = React.useState<Uint8Array | null>(null);
+  const [serverCertError, setServerCertError] = React.useState<string | null>(null);
+  // Certificate to show in the shared viewer (staged-create or loaded-edit bytes).
+  const [viewCert, setViewCert] = React.useState<Uint8Array | string | null>(null);
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<StatusState | null>(null);
@@ -146,6 +155,10 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setKeyFilename('');
     setKeyBytes(null);
     setKeyError(null);
+    setCheckServerCert(false);
+    setServerCertFilename('');
+    setServerCertBytes(null);
+    setServerCertError(null);
     setCreateOpen(true);
   };
 
@@ -195,6 +208,25 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     reader.readAsArrayBuffer(file);
   };
 
+  // Read a pinned server certificate; validate it parses before staging bytes.
+  const onServerCertSelected = (_event: unknown, file: File) => {
+    setServerCertError(null);
+    setServerCertFilename(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const bytes = new Uint8Array(reader.result as ArrayBuffer);
+        parseCertificate(bytes);
+        setServerCertBytes(bytes);
+      } catch {
+        setServerCertError('The file is not a valid certificate (PEM or DER).');
+        setServerCertBytes(null);
+      }
+    };
+    reader.onerror = () => setServerCertError('The certificate file could not be read.');
+    reader.readAsArrayBuffer(file);
+  };
+
   const portNum = Number(port);
   const needsUsername = authType === SHA0_Hashed_Password || authType === PlainPassword || authType === Cert;
   const authComplete =
@@ -225,8 +257,12 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       HubName_str: destHub.trim(),
       MaxConnection_u32: 1,
       UseEncrypt_bool: true,
+      CheckServerCert_bool: checkServerCert,
       AuthType_u32: authType,
     });
+    if (checkServerCert && serverCertBytes) {
+      link.ServerCert_bin = serverCertBytes;
+    }
     // Fill only the fields the chosen auth method uses. _bin fields are handed
     // real Uint8Arrays; the client base64-encodes them on send.
     if (authType === SHA0_Hashed_Password) {
@@ -421,8 +457,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </Table>
       ) : null}
 
-      {/* Create cascade */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+      {/* Create cascade (step aside while the cert viewer is open) */}
+      <Modal variant={ModalVariant.small} isOpen={createOpen && viewCert === null} onClose={() => setCreateOpen(false)}>
         <ModalHeader title="New cascade connection" />
         <ModalBody>
           <Form>
@@ -548,6 +584,44 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 </FormGroup>
               </>
             )}
+            <FormGroup label="Server certificate" fieldId="link-servercert">
+              <Checkbox
+                id="link-checkservercert"
+                label="Always verify the destination server certificate"
+                isChecked={checkServerCert}
+                onChange={(_event, checked) => setCheckServerCert(checked)}
+              />
+              {checkServerCert && (
+                <>
+                  <FileUpload
+                    id="link-servercert"
+                    type="dataURL"
+                    filename={serverCertFilename}
+                    filenamePlaceholder="Optionally pin a specific server certificate"
+                    browseButtonText="Upload"
+                    hideDefaultPreview
+                    onFileInputChange={onServerCertSelected}
+                    onClearClick={() => {
+                      setServerCertFilename('');
+                      setServerCertBytes(null);
+                      setServerCertError(null);
+                    }}
+                    dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
+                    filenameAriaLabel="Server certificate file name"
+                  />
+                  <HelperText>
+                    <HelperTextItem variant={serverCertError ? 'error' : 'default'}>
+                      {serverCertError ?? 'If pinned, the server must present exactly this certificate.'}
+                    </HelperTextItem>
+                  </HelperText>
+                  {serverCertBytes && !serverCertError && (
+                    <Button variant="link" isInline onClick={() => setViewCert(serverCertBytes)}>
+                      View certificate
+                    </Button>
+                  )}
+                </>
+              )}
+            </FormGroup>
           </Form>
         </ModalBody>
         <ModalFooter>
@@ -560,8 +634,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ModalFooter>
       </Modal>
 
-      {/* Edit / inspect cascade */}
-      <Modal variant={ModalVariant.medium} isOpen={edit !== null} onClose={() => setEdit(null)}>
+      {/* Edit / inspect cascade (step aside while the cert viewer is open) */}
+      <Modal variant={ModalVariant.medium} isOpen={edit !== null && viewCert === null} onClose={() => setEdit(null)}>
         <ModalHeader title={edit ? `Cascade settings: ${String(edit.AccountName_utf ?? '')}` : ''} />
         <ModalBody>
           {edit && (
@@ -594,6 +668,23 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   aria-label="Destination virtual hub"
                 />
               </FormGroup>
+              <FormGroup label="Server certificate" fieldId="edit-servercert">
+                <Checkbox
+                  id="edit-checkservercert"
+                  label="Always verify the destination server certificate"
+                  isChecked={Boolean(edit.CheckServerCert_bool)}
+                  onChange={(_event, checked) => setEditField('CheckServerCert_bool', checked)}
+                />
+                {binToBytes(edit.ServerCert_bin) && (
+                  <Button
+                    variant="link"
+                    isInline
+                    onClick={() => setViewCert(edit.ServerCert_bin as Uint8Array | string)}
+                  >
+                    View pinned certificate
+                  </Button>
+                )}
+              </FormGroup>
               <FormGroup label="Current configuration" fieldId="edit-inspect">
                 <Table aria-label="Cascade configuration" variant="compact" borders={false}>
                   <Tbody>
@@ -604,10 +695,6 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     <Tr>
                       <Td>Username</Td>
                       <Td>{String(edit.Username_str || '-')}</Td>
-                    </Tr>
-                    <Tr>
-                      <Td>Verify server certificate</Td>
-                      <Td>{edit.CheckServerCert_bool ? 'Yes' : 'No'}</Td>
                     </Tr>
                     <Tr>
                       <Td>Proxy</Td>
@@ -625,8 +712,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 </Table>
                 <HelperText>
                   <HelperTextItem>
-                    Authentication, server certificate, proxy, advanced options and policy are preserved on save;
-                    editing them here is coming next.
+                    Authentication, proxy, advanced options and policy are preserved on save; editing them here is
+                    coming next.
                   </HelperTextItem>
                 </HelperText>
               </FormGroup>
@@ -691,6 +778,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </Button>
         </ModalFooter>
       </Modal>
+
+      <CertificateModal certBin={viewCert} isOpen={viewCert !== null} onClose={() => setViewCert(null)} />
     </Flex>
   );
 };

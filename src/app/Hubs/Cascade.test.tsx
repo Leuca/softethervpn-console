@@ -266,6 +266,61 @@ describe('Cascade', () => {
     expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
   });
 
+  it('creates a cascade that verifies and pins the server certificate', async () => {
+    enumLink.mockResolvedValue({ LinkList: [] });
+    createLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('No cascade connections');
+    await user.click(screen.getAllByRole('button', { name: /new cascade/i })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await fillCommonFields(user, dialog);
+    // Anonymous auth (default) -> the only file input is the pinned server cert.
+    await user.click(within(dialog).getByLabelText('Always verify the destination server certificate'));
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(
+      fileInput,
+      new File([SELF_SIGNED_CERT_DER()], 'server.cer', { type: 'application/x-x509-ca-cert' }),
+    );
+    await within(dialog).findByRole('button', { name: 'View certificate' });
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    const sent = createLink.mock.calls[0][0];
+    expect(sent.CheckServerCert_bool).toBe(true);
+    expect(sent.ServerCert_bin).toBeInstanceOf(Uint8Array);
+    expect(sent.ServerCert_bin.length).toBeGreaterThan(0);
+  });
+
+  it('toggles server-certificate verification when editing', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 0,
+      Username_str: '',
+      CheckServerCert_bool: false,
+      ServerCert_bin: '',
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByLabelText('Always verify the destination server certificate'));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(setLink.mock.calls[0][0].CheckServerCert_bool).toBe(true);
+  });
+
   it('sets an online cascade offline', async () => {
     enumLink.mockResolvedValue({ LinkList: [connectedLink] });
     setLinkOffline.mockResolvedValue({});
