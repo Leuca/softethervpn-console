@@ -360,18 +360,35 @@ const SyslogCard: React.FunctionComponent = () => {
   const load = React.useCallback(() => {
     setSyslog(null);
     setError(null);
-    api.GetSysLog(new VPN.VpnSyslogSetting()).then((r) => setSyslog(r as unknown as Record<string, unknown>)).catch((e) => setError(String(e)));
+    api
+      .GetSysLog(new VPN.VpnSyslogSetting())
+      .then((r) => {
+        const s = r as unknown as Record<string, unknown>;
+        // Default to the standard syslog port so an enabled config is never
+        // saved with port 0 (which the server rejects, reverting to Disabled).
+        if (!s.Port_u32) {
+          s.Port_u32 = 514;
+        }
+        setSyslog(s);
+      })
+      .catch((e) => setError(String(e)));
   }, []);
   React.useEffect(() => { load(); }, [load]);
 
   const setField = (k: string, v: unknown) => setSyslog((prev) => (prev ? { ...prev, [k]: v } : prev));
+
+  const enabled = Number(syslog?.SaveType_u32 ?? 0) !== 0;
+  const host = String(syslog?.Hostname_str ?? '');
+  const port = Number(syslog?.Port_u32 ?? 0);
+  const hostValid = !enabled || host.trim() !== '';
+  const portValid = !enabled || (port >= 1 && port <= 65535);
+  const valid = hostValid && portValid;
+
   const save = () => {
-    if (!syslog) return;
+    if (!syslog || !valid) return;
     setSaving(true);
     api.SetSysLog(new VPN.VpnSyslogSetting(syslog as Partial<VPN.VpnSyslogSetting>)).then(() => { setSaving(false); load(); }).catch((e) => { setError(String(e)); setSaving(false); });
   };
-
-  const enabled = Number(syslog?.SaveType_u32 ?? 0) !== 0;
 
   return (
     <Card>
@@ -391,12 +408,26 @@ const SyslogCard: React.FunctionComponent = () => {
               </FormSelect>
             </FormGroup>
             <FormGroup label="Syslog host name" fieldId="syslog-host">
-              <TextInput id="syslog-host" value={String(syslog.Hostname_str ?? '')} onChange={(_e, v) => setField('Hostname_str', v)} isDisabled={!enabled} aria-label="Syslog host name" />
+              <TextInput id="syslog-host" value={host} onChange={(_e, v) => setField('Hostname_str', v)} isDisabled={!enabled} validated={hostValid ? 'default' : 'error'} aria-label="Syslog host name" />
+              {!hostValid && (
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem variant="error">Enter the syslog server host name.</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              )}
             </FormGroup>
             <FormGroup label="Port" fieldId="syslog-port">
-              <TextInput type="number" id="syslog-port" min={1} max={65535} value={String(syslog.Port_u32 ?? 514)} onChange={(_e, v) => setField('Port_u32', Number(v) || 0)} isDisabled={!enabled} aria-label="Syslog port" />
+              <TextInput type="number" id="syslog-port" min={1} max={65535} value={String(syslog.Port_u32 ?? 514)} onChange={(_e, v) => setField('Port_u32', Number(v) || 0)} isDisabled={!enabled} validated={portValid ? 'default' : 'error'} aria-label="Syslog port" />
+              {!portValid && (
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem variant="error">Enter a port between 1 and 65535.</HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              )}
             </FormGroup>
-            <Button variant="primary" onClick={save} isDisabled={saving} isLoading={saving}>Save</Button>
+            <Button variant="primary" onClick={save} isDisabled={saving || !valid} isLoading={saving}>Save</Button>
           </Form>
         )}
       </CardBody>

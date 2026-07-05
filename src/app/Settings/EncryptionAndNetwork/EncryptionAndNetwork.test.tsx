@@ -98,10 +98,35 @@ describe('EncryptionNetwork', () => {
     const c = card('Syslog');
     await within(c).findByLabelText('Syslog save type');
     await user.selectOptions(within(c).getByLabelText('Syslog save type'), '2');
+    await user.type(within(c).getByLabelText('Syslog host name'), 'logs.example.com');
     await user.click(within(c).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(m('SetSysLog')).toHaveBeenCalledTimes(1));
     expect(m('SetSysLog').mock.calls[0][0].SaveType_u32).toBe(2);
+  });
+
+  it('blocks saving syslog with an empty host and defaults the port to 514', async () => {
+    // server returns an enabled save type with no host and port 0
+    m('GetSysLog').mockResolvedValue({ SaveType_u32: 1, Hostname_str: '', Port_u32: 0 });
+    m('SetSysLog').mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<EncryptionNetwork />);
+
+    const c = card('Syslog');
+    // port 0 was seeded to the standard 514
+    expect(await within(c).findByLabelText('Syslog port')).toHaveValue(514);
+    // empty host: error shown and Save disabled
+    expect(within(c).getByText('Enter the syslog server host name.')).toBeInTheDocument();
+    expect(within(c).getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    await user.type(within(c).getByLabelText('Syslog host name'), 'logs.example.com');
+    expect(within(c).getByRole('button', { name: 'Save' })).toBeEnabled();
+    await user.click(within(c).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(m('SetSysLog')).toHaveBeenCalledTimes(1));
+    const sent = m('SetSysLog').mock.calls[0][0];
+    expect(sent.Hostname_str).toBe('logs.example.com');
+    expect(sent.Port_u32).toBe(514);
   });
 
   it('toggles and saves VPN over ICMP/DNS', async () => {
