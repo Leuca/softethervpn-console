@@ -450,6 +450,39 @@ describe('Cascade', () => {
     expect(sent.ProxyPort_u32).toBe(3128);
   });
 
+  it('edits the security policy of a cascade', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 0,
+      UsePolicy_bool: false,
+      'policy:Access_bool': true,
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Add security policy' }));
+    expect(await screen.findByText('Cascade security policy')).toBeInTheDocument();
+    await user.click(await screen.findByRole('switch', { name: /apply a security policy/i }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    // Back on the edit modal, save.
+    await user.click(await screen.findByRole('button', { name: 'Save' }));
+
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.UsePolicy_bool).toBe(true);
+    expect(sent['policy:Access_bool']).toBe(true);
+  });
+
   it('sets an online cascade offline', async () => {
     enumLink.mockResolvedValue({ LinkList: [connectedLink] });
     setLinkOffline.mockResolvedValue({});

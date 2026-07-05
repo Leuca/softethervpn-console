@@ -32,6 +32,7 @@ import { PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
+import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { binToBytes } from '@app/utils/blob_utils';
 import { formatOptionalDate } from '@app/utils/format';
@@ -272,6 +273,10 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [advanced, setAdvanced] = React.useState<Record<string, number | boolean>>({ ...ADVANCED_DEFAULTS });
   // Proxy config for a new cascade.
   const [proxy, setProxy] = React.useState<Record<string, unknown>>({ ProxyType_u32: VPN.VpnRpcProxyType.Direct });
+  // Security policy for a new cascade (policy:* fields + UsePolicy_bool).
+  const [createPolicy, setCreatePolicy] = React.useState<Record<string, unknown>>({});
+  // Which form the shared SecurityPolicyModal is editing, if any.
+  const [policyFor, setPolicyFor] = React.useState<'create' | 'edit' | null>(null);
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<StatusState | null>(null);
@@ -311,6 +316,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setServerCertError(null);
     setAdvanced({ ...ADVANCED_DEFAULTS });
     setProxy({ ProxyType_u32: VPN.VpnRpcProxyType.Direct });
+    setCreatePolicy({});
     setCreateOpen(true);
   };
 
@@ -412,6 +418,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       AuthType_u32: authType,
       ...advanced,
       ...proxy,
+      ...createPolicy,
     });
     coerceLinkNumbers(link as unknown as Record<string, unknown>);
     if (checkServerCert && serverCertBytes) {
@@ -520,6 +527,9 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   };
 
   const isLoading = links === null && error === null;
+  // A sub-modal (cert viewer or policy editor) is open; the create/edit modal
+  // steps aside so only one modal is active at a time (screen-reader a11y).
+  const subModalOpen = viewCert !== null || policyFor !== null;
 
   return (
     <Flex
@@ -612,8 +622,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </Table>
       ) : null}
 
-      {/* Create cascade (step aside while the cert viewer is open) */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen && viewCert === null} onClose={() => setCreateOpen(false)}>
+      {/* Create cascade (step aside while a sub-modal is open) */}
+      <Modal variant={ModalVariant.small} isOpen={createOpen && !subModalOpen} onClose={() => setCreateOpen(false)}>
         <ModalHeader title="New cascade connection" />
         <ModalBody>
           <Form>
@@ -787,6 +797,11 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               get={(key) => advanced[key]}
               set={(key, value) => setAdvanced((prev) => ({ ...prev, [key]: value as number | boolean }))}
             />
+            <FormGroup label="Security policy" fieldId="link-policy">
+              <Button variant="secondary" onClick={() => setPolicyFor('create')}>
+                {createPolicy.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
+              </Button>
+            </FormGroup>
           </Form>
         </ModalBody>
         <ModalFooter>
@@ -799,8 +814,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ModalFooter>
       </Modal>
 
-      {/* Edit / inspect cascade (step aside while the cert viewer is open) */}
-      <Modal variant={ModalVariant.medium} isOpen={edit !== null && viewCert === null} onClose={() => setEdit(null)}>
+      {/* Edit / inspect cascade (step aside while a sub-modal is open) */}
+      <Modal variant={ModalVariant.medium} isOpen={edit !== null && !subModalOpen} onClose={() => setEdit(null)}>
         <ModalHeader title={edit ? `Cascade settings: ${String(edit.AccountName_utf ?? '')}` : ''} />
         <ModalBody>
           {edit && (
@@ -852,6 +867,11 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               </FormGroup>
               <ProxyFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <AdvancedFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
+              <FormGroup label="Security policy" fieldId="edit-policy">
+                <Button variant="secondary" onClick={() => setPolicyFor('edit')}>
+                  {edit.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
+                </Button>
+              </FormGroup>
               <FormGroup label="Current configuration" fieldId="edit-inspect">
                 <Table aria-label="Cascade configuration" variant="compact" borders={false}>
                   <Tbody>
@@ -933,6 +953,21 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Modal>
 
       <CertificateModal certBin={viewCert} isOpen={viewCert !== null} onClose={() => setViewCert(null)} />
+
+      <SecurityPolicyModal
+        title="Cascade security policy"
+        subject={policyFor === 'create' ? createPolicy : policyFor === 'edit' ? edit : null}
+        isOpen={policyFor !== null}
+        onClose={() => setPolicyFor(null)}
+        onSave={(updated) => {
+          if (policyFor === 'create') {
+            setCreatePolicy(updated);
+          } else {
+            setEdit(updated);
+          }
+          setPolicyFor(null);
+        }}
+      />
     </Flex>
   );
 };
