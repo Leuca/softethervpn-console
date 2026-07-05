@@ -293,6 +293,100 @@ describe('Cascade', () => {
     expect(sent.ServerCert_bin.length).toBeGreaterThan(0);
   });
 
+  it('changes a cascade auth method when editing', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 0, // anonymous
+      Username_str: '',
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(
+      within(dialog).getByLabelText('Authentication method'),
+      'RADIUS / NT domain (plain password)',
+    );
+    await user.type(within(dialog).getByLabelText('Username'), 'newuser');
+    await user.type(within(dialog).getByLabelText('Password'), 'newpass');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.AuthType_u32).toBe(2);
+    expect(sent.Username_str).toBe('newuser');
+    expect(sent.PlainPassword_str).toBe('newpass');
+  });
+
+  it('rehashes the password when editing standard-password auth', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 1, // SHA0 standard password
+      Username_str: 'alice',
+      HashedPassword_bin: 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTA=', // 20 bytes, an existing secret
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Password'), 'newsecret');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    const sent = setLink.mock.calls[0][0];
+    expect(Array.from(sent.HashedPassword_bin)).toEqual(Array.from(hashSoftEtherPassword('alice', 'newsecret')));
+  });
+
+  it('keeps the existing password when the edit password is left blank', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 2, // plain password
+      Username_str: 'bob',
+      PlainPassword_str: 'keepme',
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    // Change only the destination host; leave the password blank.
+    const hostField = within(dialog).getByLabelText('Destination server host');
+    await user.clear(hostField);
+    await user.type(hostField, 'new.example.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.PlainPassword_str).toBe('keepme');
+    expect(sent.Hostname_str).toBe('new.example.com');
+  });
+
   it('toggles server-certificate verification when editing', async () => {
     enumLink.mockResolvedValue({ LinkList: [connectedLink] });
     getLink.mockResolvedValue({
@@ -543,9 +637,9 @@ describe('Cascade', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
 
     const dialog = await screen.findByRole('dialog');
-    // Inspection shows the config that is not directly editable yet.
-    expect(await within(dialog).findByText('RADIUS / NT domain (plain password)')).toBeInTheDocument();
-    expect(within(dialog).getByText('bob')).toBeInTheDocument();
+    // Auth is now editable and prefilled from GetLink.
+    expect(within(dialog).getByLabelText('Authentication method')).toHaveValue('2'); // PlainPassword
+    expect(within(dialog).getByLabelText('Username')).toHaveValue('bob');
 
     const hostField = within(dialog).getByLabelText('Destination server host');
     await user.clear(hostField);

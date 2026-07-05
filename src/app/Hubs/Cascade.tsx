@@ -49,8 +49,39 @@ const LINK_AUTH_TYPES = [
   { value: VPN.VpnRpcClientAuthType.Cert, label: 'Client certificate' },
 ];
 
-const authTypeLabel = (t: unknown): string =>
-  LINK_AUTH_TYPES.find((a) => a.value === Number(t))?.label ?? `Type ${t}`;
+// Read a certificate file, validating that it parses before returning bytes.
+const readCertBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m: string) => void): void => {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const bytes = new Uint8Array(reader.result as ArrayBuffer);
+      parseCertificate(bytes); // throws if not a certificate
+      onBytes(bytes);
+    } catch {
+      onError('The file is not a valid certificate (PEM or DER).');
+    }
+  };
+  reader.onerror = () => onError('The certificate file could not be read.');
+  reader.readAsArrayBuffer(file);
+};
+
+// Read a private key. The RPC decodes the key with no passphrase
+// (InRpcClientAuth -> BufToK(..., NULL)), so an encrypted key would fail
+// silently server-side; reject one with a clear error (PEM markers).
+const readKeyBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m: string) => void): void => {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const bytes = new Uint8Array(reader.result as ArrayBuffer);
+    const text = new TextDecoder('latin1').decode(bytes);
+    if (/ENCRYPTED PRIVATE KEY|Proc-Type:\s*4,\s*ENCRYPTED|DEK-Info:/i.test(text)) {
+      onError('Encrypted (password-protected) private keys are not supported yet. Provide an unencrypted key.');
+      return;
+    }
+    onBytes(bytes);
+  };
+  reader.onerror = () => onError('The private key file could not be read.');
+  reader.readAsArrayBuffer(file);
+};
 
 // _bin fields round-tripped from GetLink arrive as base64 strings; convert to
 // real bytes before SetLink so the client does not double-encode them.
@@ -241,6 +272,193 @@ interface StatusState {
   error: string | null;
 }
 
+// True when the auth section has everything it needs to save. `password` may be
+// empty in edit mode when the existing secret is kept (hasSecret).
+const authComplete = (get: (key: string) => unknown, password: string, hasSecret: boolean): boolean => {
+  const type = Number(get('AuthType_u32')) || 0;
+  const username = String(get('Username_str') ?? '').trim();
+  const { Anonymous, SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
+  if (type === Anonymous) {
+    return true;
+  }
+  if (type === SHA0_Hashed_Password || type === PlainPassword) {
+    return username.length > 0 && (password.length > 0 || hasSecret);
+  }
+  if (type === Cert) {
+    return username.length > 0 && binToBytes(get('ClientX_bin')) !== null && binToBytes(get('ClientK_bin')) !== null;
+  }
+  return false;
+};
+
+// Write the chosen auth method's fields onto `target` from the auth inputs.
+// A blank password leaves the secret already on `target` untouched (edit keeps
+// the existing one); _bin fields are handed real bytes.
+const applyAuth = (target: Record<string, unknown>, get: (key: string) => unknown, password: string): void => {
+  const { SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
+  const type = Number(get('AuthType_u32')) || 0;
+  const username = String(get('Username_str') ?? '').trim();
+  target.AuthType_u32 = type;
+  target.Username_str = username;
+  if (type === SHA0_Hashed_Password) {
+    if (password.length > 0) {
+      target.HashedPassword_bin = hashSoftEtherPassword(username, password);
+    }
+  } else if (type === PlainPassword) {
+    if (password.length > 0) {
+      target.PlainPassword_str = password;
+    }
+  } else if (type === Cert) {
+    const x = binToBytes(get('ClientX_bin'));
+    const k = binToBytes(get('ClientK_bin'));
+    if (x) {
+      target.ClientX_bin = x;
+    }
+    if (k) {
+      target.ClientK_bin = k;
+    }
+  }
+};
+
+// Shared authentication editor for the create and edit forms. Reads/writes
+// AuthType_u32, Username_str and the certificate ClientX_bin/ClientK_bin on the
+// parent object via get/set; the plaintext password is a separate controlled
+// value (in edit mode, blank keeps the existing secret). File-picker filenames
+// and errors are transient and kept in local state.
+const AuthFields: React.FunctionComponent<{
+  idPrefix: string;
+  get: (key: string) => unknown;
+  set: (key: string, value: unknown) => void;
+  password: string;
+  setPassword: (value: string) => void;
+  passwordPlaceholder?: string;
+  onViewCert: (cert: Uint8Array | string) => void;
+}> = ({ idPrefix, get, set, password, setPassword, passwordPlaceholder, onViewCert }) => {
+  const { Anonymous, SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
+  const authType = Number(get('AuthType_u32')) || Anonymous;
+  const needsUsername = authType === SHA0_Hashed_Password || authType === PlainPassword || authType === Cert;
+  const [certFilename, setCertFilename] = React.useState('');
+  const [certError, setCertError] = React.useState<string | null>(null);
+  const [keyFilename, setKeyFilename] = React.useState('');
+  const [keyError, setKeyError] = React.useState<string | null>(null);
+  return (
+    <>
+      <FormGroup label="Authentication" fieldId={`${idPrefix}-auth`}>
+        <FormSelect
+          id={`${idPrefix}-auth`}
+          value={authType}
+          onChange={(_event, value) => set('AuthType_u32', Number(value))}
+          aria-label="Authentication method"
+        >
+          {LINK_AUTH_TYPES.map((option) => (
+            <FormSelectOption key={option.value} value={option.value} label={option.label} />
+          ))}
+        </FormSelect>
+      </FormGroup>
+      {needsUsername && (
+        <FormGroup label="Username" isRequired fieldId={`${idPrefix}-username`}>
+          <TextInput
+            isRequired
+            id={`${idPrefix}-username`}
+            value={String(get('Username_str') ?? '')}
+            onChange={(_event, value) => set('Username_str', value)}
+            aria-label="Username"
+          />
+        </FormGroup>
+      )}
+      {(authType === SHA0_Hashed_Password || authType === PlainPassword) && (
+        <FormGroup label="Password" isRequired={!passwordPlaceholder} fieldId={`${idPrefix}-password`}>
+          <TextInput
+            isRequired={!passwordPlaceholder}
+            type="password"
+            id={`${idPrefix}-password`}
+            value={password}
+            onChange={(_event, value) => setPassword(value)}
+            placeholder={passwordPlaceholder}
+            aria-label="Password"
+          />
+        </FormGroup>
+      )}
+      {authType === Cert && (
+        <>
+          <FormGroup label="Client certificate" isRequired fieldId={`${idPrefix}-cert`}>
+            <FileUpload
+              id={`${idPrefix}-cert`}
+              type="dataURL"
+              filename={certFilename}
+              filenamePlaceholder="Drag and drop or upload a certificate"
+              browseButtonText="Upload"
+              hideDefaultPreview
+              onFileInputChange={(_event, file) => {
+                setCertError(null);
+                setCertFilename(file.name);
+                readCertBytes(
+                  file,
+                  (bytes) => set('ClientX_bin', bytes),
+                  (message) => {
+                    setCertError(message);
+                    set('ClientX_bin', undefined);
+                  },
+                );
+              }}
+              onClearClick={() => {
+                setCertFilename('');
+                setCertError(null);
+                set('ClientX_bin', undefined);
+              }}
+              dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
+              filenameAriaLabel="Certificate file name"
+            />
+            {certError && (
+              <HelperText>
+                <HelperTextItem variant="error">{certError}</HelperTextItem>
+              </HelperText>
+            )}
+            {binToBytes(get('ClientX_bin')) && !certError && (
+              <Button variant="link" isInline onClick={() => onViewCert(get('ClientX_bin') as Uint8Array | string)}>
+                View certificate
+              </Button>
+            )}
+          </FormGroup>
+          <FormGroup label="Private key" isRequired fieldId={`${idPrefix}-key`}>
+            <FileUpload
+              id={`${idPrefix}-key`}
+              type="dataURL"
+              filename={keyFilename}
+              filenamePlaceholder="Drag and drop or upload the private key"
+              browseButtonText="Upload"
+              hideDefaultPreview
+              onFileInputChange={(_event, file) => {
+                setKeyError(null);
+                setKeyFilename(file.name);
+                readKeyBytes(
+                  file,
+                  (bytes) => set('ClientK_bin', bytes),
+                  (message) => {
+                    setKeyError(message);
+                    set('ClientK_bin', undefined);
+                  },
+                );
+              }}
+              onClearClick={() => {
+                setKeyFilename('');
+                setKeyError(null);
+                set('ClientK_bin', undefined);
+              }}
+              dropzoneProps={{ accept: { 'application/octet-stream': ['.key', '.pem', '.der'] } }}
+              filenameAriaLabel="Private key file name"
+            />
+            {keyError && (
+              <HelperText>
+                <HelperTextItem variant="error">{keyError}</HelperTextItem>
+              </HelperText>
+            )}
+          </FormGroup>
+        </>
+      )}
+    </>
+  );
+};
+
 const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [links, setLinks] = React.useState<VPN.VpnRpcEnumLinkItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -250,16 +468,14 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [host, setHost] = React.useState('');
   const [port, setPort] = React.useState('443');
   const [destHub, setDestHub] = React.useState('');
-  const [authType, setAuthType] = React.useState<number>(VPN.VpnRpcClientAuthType.Anonymous);
-  const [username, setUsername] = React.useState('');
+  // Auth for a new cascade: AuthType_u32, Username_str and cert ClientX/K_bin
+  // live in this object (bound to AuthFields); password is the plaintext secret.
+  const [auth, setAuth] = React.useState<Record<string, unknown>>({
+    AuthType_u32: VPN.VpnRpcClientAuthType.Anonymous,
+  });
   const [password, setPassword] = React.useState('');
-  // Client certificate auth: the certificate (ClientX) and its private key (ClientK).
-  const [certFilename, setCertFilename] = React.useState('');
-  const [certBytes, setCertBytes] = React.useState<Uint8Array | null>(null);
-  const [certError, setCertError] = React.useState<string | null>(null);
-  const [keyFilename, setKeyFilename] = React.useState('');
-  const [keyBytes, setKeyBytes] = React.useState<Uint8Array | null>(null);
-  const [keyError, setKeyError] = React.useState<string | null>(null);
+  // Plaintext password entered while editing (blank keeps the existing secret).
+  const [editPassword, setEditPassword] = React.useState('');
   // Server certificate verification (CheckServerCert + optional pinned ServerCert).
   const [checkServerCert, setCheckServerCert] = React.useState(false);
   const [serverCertFilename, setServerCertFilename] = React.useState('');
@@ -299,15 +515,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setHost('');
     setPort('443');
     setDestHub('');
-    setAuthType(VPN.VpnRpcClientAuthType.Anonymous);
-    setUsername('');
+    setAuth({ AuthType_u32: VPN.VpnRpcClientAuthType.Anonymous });
     setPassword('');
-    setCertFilename('');
-    setCertBytes(null);
-    setCertError(null);
-    setKeyFilename('');
-    setKeyBytes(null);
-    setKeyError(null);
     setCheckServerCert(false);
     setServerCertFilename('');
     setServerCertBytes(null);
@@ -318,80 +527,21 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setCreateOpen(true);
   };
 
-  const { Anonymous, SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
-
-  // Read a cascade client certificate; validate it parses before staging bytes.
-  const onCertSelected = (_event: unknown, file: File) => {
-    setCertError(null);
-    setCertFilename(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const bytes = new Uint8Array(reader.result as ArrayBuffer);
-        parseCertificate(bytes); // throws if not a certificate
-        setCertBytes(bytes);
-      } catch {
-        setCertError('The file is not a valid certificate (PEM or DER).');
-        setCertBytes(null);
-      }
-    };
-    reader.onerror = () => setCertError('The certificate file could not be read.');
-    reader.readAsArrayBuffer(file);
-  };
-
-  // Read the private key and send its bytes as-is. The RPC decodes the key with
-  // no passphrase (InRpcClientAuth -> BufToK(..., NULL)), so an encrypted key
-  // would fail silently server-side; detect the PEM encryption markers and
-  // reject with a clear message. In-browser decryption is not yet supported.
-  const onKeySelected = (_event: unknown, file: File) => {
-    setKeyError(null);
-    setKeyFilename(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const bytes = new Uint8Array(reader.result as ArrayBuffer);
-      const text = new TextDecoder('latin1').decode(bytes);
-      if (/ENCRYPTED PRIVATE KEY|Proc-Type:\s*4,\s*ENCRYPTED|DEK-Info:/i.test(text)) {
-        setKeyError('Encrypted (password-protected) private keys are not supported yet. Provide an unencrypted key.');
-        setKeyBytes(null);
-        return;
-      }
-      setKeyBytes(bytes);
-    };
-    reader.onerror = () => {
-      setKeyError('The private key file could not be read.');
-      setKeyBytes(null);
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
   // Read a pinned server certificate; validate it parses before staging bytes.
   const onServerCertSelected = (_event: unknown, file: File) => {
     setServerCertError(null);
     setServerCertFilename(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const bytes = new Uint8Array(reader.result as ArrayBuffer);
-        parseCertificate(bytes);
-        setServerCertBytes(bytes);
-      } catch {
-        setServerCertError('The file is not a valid certificate (PEM or DER).');
+    readCertBytes(
+      file,
+      (bytes) => setServerCertBytes(bytes),
+      (message) => {
+        setServerCertError(message);
         setServerCertBytes(null);
-      }
-    };
-    reader.onerror = () => setServerCertError('The certificate file could not be read.');
-    reader.readAsArrayBuffer(file);
+      },
+    );
   };
 
   const portNum = Number(port);
-  const needsUsername = authType === SHA0_Hashed_Password || authType === PlainPassword || authType === Cert;
-  const authComplete =
-    authType === Anonymous ||
-    // Password is not trimmed: leading/trailing spaces can be significant.
-    ((authType === SHA0_Hashed_Password || authType === PlainPassword) &&
-      username.trim().length > 0 &&
-      password.length > 0) ||
-    (authType === Cert && username.trim().length > 0 && certBytes !== null && keyBytes !== null);
   const canCreate =
     name.trim().length > 0 &&
     host.trim().length > 0 &&
@@ -399,7 +549,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     Number.isInteger(portNum) &&
     portNum >= 1 &&
     portNum <= 65535 &&
-    authComplete &&
+    authComplete((key) => auth[key], password, false) &&
     proxyComplete((key) => proxy[key]);
 
   const create = () => {
@@ -413,7 +563,6 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       Port_u32: portNum,
       HubName_str: destHub.trim(),
       CheckServerCert_bool: checkServerCert,
-      AuthType_u32: authType,
       ...advanced,
       ...proxy,
       ...createPolicy,
@@ -422,19 +571,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     if (checkServerCert && serverCertBytes) {
       link.ServerCert_bin = serverCertBytes;
     }
-    // Fill only the fields the chosen auth method uses. _bin fields are handed
-    // real Uint8Arrays; the client base64-encodes them on send.
-    if (authType === SHA0_Hashed_Password) {
-      link.Username_str = username.trim();
-      link.HashedPassword_bin = hashSoftEtherPassword(username.trim(), password);
-    } else if (authType === PlainPassword) {
-      link.Username_str = username.trim();
-      link.PlainPassword_str = password;
-    } else if (authType === Cert && certBytes && keyBytes) {
-      link.Username_str = username.trim();
-      link.ClientX_bin = certBytes;
-      link.ClientK_bin = keyBytes;
-    }
+    applyAuth(link as unknown as Record<string, unknown>, (key) => auth[key], password);
     api
       .CreateLink(link)
       .then(() => {
@@ -474,6 +611,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Load the full cascade config for inspection / editing. GetLink is keyed by
   // the local hub (HubName_Ex_str) and the account name.
   const openEdit = (accountName: string) => {
+    setEditPassword('');
     api
       .GetLink(new VPN.VpnRpcCreateLink({ HubName_Ex_str: hub, AccountName_utf: accountName }))
       .then((response) => setEdit(response as unknown as Record<string, unknown>))
@@ -500,6 +638,9 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         delete (obj as unknown as Record<string, unknown>)[key];
       }
     }
+    // Recompute auth from the edited inputs; a blank editPassword keeps the
+    // existing secret already normalized above.
+    applyAuth(obj as unknown as Record<string, unknown>, (key) => edit[key], editPassword);
     api
       .SetLink(obj)
       .then(() => {
@@ -528,6 +669,10 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // A sub-modal (cert viewer or policy editor) is open; the create/edit modal
   // steps aside so only one modal is active at a time (screen-reader a11y).
   const subModalOpen = viewCert !== null || policyFor !== null;
+  // Whether the cascade being edited already stores a password secret (so a
+  // blank editPassword is allowed - the existing one is kept).
+  const editHasSecret =
+    !!edit && (binToBytes(edit.HashedPassword_bin) !== null || String(edit.PlainPassword_str ?? '').length > 0);
 
   return (
     <Flex
@@ -662,91 +807,14 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 aria-label="Destination virtual hub"
               />
             </FormGroup>
-            <FormGroup label="Authentication" fieldId="link-auth">
-              <FormSelect
-                id="link-auth"
-                value={authType}
-                onChange={(_event, value) => setAuthType(Number(value))}
-                aria-label="Authentication method"
-              >
-                {LINK_AUTH_TYPES.map((option) => (
-                  <FormSelectOption key={option.value} value={option.value} label={option.label} />
-                ))}
-              </FormSelect>
-            </FormGroup>
-            {needsUsername && (
-              <FormGroup label="Username" isRequired fieldId="link-username">
-                <TextInput
-                  isRequired
-                  id="link-username"
-                  value={username}
-                  onChange={(_event, value) => setUsername(value)}
-                  aria-label="Username"
-                />
-              </FormGroup>
-            )}
-            {(authType === SHA0_Hashed_Password || authType === PlainPassword) && (
-              <FormGroup label="Password" isRequired fieldId="link-password">
-                <TextInput
-                  isRequired
-                  type="password"
-                  id="link-password"
-                  value={password}
-                  onChange={(_event, value) => setPassword(value)}
-                  aria-label="Password"
-                />
-              </FormGroup>
-            )}
-            {authType === Cert && (
-              <>
-                <FormGroup label="Client certificate" isRequired fieldId="link-cert">
-                  <FileUpload
-                    id="link-cert"
-                    type="dataURL"
-                    filename={certFilename}
-                    filenamePlaceholder="Drag and drop or upload a certificate"
-                    browseButtonText="Upload"
-                    hideDefaultPreview
-                    onFileInputChange={onCertSelected}
-                    onClearClick={() => {
-                      setCertFilename('');
-                      setCertBytes(null);
-                      setCertError(null);
-                    }}
-                    dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
-                    filenameAriaLabel="Certificate file name"
-                  />
-                  {certError && (
-                    <HelperText>
-                      <HelperTextItem variant="error">{certError}</HelperTextItem>
-                    </HelperText>
-                  )}
-                </FormGroup>
-                <FormGroup label="Private key" isRequired fieldId="link-key">
-                  <FileUpload
-                    id="link-key"
-                    type="dataURL"
-                    filename={keyFilename}
-                    filenamePlaceholder="Drag and drop or upload the private key"
-                    browseButtonText="Upload"
-                    hideDefaultPreview
-                    onFileInputChange={onKeySelected}
-                    onClearClick={() => {
-                      setKeyFilename('');
-                      setKeyBytes(null);
-                      setKeyError(null);
-                    }}
-                    dropzoneProps={{ accept: { 'application/octet-stream': ['.key', '.pem', '.der'] } }}
-                    filenameAriaLabel="Private key file name"
-                  />
-                  {keyError && (
-                    <HelperText>
-                      <HelperTextItem variant="error">{keyError}</HelperTextItem>
-                    </HelperText>
-                  )}
-                </FormGroup>
-              </>
-            )}
+            <AuthFields
+              idPrefix="link"
+              get={(key) => auth[key]}
+              set={(key, value) => setAuth((prev) => ({ ...prev, [key]: value }))}
+              password={password}
+              setPassword={setPassword}
+              onViewCert={setViewCert}
+            />
             <FormGroup label="Server certificate" fieldId="link-servercert">
               <Checkbox
                 id="link-checkservercert"
@@ -846,6 +914,15 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   aria-label="Destination virtual hub"
                 />
               </FormGroup>
+              <AuthFields
+                idPrefix="edit"
+                get={(key) => edit[key]}
+                set={setEditField}
+                password={editPassword}
+                setPassword={setEditPassword}
+                passwordPlaceholder="Leave blank to keep the current password"
+                onViewCert={setViewCert}
+              />
               <FormGroup label="Server certificate" fieldId="edit-servercert">
                 <Checkbox
                   id="edit-checkservercert"
@@ -870,23 +947,6 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   {edit.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
                 </Button>
               </FormGroup>
-              <FormGroup label="Current configuration" fieldId="edit-inspect">
-                <Table aria-label="Cascade configuration" variant="compact" borders={false}>
-                  <Tbody>
-                    <Tr>
-                      <Td>Authentication</Td>
-                      <Td>{authTypeLabel(edit.AuthType_u32)}</Td>
-                    </Tr>
-                    <Tr>
-                      <Td>Username</Td>
-                      <Td>{String(edit.Username_str || '-')}</Td>
-                    </Tr>
-                  </Tbody>
-                </Table>
-                <HelperText>
-                  <HelperTextItem>Authentication is preserved on save; editing it here is coming next.</HelperTextItem>
-                </HelperText>
-              </FormGroup>
             </Form>
           )}
         </ModalBody>
@@ -899,7 +959,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               String(edit.Hostname_str ?? '').trim().length === 0 ||
               String(edit.HubName_str ?? '').trim().length === 0 ||
               !(Number(edit.Port_u32) >= 1 && Number(edit.Port_u32) <= 65535) ||
-              !proxyComplete((key) => edit[key])
+              !proxyComplete((key) => edit[key]) ||
+              !authComplete((key) => edit[key], editPassword, editHasSecret)
             }
           >
             Save
