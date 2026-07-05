@@ -21,6 +21,11 @@ import {
   InputGroup,
   InputGroupItem,
   InputGroupText,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalVariant,
   NumberInput,
   Radio,
   Spinner,
@@ -32,6 +37,8 @@ import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { useServer } from '@app/ServerContext';
 import { AppPage } from '@app/components/AppPage';
+import { binToBytes } from '@app/utils/blob_utils';
+import { parseCertificate } from '@app/utils/x509';
 
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
@@ -55,6 +62,10 @@ const DdnsSection: React.FunctionComponent = () => {
   const [hostname, setHostname] = React.useState('');
   const [changing, setChanging] = React.useState(false);
   const [changeError, setChangeError] = React.useState<string | null>(null);
+  // FQDN to offer regenerating the server cert for (null = no prompt).
+  const [certPrompt, setCertPrompt] = React.useState<string | null>(null);
+  const [regenerating, setRegenerating] = React.useState(false);
+  const [certDone, setCertDone] = React.useState(false);
 
   const load = React.useCallback(() => {
     setStatus(null);
@@ -72,18 +83,68 @@ const DdnsSection: React.FunctionComponent = () => {
     load();
   }, [load]);
 
+  // After a hostname change, SSTP / VPN Azure clients need the server cert CN to
+  // match the new FQDN. If the cert is self-signed and its CN no longer matches,
+  // offer to regenerate it (mirrors the native Server Manager).
+  const maybePromptCertRegen = (fqdn: string) => {
+    if (!fqdn) {
+      return;
+    }
+    api
+      .GetServerCert()
+      .then((response) => {
+        const bytes = binToBytes(response.Cert_bin);
+        if (!bytes) {
+          return;
+        }
+        try {
+          const cert = parseCertificate(bytes);
+          if (cert.isSelfIssued && cert.subject.commonName !== fqdn) {
+            setCertPrompt(fqdn);
+          }
+        } catch {
+          // Ignore an unparseable certificate; just skip the prompt.
+        }
+      })
+      .catch(() => undefined);
+  };
+
   const changeHostname = () => {
     setChanging(true);
     setChangeError(null);
+    setCertDone(false);
     api
       .ChangeDDnsClientHostname(new VPN.VpnRpcTest({ StrValue_str: hostname }))
-      .then(() => {
+      .then(() => api.GetDDnsClientStatus())
+      .then((response) => {
+        setStatus(response);
+        setHostname(response.CurrentHostName_str);
         setChanging(false);
-        load();
+        maybePromptCertRegen(response.CurrentFqdn_str);
       })
       .catch((e) => {
         setChangeError(String(e));
         setChanging(false);
+      });
+  };
+
+  const regenerateCert = () => {
+    const fqdn = certPrompt;
+    if (!fqdn) {
+      return;
+    }
+    setRegenerating(true);
+    api
+      .RegenerateServerCert(new VPN.VpnRpcTest({ StrValue_str: fqdn }))
+      .then(() => {
+        setRegenerating(false);
+        setCertPrompt(null);
+        setCertDone(true);
+      })
+      .catch((e) => {
+        setRegenerating(false);
+        setCertPrompt(null);
+        setChangeError(String(e));
       });
   };
 
@@ -160,6 +221,14 @@ const DdnsSection: React.FunctionComponent = () => {
               {changeError}
             </Alert>
           )}
+          {certDone && (
+            <Alert
+              variant="success"
+              title="The server certificate was regenerated to match the new hostname."
+              isInline
+              style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
+            />
+          )}
           <Form>
             <FormGroup label="New hostname" fieldId="ddns-hostname">
               <InputGroup>
@@ -205,6 +274,28 @@ const DdnsSection: React.FunctionComponent = () => {
           </Form>
         </CardBody>
       </Card>
+
+      <Modal variant={ModalVariant.small} isOpen={certPrompt !== null} onClose={() => setCertPrompt(null)}>
+        <ModalHeader title="Update the server certificate?" />
+        <ModalBody>
+          <Content component="p">
+            The Dynamic DNS hostname is now <strong>{certPrompt}</strong>. Microsoft SSTP and VPN Azure clients require
+            the server certificate&apos;s common name (CN) to exactly match the hostname they connect to.
+          </Content>
+          <Content component="p">
+            Regenerate the self-signed server certificate with CN = <strong>{certPrompt}</strong>? Keep the current one
+            if you use your own CA-issued certificate.
+          </Content>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="primary" onClick={regenerateCert} isLoading={regenerating} isDisabled={regenerating}>
+            Regenerate certificate
+          </Button>
+          <Button variant="link" onClick={() => setCertPrompt(null)} isDisabled={regenerating}>
+            Keep current
+          </Button>
+        </ModalFooter>
+      </Modal>
     </Gallery>
   );
 };

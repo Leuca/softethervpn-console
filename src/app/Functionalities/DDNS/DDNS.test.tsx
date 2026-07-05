@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DynDNS } from './DDNS';
 import { api } from '@app/utils/vpnrpc_settings';
+import { SELF_SIGNED_CERT_B64 } from '@app/utils/x509.fixture';
 
 vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: {
@@ -11,6 +12,8 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
     ChangeDDnsClientHostname: vi.fn(),
     GetDDnsInternetSettng: vi.fn(),
     SetDDnsInternetSettng: vi.fn(),
+    GetServerCert: vi.fn(),
+    RegenerateServerCert: vi.fn(),
   },
 }));
 
@@ -23,6 +26,11 @@ const getStatus = api.GetDDnsClientStatus as unknown as Mock;
 const changeHostname = api.ChangeDDnsClientHostname as unknown as Mock;
 const getProxy = api.GetDDnsInternetSettng as unknown as Mock;
 const setProxy = api.SetDDnsInternetSettng as unknown as Mock;
+const getServerCert = api.GetServerCert as unknown as Mock;
+const regenerateServerCert = api.RegenerateServerCert as unknown as Mock;
+
+// The fixture cert has CN=test.example.com and is self-signed.
+const CERT_FQDN = 'test.example.com';
 
 const status = (over: Record<string, unknown> = {}) => ({
   CurrentHostName_str: 'vpn123456',
@@ -41,6 +49,8 @@ describe('DynDNS', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ddnsProxy = false;
+    // Default: no server certificate, so the CN prompt does not appear.
+    getServerCert.mockResolvedValue({ Cert_bin: '' });
   });
 
   it('shows the FQDN and IPv4, and the summarized IPv6 error', async () => {
@@ -86,6 +96,50 @@ describe('DynDNS', () => {
 
     await waitFor(() => expect(changeHostname).toHaveBeenCalledTimes(1));
     expect(changeHostname.mock.calls[0][0].StrValue_str).toBe('newname');
+  });
+
+  it('offers to regenerate the server cert when its CN no longer matches the FQDN', async () => {
+    // initial FQDN matches the cert CN; after the change it differs
+    getStatus.mockResolvedValueOnce(status({ CurrentFqdn_str: CERT_FQDN, CurrentHostName_str: CERT_FQDN.split('.')[0] }));
+    getStatus.mockResolvedValue(status({ CurrentFqdn_str: 'newname.softether.net', CurrentHostName_str: 'newname' }));
+    changeHostname.mockResolvedValue({});
+    getServerCert.mockResolvedValue({ Cert_bin: SELF_SIGNED_CERT_B64 }); // self-signed, CN=test.example.com
+    regenerateServerCert.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<DynDNS />);
+    await screen.findByLabelText('New hostname');
+    const input = screen.getByLabelText('New hostname');
+    await user.clear(input);
+    await user.type(input, 'newname');
+    await user.click(screen.getByRole('button', { name: 'Set hostname' }));
+
+    // CN (test.example.com) != new FQDN (newname.softether.net) -> prompt
+    expect(await screen.findByText('Update the server certificate?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Regenerate certificate' }));
+
+    await waitFor(() => expect(regenerateServerCert).toHaveBeenCalledTimes(1));
+    expect(regenerateServerCert.mock.calls[0][0].StrValue_str).toBe('newname.softether.net');
+  });
+
+  it('does not prompt to regenerate when the cert CN already matches', async () => {
+    // reloaded FQDN equals the cert CN (test.example.com)
+    getStatus.mockResolvedValue(status({ CurrentFqdn_str: CERT_FQDN, CurrentHostName_str: 'oldname' }));
+    changeHostname.mockResolvedValue({});
+    getServerCert.mockResolvedValue({ Cert_bin: SELF_SIGNED_CERT_B64 }); // CN matches the FQDN
+    const user = userEvent.setup();
+
+    render(<DynDNS />);
+    await screen.findByLabelText('New hostname');
+    const input = screen.getByLabelText('New hostname');
+    await user.clear(input);
+    await user.type(input, 'newname');
+    await user.click(screen.getByRole('button', { name: 'Set hostname' }));
+
+    await waitFor(() => expect(changeHostname).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getServerCert).toHaveBeenCalled());
+    expect(screen.queryByText('Update the server certificate?')).not.toBeInTheDocument();
+    expect(regenerateServerCert).not.toHaveBeenCalled();
   });
 
   it('does not render the proxy section without the capability', async () => {
