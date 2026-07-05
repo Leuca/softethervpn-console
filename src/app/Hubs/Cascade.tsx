@@ -163,9 +163,12 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const portNum = Number(port);
   const needsUsername = authType === SHA0_Hashed_Password || authType === PlainPassword || authType === Cert;
   const authComplete =
-    (authType === Anonymous ||
-      ((authType === SHA0_Hashed_Password || authType === PlainPassword) && username.trim().length > 0) ||
-      (authType === Cert && username.trim().length > 0 && certBytes !== null && keyBytes !== null));
+    authType === Anonymous ||
+    // Password is not trimmed: leading/trailing spaces can be significant.
+    ((authType === SHA0_Hashed_Password || authType === PlainPassword) &&
+      username.trim().length > 0 &&
+      password.length > 0) ||
+    (authType === Cert && username.trim().length > 0 && certBytes !== null && keyBytes !== null);
   const canCreate =
     name.trim().length > 0 &&
     host.trim().length > 0 &&
@@ -408,8 +411,9 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               </FormGroup>
             )}
             {(authType === SHA0_Hashed_Password || authType === PlainPassword) && (
-              <FormGroup label="Password" fieldId="link-password">
+              <FormGroup label="Password" isRequired fieldId="link-password">
                 <TextInput
+                  isRequired
                   type="password"
                   id="link-password"
                   value={password}

@@ -129,6 +129,27 @@ describe('Cascade', () => {
     expect(within(authSelect).getByRole('option', { name: 'Client certificate' })).toBeInTheDocument();
   });
 
+  it('requires a password for password-based auth', async () => {
+    enumLink.mockResolvedValue({ LinkList: [] });
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('No cascade connections');
+    await user.click(screen.getAllByRole('button', { name: /new cascade/i })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await fillCommonFields(user, dialog);
+    await user.selectOptions(within(dialog).getByLabelText('Authentication method'), 'Standard password');
+    await user.type(within(dialog).getByLabelText('Username'), 'alice');
+
+    // Username present but no password yet: Create stays disabled.
+    const createBtn = within(dialog).getByRole('button', { name: 'Create' });
+    expect(createBtn).toBeDisabled();
+
+    await user.type(within(dialog).getByLabelText('Password'), 'secret');
+    expect(createBtn).toBeEnabled();
+  });
+
   it('hashes the password for standard (SHA-0) auth', async () => {
     enumLink.mockResolvedValue({ LinkList: [] });
     createLink.mockResolvedValue({});
