@@ -321,6 +321,63 @@ describe('Cascade', () => {
     expect(setLink.mock.calls[0][0].CheckServerCert_bool).toBe(true);
   });
 
+  it('applies advanced tuning options on create', async () => {
+    enumLink.mockResolvedValue({ LinkList: [] });
+    createLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('No cascade connections');
+    await user.click(screen.getAllByRole('button', { name: /new cascade/i })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await fillCommonFields(user, dialog);
+    await user.click(within(dialog).getByRole('button', { name: /advanced settings/i }));
+
+    const maxConn = within(dialog).getByLabelText('Number of TCP connections');
+    await user.clear(maxConn);
+    await user.type(maxConn, '4');
+    await user.click(within(dialog).getByLabelText('Compress the data'));
+    await user.click(within(dialog).getByLabelText('Encrypt the VPN communication')); // default on -> off
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    const sent = createLink.mock.calls[0][0];
+    expect(sent.MaxConnection_u32).toBe(4);
+    expect(sent.UseCompress_bool).toBe(true);
+    expect(sent.UseEncrypt_bool).toBe(false);
+  });
+
+  it('edits advanced tuning options', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 0,
+      MaxConnection_u32: 1,
+      UseEncrypt_bool: true,
+      UseCompress_bool: false,
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /advanced settings/i }));
+    const maxConn = within(dialog).getByLabelText('Number of TCP connections');
+    await user.clear(maxConn);
+    await user.type(maxConn, '8');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(setLink.mock.calls[0][0].MaxConnection_u32).toBe(8);
+  });
+
   it('sets an online cascade offline', async () => {
     enumLink.mockResolvedValue({ LinkList: [connectedLink] });
     setLinkOffline.mockResolvedValue({});

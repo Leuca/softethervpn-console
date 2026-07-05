@@ -8,6 +8,7 @@ import {
   EmptyStateActions,
   EmptyStateBody,
   EmptyStateFooter,
+  ExpandableSection,
   FileUpload,
   Flex,
   FlexItem,
@@ -60,6 +61,76 @@ const proxyTypeLabel = (t: unknown): string => PROXY_TYPE_LABELS[Number(t)] ?? `
 // _bin fields round-tripped from GetLink arrive as base64 strings; convert to
 // real bytes before SetLink so the client does not double-encode them.
 const LINK_BIN_KEYS = ['HashedPassword_bin', 'ClientX_bin', 'ClientK_bin', 'ServerCert_bin'];
+
+// Advanced tuning defaults for a new cascade (mirror the native client).
+const ADVANCED_DEFAULTS: Record<string, number | boolean> = {
+  MaxConnection_u32: 1,
+  UseEncrypt_bool: true,
+  UseCompress_bool: false,
+  HalfConnection_bool: false,
+  DisableQoS_bool: false,
+  NoUdpAcceleration_bool: false,
+  NoTls1_bool: false,
+  AdditionalConnectionInterval_u32: 1,
+  ConnectionDisconnectSpan_u32: 0,
+};
+
+// Shared advanced-settings block for the create and edit forms. `get`/`set` bind
+// it either to local create state or to the working edit object.
+const AdvancedFields: React.FunctionComponent<{
+  idPrefix: string;
+  get: (key: string) => unknown;
+  set: (key: string, value: unknown) => void;
+}> = ({ idPrefix, get, set }) => {
+  const bool = (key: string) => Boolean(get(key));
+  const checkbox = (key: string, label: string) => (
+    <Checkbox
+      id={`${idPrefix}-${key}`}
+      label={label}
+      isChecked={bool(key)}
+      onChange={(_event, checked) => set(key, checked)}
+    />
+  );
+  // Number fields hold the raw string while editing (so the field can be cleared)
+  // and are coerced to integers at save time by coerceLinkNumbers.
+  const numField = (key: string, label: string, fallback: number, ariaLabel: string) => (
+    <FormGroup label={label} fieldId={`${idPrefix}-${key}`}>
+      <TextInput
+        type="number"
+        id={`${idPrefix}-${key}`}
+        value={String(get(key) ?? fallback)}
+        onChange={(_event, value) => set(key, value)}
+        aria-label={ariaLabel}
+      />
+    </FormGroup>
+  );
+  return (
+    <ExpandableSection toggleText="Advanced settings">
+      {numField('MaxConnection_u32', 'Number of TCP connections', 1, 'Number of TCP connections')}
+      {checkbox('UseEncrypt_bool', 'Encrypt the VPN communication')}
+      {checkbox('UseCompress_bool', 'Compress the data')}
+      {checkbox('HalfConnection_bool', 'Use half-duplex mode (with multiple connections)')}
+      {checkbox('DisableQoS_bool', 'Disable VoIP / QoS control')}
+      {checkbox('NoUdpAcceleration_bool', 'Disable UDP acceleration')}
+      {checkbox('NoTls1_bool', 'Do not use TLS 1.0')}
+      {numField('AdditionalConnectionInterval_u32', 'Additional connection interval (seconds)', 1, 'Additional connection interval')}
+      {numField('ConnectionDisconnectSpan_u32', 'Connection life of each TCP connection (seconds, 0 = no expiry)', 0, 'Connection life')}
+    </ExpandableSection>
+  );
+};
+
+// Coerce the advanced numeric fields (held as strings while editing) to valid
+// integers before sending. MaxConnection and interval are at least 1; the
+// connection-life span may be 0 (no expiry).
+const coerceLinkNumbers = (obj: Record<string, unknown>): void => {
+  const asInt = (value: unknown, min: number): number => {
+    const n = Math.floor(Number(value));
+    return Number.isFinite(n) && n >= min ? n : min;
+  };
+  if ('MaxConnection_u32' in obj) obj.MaxConnection_u32 = asInt(obj.MaxConnection_u32, 1);
+  if ('AdditionalConnectionInterval_u32' in obj) obj.AdditionalConnectionInterval_u32 = asInt(obj.AdditionalConnectionInterval_u32, 1);
+  if ('ConnectionDisconnectSpan_u32' in obj) obj.ConnectionDisconnectSpan_u32 = asInt(obj.ConnectionDisconnectSpan_u32, 0);
+};
 
 // GetLinkStatus returns many fields; surface the connection summary only.
 const STATUS_KEYS = [
@@ -122,6 +193,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [serverCertError, setServerCertError] = React.useState<string | null>(null);
   // Certificate to show in the shared viewer (staged-create or loaded-edit bytes).
   const [viewCert, setViewCert] = React.useState<Uint8Array | string | null>(null);
+  // Advanced tuning for a new cascade.
+  const [advanced, setAdvanced] = React.useState<Record<string, number | boolean>>({ ...ADVANCED_DEFAULTS });
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<StatusState | null>(null);
@@ -159,6 +232,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setServerCertFilename('');
     setServerCertBytes(null);
     setServerCertError(null);
+    setAdvanced({ ...ADVANCED_DEFAULTS });
     setCreateOpen(true);
   };
 
@@ -246,6 +320,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     authComplete;
 
   const create = () => {
+    const adv = { ...advanced };
+    coerceLinkNumbers(adv);
     const link = new VPN.VpnRpcCreateLink({
       // HubName_Ex_str is the LOCAL hub hosting the cascade; HubName_str is the
       // destination hub on the remote server (the API is asymmetric).
@@ -255,10 +331,9 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       Hostname_str: host.trim(),
       Port_u32: portNum,
       HubName_str: destHub.trim(),
-      MaxConnection_u32: 1,
-      UseEncrypt_bool: true,
       CheckServerCert_bool: checkServerCert,
       AuthType_u32: authType,
+      ...adv,
     });
     if (checkServerCert && serverCertBytes) {
       link.ServerCert_bin = serverCertBytes;
@@ -332,6 +407,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     // _bin fields (base64 on read) back to bytes so they are not double-encoded.
     const obj = new VPN.VpnRpcCreateLink(edit as Partial<VPN.VpnRpcCreateLink>);
     obj.HubName_Ex_str = hub;
+    coerceLinkNumbers(obj as unknown as Record<string, unknown>);
     for (const key of LINK_BIN_KEYS) {
       const bytes = binToBytes(edit[key]);
       if (bytes) {
@@ -622,6 +698,11 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 </>
               )}
             </FormGroup>
+            <AdvancedFields
+              idPrefix="link"
+              get={(key) => advanced[key]}
+              set={(key, value) => setAdvanced((prev) => ({ ...prev, [key]: value as number | boolean }))}
+            />
           </Form>
         </ModalBody>
         <ModalFooter>
@@ -685,6 +766,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   </Button>
                 )}
               </FormGroup>
+              <AdvancedFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <FormGroup label="Current configuration" fieldId="edit-inspect">
                 <Table aria-label="Cascade configuration" variant="compact" borders={false}>
                   <Tbody>
@@ -700,20 +782,11 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                       <Td>Proxy</Td>
                       <Td>{proxyTypeLabel(edit.ProxyType_u32)}</Td>
                     </Tr>
-                    <Tr>
-                      <Td>Max TCP connections</Td>
-                      <Td>{String(edit.MaxConnection_u32 ?? '-')}</Td>
-                    </Tr>
-                    <Tr>
-                      <Td>Encryption / compression</Td>
-                      <Td>{`${edit.UseEncrypt_bool ? 'On' : 'Off'} / ${edit.UseCompress_bool ? 'On' : 'Off'}`}</Td>
-                    </Tr>
                   </Tbody>
                 </Table>
                 <HelperText>
                   <HelperTextItem>
-                    Authentication, proxy, advanced options and policy are preserved on save; editing them here is
-                    coming next.
+                    Authentication and proxy are preserved on save; editing them here is coming next.
                   </HelperTextItem>
                 </HelperText>
               </FormGroup>
