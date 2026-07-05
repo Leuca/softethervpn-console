@@ -88,6 +88,28 @@ describe('Groups', () => {
     expect(setGroup.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Name_str: 'sales', Note_utf: 'EMEA' });
   });
 
+  it('disables edit save again when group fields return to their original values', async () => {
+    enumGroup.mockResolvedValue({ GroupList: [sales] });
+    getGroup.mockResolvedValue({ Name_str: 'sales', Realname_utf: 'Sales team', Note_utf: '' });
+    const user = userEvent.setup();
+
+    render(<Groups hub="DEFAULT" />);
+    await screen.findByText('sales');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    const note = within(dialog).getByLabelText('Note');
+    expect(save).toBeDisabled();
+
+    await user.type(note, 'EMEA');
+    expect(save).toBeEnabled();
+
+    await user.clear(note);
+    expect(save).toBeDisabled();
+  });
+
   it('edits the security policy and sends it with the group on save', async () => {
     enumGroup.mockResolvedValue({ GroupList: [sales] });
     getGroup.mockResolvedValue({

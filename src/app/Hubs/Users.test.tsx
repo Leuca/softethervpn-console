@@ -129,6 +129,35 @@ describe('Users', () => {
     expect(Object.prototype.hasOwnProperty.call(sent, 'Auth_Password_str')).toBe(false);
   });
 
+  it('disables edit save again when user fields return to their original values', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({ Name_str: 'alice', Realname_utf: 'Alice A', Note_utf: '', AuthType_u32: 1 });
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    const realname = within(dialog).getByLabelText('Real name');
+    expect(save).toBeDisabled();
+
+    await user.clear(realname);
+    await user.type(realname, 'Alice B');
+    expect(save).toBeEnabled();
+
+    await user.clear(realname);
+    await user.type(realname, 'Alice A');
+    expect(save).toBeDisabled();
+
+    await user.type(within(dialog).getByLabelText('New password'), 'newpass');
+    expect(save).toBeEnabled();
+    await user.clear(within(dialog).getByLabelText('New password'));
+    expect(save).toBeDisabled();
+  });
+
   it('sends a new password when one is entered while editing', async () => {
     enumUser.mockResolvedValue({ UserList: [alice] });
     getUser.mockResolvedValue({ HubName_str: 'DEFAULT', Name_str: 'alice', AuthType_u32: 1 });
@@ -185,6 +214,8 @@ describe('Users', () => {
     await user.click(await screen.findByText('Edit'));
 
     const dialog = await screen.findByRole('dialog');
+    const note = within(dialog).getByLabelText('Note');
+    await user.type(note, 'keep cert');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     // Sent as decoded bytes, not the base64 string (which the client would

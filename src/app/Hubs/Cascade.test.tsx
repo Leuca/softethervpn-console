@@ -5,7 +5,7 @@ import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Cascade } from './Cascade';
 import { api } from '@app/utils/vpnrpc_settings';
 import { hashSoftEtherPassword } from '@app/utils/sha0';
-import { SELF_SIGNED_CERT_DER, SELF_SIGNED_CERT_PEM } from '@app/utils/x509.fixture';
+import { SELF_SIGNED_CERT_B64, SELF_SIGNED_CERT_DER, SELF_SIGNED_CERT_PEM } from '@app/utils/x509.fixture';
 
 // Fill the four always-required fields of the create form.
 async function fillCommonFields(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
@@ -399,6 +399,12 @@ describe('Cascade', () => {
       Username_str: '',
       CheckServerCert_bool: false,
       ServerCert_bin: '',
+      MaxConnection_u32: 0,
+      AdditionalConnectionInterval_u32: 0,
+      ConnectionDisconnectSpan_u32: 0,
+      ProxyType_u32: 1,
+      ProxyName_str: '',
+      ProxyPort_u32: 0,
     });
     setLink.mockResolvedValue({});
     const user = userEvent.setup();
@@ -409,6 +415,7 @@ describe('Cascade', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
 
     const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled();
     await user.click(within(dialog).getByLabelText('Always verify the destination server certificate'));
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(
@@ -416,7 +423,9 @@ describe('Cascade', () => {
       new File([SELF_SIGNED_CERT_DER()], 'server.cer', { type: 'application/x-x509-ca-cert' }),
     );
     await within(dialog).findByRole('button', { name: 'View pinned certificate' });
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    expect(save).toBeEnabled();
+    await user.click(save);
 
     const sent = setLink.mock.calls[0][0];
     expect(sent.CheckServerCert_bool).toBe(true);
@@ -434,7 +443,13 @@ describe('Cascade', () => {
       AuthType_u32: 0,
       Username_str: '',
       CheckServerCert_bool: true,
-      ServerCert_bin: SELF_SIGNED_CERT_DER(),
+      ServerCert_bin: SELF_SIGNED_CERT_B64,
+      MaxConnection_u32: 0,
+      AdditionalConnectionInterval_u32: 0,
+      ConnectionDisconnectSpan_u32: 0,
+      ProxyType_u32: 1,
+      ProxyName_str: '',
+      ProxyPort_u32: 0,
     });
     setLink.mockResolvedValue({});
     const user = userEvent.setup();
@@ -445,10 +460,148 @@ describe('Cascade', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
 
     const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled();
     await user.click(within(dialog).getByRole('button', { name: 'Remove pinned certificate' }));
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    expect(save).toBeEnabled();
+    await user.click(save);
 
-    expect(setLink.mock.calls[0][0].ServerCert_bin).toBeUndefined();
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.ServerCert_bin).toBeInstanceOf(Uint8Array);
+    expect(sent.ServerCert_bin).toHaveLength(0);
+  });
+
+  it('enables save after changing an existing cascade username', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 2,
+      Username_str: 'bob',
+      PlainPassword_str: 'secret',
+      CheckServerCert_bool: false,
+      ServerCert_bin: '',
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled();
+    const username = within(dialog).getByLabelText('Username');
+    await user.clear(username);
+    await user.type(username, 'alice');
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    expect(save).toBeEnabled();
+    await user.click(save);
+
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.Username_str).toBe('alice');
+    expect(sent.PlainPassword_str).toBe('secret');
+  });
+
+  it('disables save again when a changed username is restored', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 2,
+      Username_str: 'bob',
+      PlainPassword_str: 'secret',
+      CheckServerCert_bool: false,
+      ServerCert_bin: '',
+    });
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    const username = within(dialog).getByLabelText('Username');
+
+    expect(save).toBeDisabled();
+    await user.clear(username);
+    await user.type(username, 'alice');
+    expect(save).toBeEnabled();
+    await user.clear(username);
+    await user.type(username, 'bob');
+    expect(save).toBeDisabled();
+  });
+
+  it.each([
+    [
+      'standard password',
+      {
+        AuthType_u32: 1,
+        Username_str: 'bob',
+        HashedPassword_bin: 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTA=',
+      },
+      { HashedPassword_bin: new Uint8Array(new TextEncoder().encode('12345678901234567890')) },
+    ],
+    [
+      'client certificate',
+      {
+        AuthType_u32: 3,
+        Username_str: 'bob',
+        ClientX_bin: SELF_SIGNED_CERT_B64,
+        ClientK_bin: 'AQIDBA==',
+      },
+      { ClientX_bin: SELF_SIGNED_CERT_DER(), ClientK_bin: new Uint8Array([1, 2, 3, 4]) },
+    ],
+  ])('handles username dirty state for %s auth', async (_label, authFields, expectedBin) => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      CheckServerCert_bool: false,
+      ServerCert_bin: '',
+      ...authFields,
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    const username = within(dialog).getByLabelText('Username');
+
+    expect(save).toBeDisabled();
+    await user.clear(username);
+    await user.type(username, 'alice');
+    expect(save).toBeEnabled();
+    await user.clear(username);
+    await user.type(username, 'bob');
+    expect(save).toBeDisabled();
+    await user.clear(username);
+    await user.type(username, 'alice');
+    expect(save).toBeEnabled();
+    await user.click(save);
+
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.Username_str).toBe('alice');
+    for (const [key, expected] of Object.entries(expectedBin)) {
+      expect(Array.from(sent[key])).toEqual(Array.from(expected));
+    }
   });
 
   it('applies advanced tuning options on create', async () => {
@@ -616,8 +769,9 @@ describe('Cascade', () => {
       Port_u32: 443,
       HubName_str: 'BRANCH',
       AuthType_u32: 0,
-      UsePolicy_bool: false,
       'policy:Access_bool': true,
+      'policy:NoBridge_bool': false,
+      'policy:Ver3_bool': true,
     });
     setLink.mockResolvedValue({});
     const user = userEvent.setup();
@@ -627,17 +781,19 @@ describe('Cascade', () => {
     await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
     await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
 
-    await user.click(await screen.findByRole('button', { name: 'Add security policy' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit security policy' }));
     expect(await screen.findByText('Cascade security policy')).toBeInTheDocument();
-    await user.click(await screen.findByRole('switch', { name: /apply a security policy/i }));
+    expect(screen.queryByRole('switch', { name: /apply a security policy/i })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('switch', { name: 'Deny bridge operation' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
 
     // Back on the edit modal, save.
     await user.click(await screen.findByRole('button', { name: 'Save' }));
 
     const sent = setLink.mock.calls[0][0];
-    expect(sent.UsePolicy_bool).toBe(true);
     expect(sent['policy:Access_bool']).toBe(true);
+    expect(sent['policy:NoBridge_bool']).toBe(true);
+    expect(sent['policy:Ver3_bool']).toBe(true);
   });
 
   it('sets an online cascade offline', async () => {

@@ -176,11 +176,20 @@ describe('HubCertificates', () => {
     await waitFor(() => expect(getCrl).toHaveBeenCalledOnce());
     await screen.findByText('Edit revoked certificate');
     const editDialog = await screen.findByRole('dialog');
+    const save = within(editDialog).getByRole('button', { name: 'Save' });
     expect(within(editDialog).getByLabelText('Serial number')).toHaveValue('01');
     expect(within(editDialog).getByLabelText('SHA1 digest')).toHaveValue('00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13');
-    await user.clear(within(editDialog).getByLabelText('Common name'));
-    await user.type(within(editDialog).getByLabelText('Common name'), 'blocked.example.com');
-    await user.click(within(editDialog).getByRole('button', { name: 'Save' }));
+    expect(save).toBeDisabled();
+    const commonName = within(editDialog).getByLabelText('Common name');
+    await user.clear(commonName);
+    await user.type(commonName, 'blocked.example.com');
+    expect(save).toBeEnabled();
+    await user.clear(commonName);
+    await user.type(commonName, 'revoked.example.com');
+    expect(save).toBeDisabled();
+    await user.clear(commonName);
+    await user.type(commonName, 'blocked.example.com');
+    await user.click(save);
 
     await waitFor(() => expect(setCrl).toHaveBeenCalledOnce());
     expect(setCrl.mock.calls[0][0]).toMatchObject({

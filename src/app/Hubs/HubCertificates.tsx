@@ -28,6 +28,7 @@ import { api } from '@app/utils/vpnrpc_settings';
 import { formatOptionalDate } from '@app/utils/format';
 import { certificateBytesToDer, parseCertificate } from '@app/utils/x509';
 import { binToBytes } from '@app/utils/blob_utils';
+import { recordChanged } from '@app/utils/dirty';
 
 interface CrlFormState {
   key: number | null;
@@ -204,6 +205,21 @@ const crlFormFromResponse = (response: VPN.VpnRpcCrl): CrlFormState => ({
   certificateError: null,
 });
 
+const crlComparable = (form: CrlFormState | null): Record<string, unknown> | null =>
+  form
+    ? {
+        commonName: form.commonName,
+        organization: form.organization,
+        unit: form.unit,
+        country: form.country,
+        state: form.state,
+        local: form.local,
+        serial: form.serial,
+        md5: form.md5,
+        sha1: form.sha1,
+      }
+    : null;
+
 const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [certs, setCerts] = React.useState<VPN.VpnRpcHubEnumCAItem[] | null>(null);
   const [crls, setCrls] = React.useState<VPN.VpnRpcEnumCrlItem[] | null>(null);
@@ -213,6 +229,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [viewCert, setViewCert] = React.useState<Uint8Array | string | null>(null);
   const [pendingDelete, setPendingDelete] = React.useState<PendingDelete | null>(null);
   const [crlForm, setCrlForm] = React.useState<CrlFormState | null>(null);
+  const [crlOriginal, setCrlOriginal] = React.useState<CrlFormState | null>(null);
   const [crlSaving, setCrlSaving] = React.useState(false);
   const importingRef = React.useRef(false);
 
@@ -290,7 +307,11 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const editCrl = (key: number) => {
     api
       .GetCrl(new VPN.VpnRpcCrl({ HubName_str: hub, Key_u32: key }))
-      .then((response) => setCrlForm(crlFormFromResponse(response)))
+      .then((response) => {
+        const form = crlFormFromResponse(response);
+        setCrlForm(form);
+        setCrlOriginal(form);
+      })
       .catch((e) => setError(String(e)));
   };
 
@@ -334,6 +355,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const md5Result = parseHexBytes(crlForm?.md5 ?? '', 'MD5 digest', 16);
   const sha1Result = parseHexBytes(crlForm?.sha1 ?? '', 'SHA1 digest', 20);
   const crlValidationError = serialResult.error ?? md5Result.error ?? sha1Result.error;
+  const crlDirty = crlForm?.key === null || recordChanged(crlComparable(crlOriginal), crlComparable(crlForm));
   const crlHasMatcher =
     crlForm !== null &&
     [
@@ -370,6 +392,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     request
       .then(() => {
         setCrlForm(null);
+        setCrlOriginal(null);
         load();
       })
       .catch((e) => setError(String(e)))
@@ -467,7 +490,13 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <strong>Certificate revocation list</strong>
         </FlexItem>
         <FlexItem>
-          <Button variant="primary" onClick={() => setCrlForm(emptyCrlForm())}>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setCrlOriginal(null);
+              setCrlForm(emptyCrlForm());
+            }}
+          >
             Add revoked certificate
           </Button>
         </FlexItem>
@@ -530,7 +559,14 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ModalFooter>
       </Modal>
 
-      <Modal variant={ModalVariant.medium} isOpen={crlForm !== null} onClose={() => setCrlForm(null)}>
+      <Modal
+        variant={ModalVariant.medium}
+        isOpen={crlForm !== null}
+        onClose={() => {
+          setCrlForm(null);
+          setCrlOriginal(null);
+        }}
+      >
         <ModalHeader title={crlForm?.key === null ? 'Add revoked certificate' : 'Edit revoked certificate'} />
         <ModalBody>
           {crlForm && (
@@ -655,10 +691,21 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={saveCrl} isLoading={crlSaving} isDisabled={!crlHasMatcher || !!crlValidationError}>
+          <Button
+            variant="primary"
+            onClick={saveCrl}
+            isLoading={crlSaving}
+            isDisabled={!crlDirty || !crlHasMatcher || !!crlValidationError}
+          >
             Save
           </Button>
-          <Button variant="link" onClick={() => setCrlForm(null)}>
+          <Button
+            variant="link"
+            onClick={() => {
+              setCrlForm(null);
+              setCrlOriginal(null);
+            }}
+          >
             Cancel
           </Button>
         </ModalFooter>

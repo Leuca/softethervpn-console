@@ -16,6 +16,7 @@ import {
   Switch,
 } from '@patternfly/react-core';
 import { POLICY_FIELDS, POLICY_GROUPS, policyBool, policyInt } from '@app/Hubs/securityPolicy';
+import { recordChanged } from '@app/utils/dirty';
 
 interface SecurityPolicyModalProps {
   title: string;
@@ -25,6 +26,8 @@ interface SecurityPolicyModalProps {
   onClose: () => void;
   /** Receives a copy of the subject with the edited policy applied. */
   onSave: (updated: Record<string, unknown>) => void;
+  /** Users/groups gate policy fields with UsePolicy; cascades always carry policy fields. */
+  hasUsePolicySwitch?: boolean;
 }
 
 /**
@@ -39,33 +42,49 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
   isOpen,
   onClose,
   onSave,
+  hasUsePolicySwitch = true,
 }) => {
   const [draft, setDraft] = React.useState<Record<string, unknown>>({});
+  const [original, setOriginal] = React.useState<Record<string, unknown> | null>(null);
 
   // Seed a working copy each time the modal opens.
   React.useEffect(() => {
     if (isOpen && subject) {
-      setDraft({ ...subject });
+      const next = { ...subject };
+      setDraft(next);
+      setOriginal(next);
     }
   }, [isOpen, subject]);
 
-  const usePolicy = draft.UsePolicy_bool === true;
+  const usePolicy = !hasUsePolicySwitch || draft.UsePolicy_bool === true;
   const setField = (key: string, value: unknown) => setDraft((prev) => ({ ...prev, [key]: value }));
   const clampInt = (value: number) => (Number.isNaN(value) || value < 0 ? 0 : value);
+  const dirty = recordChanged(original, draft);
+  const apply = () => {
+    if (hasUsePolicySwitch) {
+      onSave(draft);
+      return;
+    }
+    const updated: Record<string, unknown> = { ...draft, 'policy:Ver3_bool': true };
+    delete updated.UsePolicy_bool;
+    onSave(updated);
+  };
 
   return (
     <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={onClose}>
       <ModalHeader title={title} />
       <ModalBody>
         <Stack hasGutter>
-          <StackItem>
-            <Switch
-              id="policy-enabled"
-              label="Apply a security policy to this object"
-              isChecked={usePolicy}
-              onChange={(_event, checked) => setField('UsePolicy_bool', checked)}
-            />
-          </StackItem>
+          {hasUsePolicySwitch && (
+            <StackItem>
+              <Switch
+                id="policy-enabled"
+                label="Apply a security policy to this object"
+                isChecked={usePolicy}
+                onChange={(_event, checked) => setField('UsePolicy_bool', checked)}
+              />
+            </StackItem>
+          )}
 
           {POLICY_GROUPS.map((group) => {
             const fields = POLICY_FIELDS.filter((f) => f.group === group.id);
@@ -112,7 +131,7 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
         </Stack>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" onClick={() => onSave(draft)}>
+        <Button variant="primary" onClick={apply} isDisabled={!dirty}>
           Apply
         </Button>
         <Button variant="link" onClick={onClose}>

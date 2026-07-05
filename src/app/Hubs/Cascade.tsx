@@ -35,6 +35,7 @@ import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { binToBytes } from '@app/utils/blob_utils';
+import { recordChanged } from '@app/utils/dirty';
 import { formatOptionalDate } from '@app/utils/format';
 import { hashSoftEtherPassword } from '@app/utils/sha0';
 import { certificateBytesToDer } from '@app/utils/x509';
@@ -85,6 +86,19 @@ const readKeyBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m:
 // _bin fields round-tripped from GetLink arrive as base64 strings; convert to
 // real bytes before SetLink so the client does not double-encode them.
 const LINK_BIN_KEYS = ['HashedPassword_bin', 'ClientX_bin', 'ClientK_bin', 'ServerCert_bin'];
+const AUTH_KEYS = ['AuthType_u32', 'Username_str', 'HashedPassword_bin', 'PlainPassword_str', 'ClientX_bin', 'ClientK_bin'];
+const PROXY_KEYS = ['ProxyType_u32', 'ProxyName_str', 'ProxyPort_u32', 'ProxyUsername_str', 'ProxyPassword_str'];
+const ADVANCED_KEYS = [
+  'MaxConnection_u32',
+  'UseEncrypt_bool',
+  'UseCompress_bool',
+  'HalfConnection_bool',
+  'DisableQoS_bool',
+  'NoRoutingTracking_bool',
+  'NoUdpAcceleration_bool',
+  'AdditionalConnectionInterval_u32',
+  'ConnectionDisconnectSpan_u32',
+];
 
 const MIN_TCP_CONNECTIONS = 1;
 const MAX_TCP_CONNECTIONS = 32;
@@ -182,6 +196,24 @@ const advancedComplete = (get: (key: string) => unknown): boolean => {
     interval >= 1 &&
     Number.isInteger(disconnectSpan) &&
     disconnectSpan >= 0
+  );
+};
+
+// Existing cascades may come back from older/native configurations with zeroes
+// for advanced fields that the web create form treats as invalid. Edit-save
+// coerces those before SetLink, so do not let them block unrelated edits.
+const editAdvancedComplete = (get: (key: string) => unknown): boolean => {
+  const finiteNumber = (key: string): boolean => {
+    const value = get(key);
+    if (value === undefined || value === null) {
+      return true;
+    }
+    return value !== '' && Number.isFinite(Number(value));
+  };
+  return (
+    finiteNumber('MaxConnection_u32') &&
+    finiteNumber('AdditionalConnectionInterval_u32') &&
+    finiteNumber('ConnectionDisconnectSpan_u32')
   );
 };
 
@@ -401,6 +433,44 @@ const authComplete = (get: (key: string) => unknown, password: string, hasSecret
   return false;
 };
 
+const authTypeNeedsUsername = (type: number): boolean => {
+  const { SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
+  return type === SHA0_Hashed_Password || type === PlainPassword || type === Cert;
+};
+
+const authHasSecret = (get: (key: string) => unknown): boolean => {
+  const { SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
+  const type = Number(get('AuthType_u32')) || 0;
+  if (type === SHA0_Hashed_Password) {
+    return binToBytes(get('HashedPassword_bin')) !== null;
+  }
+  if (type === PlainPassword) {
+    return String(get('PlainPassword_str') ?? '').length > 0;
+  }
+  if (type === Cert) {
+    return binToBytes(get('ClientX_bin')) !== null && binToBytes(get('ClientK_bin')) !== null;
+  }
+  return true;
+};
+
+const editAuthComplete = (
+  get: (key: string) => unknown,
+  original: Record<string, unknown> | null,
+  password: string,
+  touched: Set<string>,
+): boolean => {
+  const type = Number(get('AuthType_u32')) || 0;
+  const originalType = Number(original?.AuthType_u32 ?? type) || 0;
+  const username = String(get('Username_str') ?? '').trim();
+  const authTypeChanged = type !== originalType;
+  const secretChanged =
+    password.length > 0 || ['HashedPassword_bin', 'PlainPassword_str', 'ClientX_bin', 'ClientK_bin'].some((key) => touched.has(key));
+  if (!authTypeChanged && !secretChanged) {
+    return authTypeNeedsUsername(type) ? username.length > 0 : true;
+  }
+  return authComplete(get, password, authHasSecret(get));
+};
+
 // Write the chosen auth method's fields onto `target` from the auth inputs.
 // A blank password leaves the secret already on `target` untouched (edit keeps
 // the existing one); _bin fields are handed real bytes.
@@ -607,6 +677,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [status, setStatus] = React.useState<StatusState | null>(null);
   // Working copy of the cascade being edited (the full GetLink response).
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
+  const [editOriginal, setEditOriginal] = React.useState<Record<string, unknown> | null>(null);
+  const [editTouched, setEditTouched] = React.useState<Set<string>>(() => new Set());
 
   const load = React.useCallback(() => {
     setLinks(null);
@@ -710,13 +782,21 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // the local hub (HubName_Ex_str) and the account name.
   const openEdit = (accountName: string) => {
     setEditPassword('');
+    setEditTouched(new Set());
     api
       .GetLink(new VPN.VpnRpcCreateLink({ HubName_Ex_str: hub, AccountName_utf: accountName }))
-      .then((response) => setEdit(response as unknown as Record<string, unknown>))
+      .then((response) => {
+        const record = response as unknown as Record<string, unknown>;
+        setEdit(record);
+        setEditOriginal(record);
+      })
       .catch((e) => setError(String(e)));
   };
 
-  const setEditField = (key: string, value: unknown) => setEdit((prev) => (prev ? { ...prev, [key]: value } : prev));
+  const setEditField = (key: string, value: unknown) => {
+    setEditTouched((prev) => new Set(prev).add(key));
+    setEdit((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
 
   const saveEdit = () => {
     if (!edit) {
@@ -732,13 +812,17 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       const bytes = binToBytes(edit[key]);
       if (bytes) {
         (obj as unknown as Record<string, unknown>)[key] = bytes;
+      } else if (key === 'ServerCert_bin') {
+        obj.ServerCert_bin = new Uint8Array();
       } else {
         delete (obj as unknown as Record<string, unknown>)[key];
       }
     }
-    // Recompute auth from the edited inputs; a blank editPassword keeps the
-    // existing secret already normalized above.
-    applyAuth(obj as unknown as Record<string, unknown>, (key) => edit[key], editPassword);
+    // Recompute auth only when the auth section changed. Otherwise preserve
+    // the GetLink payload even if an unrelated section is being edited.
+    if (AUTH_KEYS.some((key) => editTouched.has(key)) || editPassword.length > 0) {
+      applyAuth(obj as unknown as Record<string, unknown>, (key) => edit[key], editPassword);
+    }
     api
       .SetLink(obj)
       .then(() => {
@@ -767,10 +851,10 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // A sub-modal (cert viewer or policy editor) is open; the create/edit modal
   // steps aside so only one modal is active at a time (screen-reader a11y).
   const subModalOpen = viewCert !== null || policyFor !== null;
-  // Whether the cascade being edited already stores a password secret (so a
-  // blank editPassword is allowed - the existing one is kept).
-  const editHasSecret =
-    !!edit && (binToBytes(edit.HashedPassword_bin) !== null || String(edit.PlainPassword_str ?? '').length > 0);
+  const authTouched = AUTH_KEYS.some((key) => editTouched.has(key)) || editPassword.length > 0;
+  const proxyTouched = PROXY_KEYS.some((key) => editTouched.has(key));
+  const advancedTouched = ADVANCED_KEYS.some((key) => editTouched.has(key));
+  const editDirty = recordChanged(editOriginal, edit, editPassword.length > 0);
 
   return (
     <Flex
@@ -931,7 +1015,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             />
             <FormGroup label="Security policy" fieldId="link-policy">
               <Button variant="secondary" onClick={() => setPolicyFor('create')}>
-                {createPolicy.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
+                Edit security policy
               </Button>
             </FormGroup>
           </Form>
@@ -985,7 +1069,10 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 get={(key) => edit[key]}
                 set={setEditField}
                 password={editPassword}
-                setPassword={setEditPassword}
+                setPassword={(value) => {
+                  setEditTouched((prev) => new Set(prev).add('PlainPassword_str'));
+                  setEditPassword(value);
+                }}
                 passwordPlaceholder="Leave blank to keep the current password"
                 onViewCert={setViewCert}
               />
@@ -999,7 +1086,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               <AdvancedFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <FormGroup label="Security policy" fieldId="edit-policy">
                 <Button variant="secondary" onClick={() => setPolicyFor('edit')}>
-                  {edit.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
+                  Edit security policy
                 </Button>
               </FormGroup>
             </Form>
@@ -1011,12 +1098,14 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             onClick={saveEdit}
             isDisabled={
               !edit ||
+              !editDirty ||
               String(edit.Hostname_str ?? '').trim().length === 0 ||
               String(edit.HubName_str ?? '').trim().length === 0 ||
               !(Number(edit.Port_u32) >= 1 && Number(edit.Port_u32) <= 65535) ||
-              !advancedComplete((key) => edit[key]) ||
-              !proxyComplete((key) => edit[key]) ||
-              !authComplete((key) => edit[key], editPassword, editHasSecret)
+              (advancedTouched && !advancedComplete((key) => edit[key])) ||
+              (!advancedTouched && !editAdvancedComplete((key) => edit[key])) ||
+              (proxyTouched && !proxyComplete((key) => edit[key])) ||
+              (authTouched && !editAuthComplete((key) => edit[key], editOriginal, editPassword, editTouched))
             }
           >
             Save
@@ -1078,10 +1167,12 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           if (policyFor === 'create') {
             setCreatePolicy(updated);
           } else {
+            setEditTouched((prev) => new Set(prev).add('policy:Ver3_bool'));
             setEdit(updated);
           }
           setPolicyFor(null);
         }}
+        hasUsePolicySwitch={false}
       />
     </Flex>
   );

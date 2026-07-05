@@ -25,6 +25,7 @@ import { BanIcon, PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
+import { recordChanged } from '@app/utils/dirty';
 
 const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [groups, setGroups] = React.useState<VPN.VpnRpcEnumGroupItem[] | null>(null);
@@ -37,6 +38,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   // Working copy of the group being edited (the full GetGroup response).
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
+  const [editOriginal, setEditOriginal] = React.useState<Record<string, unknown> | null>(null);
   const [policyOpen, setPolicyOpen] = React.useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
 
@@ -78,7 +80,11 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const openEdit = (groupName: string) => {
     api
       .GetGroup(new VPN.VpnRpcSetGroup({ HubName_str: hub, Name_str: groupName }))
-      .then((response) => setEdit(response as unknown as Record<string, unknown>))
+      .then((response) => {
+        const record = response as unknown as Record<string, unknown>;
+        setEdit(record);
+        setEditOriginal(record);
+      })
       .catch((e) => setError(String(e)));
   };
 
@@ -115,6 +121,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   };
 
   const isLoading = groups === null && error === null;
+  const editDirty = recordChanged(editOriginal, edit);
 
   return (
     <Flex
@@ -270,7 +277,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={saveEdit}>
+          <Button variant="primary" onClick={saveEdit} isDisabled={!editDirty}>
             Save
           </Button>
           <Button variant="link" onClick={() => setEdit(null)}>

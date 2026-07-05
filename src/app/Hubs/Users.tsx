@@ -33,6 +33,7 @@ import { api } from '@app/utils/vpnrpc_settings';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 import { binToBytes } from '@app/utils/blob_utils';
+import { recordChanged } from '@app/utils/dirty';
 import { formatOptionalDate, userAuthTypeLabel } from '@app/utils/format';
 import { parseCertificate } from '@app/utils/x509';
 
@@ -77,6 +78,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the user being edited (the full GetUser response) plus an
   // optional new password (blank = keep the current one).
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
+  const [editOriginal, setEditOriginal] = React.useState<Record<string, unknown> | null>(null);
   const [newPassword, setNewPassword] = React.useState('');
   const [certOpen, setCertOpen] = React.useState(false);
   const [certFilename, setCertFilename] = React.useState('');
@@ -138,7 +140,11 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setCertError(null);
     api
       .GetUser(new VPN.VpnRpcSetUser({ HubName_str: hub, Name_str: userName }))
-      .then((response) => setEdit(response as unknown as Record<string, unknown>))
+      .then((response) => {
+        const record = response as unknown as Record<string, unknown>;
+        setEdit(record);
+        setEditOriginal(record);
+      })
       .catch((e) => setError(String(e)));
   };
 
@@ -218,6 +224,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   };
 
   const isLoading = users === null && error === null;
+  const editDirty = recordChanged(editOriginal, edit, newPassword.length > 0);
 
   return (
     <Flex
@@ -529,7 +536,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={saveEdit}>
+          <Button variant="primary" onClick={saveEdit} isDisabled={!editDirty}>
             Save
           </Button>
           <Button variant="link" onClick={() => setEdit(null)}>
