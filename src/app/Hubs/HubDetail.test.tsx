@@ -36,7 +36,7 @@ describe('HubDetail', () => {
     );
     await screen.findByText('Standalone');
 
-    for (const name of ['Status', 'Properties', 'Users', 'Groups', 'Access List', 'Trusted CA', 'RADIUS']) {
+    for (const name of ['Status', 'Properties', 'Users', 'Groups', 'Access List', 'Secure NAT', 'Trusted CA', 'RADIUS']) {
       expect(screen.getByRole('tab', { name })).toBeInTheDocument();
     }
     // Security policy is edited per user/group, not at the hub level, so there
