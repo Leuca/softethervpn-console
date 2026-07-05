@@ -378,6 +378,78 @@ describe('Cascade', () => {
     expect(setLink.mock.calls[0][0].MaxConnection_u32).toBe(8);
   });
 
+  it('creates a cascade through an HTTP proxy', async () => {
+    enumLink.mockResolvedValue({ LinkList: [] });
+    createLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('No cascade connections');
+    await user.click(screen.getAllByRole('button', { name: /new cascade/i })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await fillCommonFields(user, dialog);
+    await user.click(within(dialog).getByRole('button', { name: /^proxy$/i }));
+    await user.selectOptions(within(dialog).getByLabelText('Proxy type'), 'HTTP proxy');
+    await user.type(within(dialog).getByLabelText('Proxy host'), 'proxy.example.com');
+    await user.type(within(dialog).getByLabelText('Proxy port'), '8080');
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    const sent = createLink.mock.calls[0][0];
+    expect(sent.ProxyType_u32).toBe(1); // HTTP
+    expect(sent.ProxyName_str).toBe('proxy.example.com');
+    expect(sent.ProxyPort_u32).toBe(8080);
+  });
+
+  it('blocks create when a proxy is selected without a host', async () => {
+    enumLink.mockResolvedValue({ LinkList: [] });
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('No cascade connections');
+    await user.click(screen.getAllByRole('button', { name: /new cascade/i })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await fillCommonFields(user, dialog);
+    await user.click(within(dialog).getByRole('button', { name: /^proxy$/i }));
+    await user.selectOptions(within(dialog).getByLabelText('Proxy type'), 'SOCKS proxy');
+
+    // Host/port missing: Create disabled.
+    expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
+  });
+
+  it('edits proxy settings', async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: 'DEFAULT',
+      AccountName_utf: 'to-branch',
+      Hostname_str: 'branch.example.com',
+      Port_u32: 443,
+      HubName_str: 'BRANCH',
+      AuthType_u32: 0,
+      ProxyType_u32: 0,
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('to-branch');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit settings' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^proxy$/i }));
+    await user.selectOptions(within(dialog).getByLabelText('Proxy type'), 'HTTP proxy');
+    await user.type(within(dialog).getByLabelText('Proxy host'), 'p.example.com');
+    await user.type(within(dialog).getByLabelText('Proxy port'), '3128');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.ProxyType_u32).toBe(1);
+    expect(sent.ProxyName_str).toBe('p.example.com');
+    expect(sent.ProxyPort_u32).toBe(3128);
+  });
+
   it('sets an online cascade offline', async () => {
     enumLink.mockResolvedValue({ LinkList: [connectedLink] });
     setLinkOffline.mockResolvedValue({});

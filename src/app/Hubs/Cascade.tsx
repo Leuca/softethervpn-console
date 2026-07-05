@@ -51,13 +51,6 @@ const LINK_AUTH_TYPES = [
 const authTypeLabel = (t: unknown): string =>
   LINK_AUTH_TYPES.find((a) => a.value === Number(t))?.label ?? `Type ${t}`;
 
-const PROXY_TYPE_LABELS: Record<number, string> = {
-  [VPN.VpnRpcProxyType.Direct]: 'Direct (none)',
-  [VPN.VpnRpcProxyType.HTTP]: 'HTTP',
-  [VPN.VpnRpcProxyType.SOCKS]: 'SOCKS',
-};
-const proxyTypeLabel = (t: unknown): string => PROXY_TYPE_LABELS[Number(t)] ?? `Type ${t}`;
-
 // _bin fields round-tripped from GetLink arrive as base64 strings; convert to
 // real bytes before SetLink so the client does not double-encode them.
 const LINK_BIN_KEYS = ['HashedPassword_bin', 'ClientX_bin', 'ClientK_bin', 'ServerCert_bin'];
@@ -130,6 +123,88 @@ const coerceLinkNumbers = (obj: Record<string, unknown>): void => {
   if ('MaxConnection_u32' in obj) obj.MaxConnection_u32 = asInt(obj.MaxConnection_u32, 1);
   if ('AdditionalConnectionInterval_u32' in obj) obj.AdditionalConnectionInterval_u32 = asInt(obj.AdditionalConnectionInterval_u32, 1);
   if ('ConnectionDisconnectSpan_u32' in obj) obj.ConnectionDisconnectSpan_u32 = asInt(obj.ConnectionDisconnectSpan_u32, 0);
+  if ('ProxyPort_u32' in obj) obj.ProxyPort_u32 = asInt(obj.ProxyPort_u32, 0);
+};
+
+const PROXY_TYPES = [
+  { value: VPN.VpnRpcProxyType.Direct, label: 'Direct (no proxy)' },
+  { value: VPN.VpnRpcProxyType.HTTP, label: 'HTTP proxy' },
+  { value: VPN.VpnRpcProxyType.SOCKS, label: 'SOCKS proxy' },
+];
+
+// A proxy config is complete when it is Direct, or has a host and a valid port.
+const proxyComplete = (get: (key: string) => unknown): boolean => {
+  if ((Number(get('ProxyType_u32')) || 0) === VPN.VpnRpcProxyType.Direct) {
+    return true;
+  }
+  const host = String(get('ProxyName_str') ?? '').trim();
+  const port = Number(get('ProxyPort_u32'));
+  return host.length > 0 && Number.isInteger(port) && port >= 1 && port <= 65535;
+};
+
+// Shared proxy block for the create and edit forms.
+const ProxyFields: React.FunctionComponent<{
+  idPrefix: string;
+  get: (key: string) => unknown;
+  set: (key: string, value: unknown) => void;
+}> = ({ idPrefix, get, set }) => {
+  const type = Number(get('ProxyType_u32')) || 0;
+  return (
+    <ExpandableSection toggleText="Proxy">
+      <FormGroup label="Proxy type" fieldId={`${idPrefix}-proxytype`}>
+        <FormSelect
+          id={`${idPrefix}-proxytype`}
+          value={type}
+          onChange={(_event, value) => set('ProxyType_u32', Number(value))}
+          aria-label="Proxy type"
+        >
+          {PROXY_TYPES.map((option) => (
+            <FormSelectOption key={option.value} value={option.value} label={option.label} />
+          ))}
+        </FormSelect>
+      </FormGroup>
+      {type !== VPN.VpnRpcProxyType.Direct && (
+        <>
+          <FormGroup label="Proxy host" isRequired fieldId={`${idPrefix}-proxyhost`}>
+            <TextInput
+              isRequired
+              id={`${idPrefix}-proxyhost`}
+              value={String(get('ProxyName_str') ?? '')}
+              onChange={(_event, value) => set('ProxyName_str', value)}
+              aria-label="Proxy host"
+            />
+          </FormGroup>
+          <FormGroup label="Proxy port" isRequired fieldId={`${idPrefix}-proxyport`}>
+            <TextInput
+              isRequired
+              type="number"
+              id={`${idPrefix}-proxyport`}
+              value={String(get('ProxyPort_u32') ?? '')}
+              onChange={(_event, value) => set('ProxyPort_u32', value)}
+              aria-label="Proxy port"
+            />
+          </FormGroup>
+          <FormGroup label="Proxy username" fieldId={`${idPrefix}-proxyuser`}>
+            <TextInput
+              id={`${idPrefix}-proxyuser`}
+              value={String(get('ProxyUsername_str') ?? '')}
+              onChange={(_event, value) => set('ProxyUsername_str', value)}
+              aria-label="Proxy username"
+            />
+          </FormGroup>
+          <FormGroup label="Proxy password" fieldId={`${idPrefix}-proxypass`}>
+            <TextInput
+              type="password"
+              id={`${idPrefix}-proxypass`}
+              value={String(get('ProxyPassword_str') ?? '')}
+              onChange={(_event, value) => set('ProxyPassword_str', value)}
+              aria-label="Proxy password"
+            />
+          </FormGroup>
+        </>
+      )}
+    </ExpandableSection>
+  );
 };
 
 // GetLinkStatus returns many fields; surface the connection summary only.
@@ -195,6 +270,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [viewCert, setViewCert] = React.useState<Uint8Array | string | null>(null);
   // Advanced tuning for a new cascade.
   const [advanced, setAdvanced] = React.useState<Record<string, number | boolean>>({ ...ADVANCED_DEFAULTS });
+  // Proxy config for a new cascade.
+  const [proxy, setProxy] = React.useState<Record<string, unknown>>({ ProxyType_u32: VPN.VpnRpcProxyType.Direct });
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<StatusState | null>(null);
@@ -233,6 +310,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setServerCertBytes(null);
     setServerCertError(null);
     setAdvanced({ ...ADVANCED_DEFAULTS });
+    setProxy({ ProxyType_u32: VPN.VpnRpcProxyType.Direct });
     setCreateOpen(true);
   };
 
@@ -317,11 +395,10 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     Number.isInteger(portNum) &&
     portNum >= 1 &&
     portNum <= 65535 &&
-    authComplete;
+    authComplete &&
+    proxyComplete((key) => proxy[key]);
 
   const create = () => {
-    const adv = { ...advanced };
-    coerceLinkNumbers(adv);
     const link = new VPN.VpnRpcCreateLink({
       // HubName_Ex_str is the LOCAL hub hosting the cascade; HubName_str is the
       // destination hub on the remote server (the API is asymmetric).
@@ -333,8 +410,10 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       HubName_str: destHub.trim(),
       CheckServerCert_bool: checkServerCert,
       AuthType_u32: authType,
-      ...adv,
+      ...advanced,
+      ...proxy,
     });
+    coerceLinkNumbers(link as unknown as Record<string, unknown>);
     if (checkServerCert && serverCertBytes) {
       link.ServerCert_bin = serverCertBytes;
     }
@@ -698,6 +777,11 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 </>
               )}
             </FormGroup>
+            <ProxyFields
+              idPrefix="link"
+              get={(key) => proxy[key]}
+              set={(key, value) => setProxy((prev) => ({ ...prev, [key]: value }))}
+            />
             <AdvancedFields
               idPrefix="link"
               get={(key) => advanced[key]}
@@ -766,6 +850,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   </Button>
                 )}
               </FormGroup>
+              <ProxyFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <AdvancedFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <FormGroup label="Current configuration" fieldId="edit-inspect">
                 <Table aria-label="Cascade configuration" variant="compact" borders={false}>
@@ -778,16 +863,10 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                       <Td>Username</Td>
                       <Td>{String(edit.Username_str || '-')}</Td>
                     </Tr>
-                    <Tr>
-                      <Td>Proxy</Td>
-                      <Td>{proxyTypeLabel(edit.ProxyType_u32)}</Td>
-                    </Tr>
                   </Tbody>
                 </Table>
                 <HelperText>
-                  <HelperTextItem>
-                    Authentication and proxy are preserved on save; editing them here is coming next.
-                  </HelperTextItem>
+                  <HelperTextItem>Authentication is preserved on save; editing it here is coming next.</HelperTextItem>
                 </HelperText>
               </FormGroup>
             </Form>
@@ -801,7 +880,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               !edit ||
               String(edit.Hostname_str ?? '').trim().length === 0 ||
               String(edit.HubName_str ?? '').trim().length === 0 ||
-              !(Number(edit.Port_u32) >= 1 && Number(edit.Port_u32) <= 65535)
+              !(Number(edit.Port_u32) >= 1 && Number(edit.Port_u32) <= 65535) ||
+              !proxyComplete((key) => edit[key])
             }
           >
             Save
