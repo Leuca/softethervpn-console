@@ -6,11 +6,12 @@ import { Properties } from './Properties';
 import { api } from '@app/utils/vpnrpc_settings';
 
 vi.mock('@app/utils/vpnrpc_settings', () => ({
-  api: { GetHub: vi.fn(), SetHub: vi.fn() },
+  api: { GetHub: vi.fn(), SetHub: vi.fn(), GetHubMsg: vi.fn(), SetHubMsg: vi.fn() },
 }));
 
 const getHub = api.GetHub as unknown as Mock;
 const setHub = api.SetHub as unknown as Mock;
+const getHubMsg = api.GetHubMsg as unknown as Mock;
 
 // GetHub is not relied on to echo HubName_str; the save sets it from the prop.
 const hubConfig = {
@@ -23,6 +24,7 @@ const hubConfig = {
 describe('Properties', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getHubMsg.mockResolvedValue({ Msg_bin: new Uint8Array() });
   });
 
   it('loads the hub config and shows current values', async () => {
@@ -31,6 +33,7 @@ describe('Properties', () => {
     render(<Properties hub="DEFAULT" />);
 
     expect(await screen.findByLabelText('Max sessions')).toHaveValue(10);
+    expect(screen.getByRole('button', { name: 'Set the Message' })).toBeInTheDocument();
     expect(getHub.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
   });
 

@@ -17,6 +17,7 @@ import {
 import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
+import { HubMessage } from '@app/Hubs/HubMessage';
 
 const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the full GetHub response, plus an optional new admin password.
@@ -133,6 +134,7 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               aria-label="New admin password"
             />
           </FormGroup>
+          <HubMessage hub={hub} />
         </Form>
       ) : null}
     </Flex>
