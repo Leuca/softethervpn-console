@@ -17,6 +17,7 @@ import {
 import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
+import { HubAdminOptions } from '@app/Hubs/HubAdminOptions';
 import { HubMessage } from '@app/Hubs/HubMessage';
 
 const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
@@ -100,42 +101,51 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <Spinner size="xl" aria-label="Loading hub properties" />
         </Bullseye>
       ) : config !== null ? (
-        <Form style={{ maxWidth: '32rem' }}>
-          <FormGroup label="Max sessions" fieldId="hub-maxsession">
-            <TextInput
-              type="number"
-              id="hub-maxsession"
-              min={0}
-              value={String(config.MaxSession_u32 ?? 0)}
-              onChange={(_event, value) => setField('MaxSession_u32', Number(value) || 0)}
-              aria-label="Max sessions"
-            />
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem>0 means unlimited.</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          </FormGroup>
-          <FormGroup fieldId="hub-noenum">
-            <Checkbox
-              id="hub-noenum"
-              label="Hide this hub from anonymous enumeration"
-              isChecked={Boolean(config.NoEnum_bool)}
-              onChange={(_event, checked) => setField('NoEnum_bool', checked)}
-            />
-          </FormGroup>
-          <FormGroup label="New admin password" fieldId="hub-password">
-            <TextInput
-              type="password"
-              id="hub-password"
-              value={newPassword}
-              onChange={(_event, value) => setNewPassword(value)}
-              placeholder="Leave blank to keep the current password"
-              aria-label="New admin password"
-            />
-          </FormGroup>
-          <HubMessage hub={hub} />
-        </Form>
+        <>
+          <Form style={{ maxWidth: '32rem' }}>
+            <FormGroup label="Max sessions" fieldId="hub-maxsession">
+              <TextInput
+                type="number"
+                id="hub-maxsession"
+                min={0}
+                value={String(config.MaxSession_u32 ?? 0)}
+                onChange={(_event, value) => setField('MaxSession_u32', Number(value) || 0)}
+                aria-label="Max sessions"
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>0 means unlimited.</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+            <FormGroup fieldId="hub-noenum">
+              <Checkbox
+                id="hub-noenum"
+                label="Hide this hub from anonymous enumeration"
+                isChecked={Boolean(config.NoEnum_bool)}
+                onChange={(_event, checked) => setField('NoEnum_bool', checked)}
+              />
+            </FormGroup>
+            <FormGroup label="New admin password" fieldId="hub-password">
+              <TextInput
+                type="password"
+                id="hub-password"
+                value={newPassword}
+                onChange={(_event, value) => setNewPassword(value)}
+                placeholder="Leave blank to keep the current password"
+                aria-label="New admin password"
+              />
+            </FormGroup>
+          </Form>
+          <Flex gap={{ default: 'gapSm' }}>
+            <FlexItem>
+              <HubMessage hub={hub} />
+            </FlexItem>
+            <FlexItem>
+              <HubAdminOptions hub={hub} />
+            </FlexItem>
+          </Flex>
+        </>
       ) : null}
     </Flex>
   );
