@@ -5,6 +5,8 @@ import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Properties } from './Properties';
 import { api } from '@app/utils/vpnrpc_settings';
 
+let serverUser = 'Administrator';
+
 vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: {
     GetHub: vi.fn(),
@@ -14,12 +16,14 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
     GetHubAdminOptions: vi.fn(),
     GetDefaultHubAdminOptions: vi.fn(),
     SetHubAdminOptions: vi.fn(),
+    GetHubExtOptions: vi.fn(),
+    SetHubExtOptions: vi.fn(),
   },
 }));
 
 vi.mock('@app/ServerContext', () => ({
   useServer: () => ({
-    user: 'Administrator',
+    user: serverUser,
     capsList: [{ CapsName_str: 'b_support_hub_admin_option', CapsValue_u32: 1 }],
   }),
 }));
@@ -30,6 +34,8 @@ const getHubMsg = api.GetHubMsg as unknown as Mock;
 const getHubAdminOptions = api.GetHubAdminOptions as unknown as Mock;
 const getDefaultHubAdminOptions = api.GetDefaultHubAdminOptions as unknown as Mock;
 const setHubAdminOptions = api.SetHubAdminOptions as unknown as Mock;
+const getHubExtOptions = api.GetHubExtOptions as unknown as Mock;
+const setHubExtOptions = api.SetHubExtOptions as unknown as Mock;
 
 // GetHub is not relied on to echo HubName_str; the save sets it from the prop.
 const hubConfig = {
@@ -42,6 +48,7 @@ const hubConfig = {
 describe('Properties', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverUser = 'Administrator';
     getHubMsg.mockResolvedValue({ Msg_bin: new Uint8Array() });
     getHubAdminOptions.mockResolvedValue({
       AdminOptionList: [
@@ -63,6 +70,16 @@ describe('Properties', () => {
         },
       ],
     });
+    getHubExtOptions.mockResolvedValue({
+      AdminOptionList: [
+        { Name_str: 'NoIpTable', Value_u32: 0, Descrption_utf: 'Do not generate an IP address table.' },
+        {
+          Name_str: 'BroadcastStormDetectionThreshold',
+          Value_u32: 32,
+          Descrption_utf: 'Broadcast storm threshold.',
+        },
+      ],
+    });
   });
 
   it('loads the hub config and shows current values', async () => {
@@ -72,6 +89,7 @@ describe('Properties', () => {
 
     expect(await screen.findByLabelText('Max sessions')).toHaveValue(10);
     expect(screen.getByRole('button', { name: 'Set the Message' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Extended Options' })).toBeInTheDocument();
     expect(getHub.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
   });
 
@@ -165,5 +183,82 @@ describe('Properties', () => {
         expect.objectContaining({ Name_str: 'no_change_users', Value_u32: 0 }),
       ]),
     );
+  });
+
+  it('loads hub extended options', async () => {
+    getHub.mockResolvedValue({ ...hubConfig });
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await screen.findByLabelText('Max sessions');
+    expect(getHubExtOptions).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Extended Options' }));
+    const extDialog = await screen.findByRole('dialog', { name: 'Virtual Hub Extended Options' });
+
+    expect(await within(extDialog).findByText('NoIpTable')).toBeInTheDocument();
+    expect(within(extDialog).getByText('Do not generate an IP address table.')).toBeInTheDocument();
+    expect(getHubExtOptions.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+    expect(getHubAdminOptions.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+  });
+
+  it('shows an error when hub extended options fail to load', async () => {
+    getHub.mockResolvedValue({ ...hubConfig });
+    getHubExtOptions.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await user.click(await screen.findByRole('button', { name: 'Extended Options' }));
+
+    expect(await screen.findByText('Could not load or save hub extended options')).toBeInTheDocument();
+  });
+
+  it('edits hub extended options inline before saving', async () => {
+    getHub.mockResolvedValue({ ...hubConfig });
+    setHubExtOptions.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await user.click(await screen.findByRole('button', { name: 'Extended Options' }));
+    const extDialog = await screen.findByRole('dialog', { name: 'Virtual Hub Extended Options' });
+
+    await user.click(await within(extDialog).findByLabelText('Value for NoIpTable'));
+    const threshold = within(extDialog).getByLabelText('Value for BroadcastStormDetectionThreshold');
+    await user.clear(threshold);
+    await user.type(threshold, '64');
+
+    await user.click(within(extDialog).getByRole('button', { name: 'Save options' }));
+
+    const sent = setHubExtOptions.mock.calls[0][0];
+    expect(sent.HubName_str).toBe('DEFAULT');
+    expect(sent.AdminOptionList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ Name_str: 'NoIpTable', Value_u32: 1 }),
+        expect.objectContaining({ Name_str: 'BroadcastStormDetectionThreshold', Value_u32: 64 }),
+      ]),
+    );
+  });
+
+  it('keeps hub extended options read-only when hub admins are denied', async () => {
+    serverUser = 'Hub Administrator';
+    getHub.mockResolvedValue({ ...hubConfig });
+    getHubAdminOptions.mockResolvedValue({
+      AdminOptionList: [
+        {
+          Name_str: 'deny_hub_admin_change_ext_option',
+          Value_u32: 1,
+          Descrption_utf: 'Deny hub admins changing extended options.',
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await user.click(await screen.findByRole('button', { name: 'Extended Options' }));
+    const extDialog = await screen.findByRole('dialog', { name: 'Virtual Hub Extended Options' });
+
+    expect(await within(extDialog).findByText('Options are read-only')).toBeInTheDocument();
+    expect(within(extDialog).getByRole('button', { name: 'Save options' })).toBeDisabled();
+    expect(within(extDialog).getByLabelText('Value for NoIpTable')).toBeDisabled();
   });
 });

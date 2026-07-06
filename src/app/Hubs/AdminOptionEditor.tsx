@@ -7,6 +7,7 @@ interface AdminOptionEditorProps {
   ariaLabel: string;
   options: VPN.VpnAdminOption[];
   defaultOptions?: VPN.VpnAdminOption[];
+  numericOptions?: Set<string>;
   canChange: boolean;
   onChange: (options: VPN.VpnAdminOption[]) => void;
 }
@@ -35,6 +36,7 @@ const AdminOptionEditor: React.FunctionComponent<AdminOptionEditorProps> = ({
   ariaLabel,
   options,
   defaultOptions = [],
+  numericOptions = numericOptionNames,
   canChange,
   onChange,
 }) => {
@@ -63,7 +65,7 @@ const AdminOptionEditor: React.FunctionComponent<AdminOptionEditorProps> = ({
         </Thead>
         <Tbody>
           {options.map((option) => {
-            const numeric = numericOptionNames.has(option.Name_str);
+            const numeric = numericOptions.has(option.Name_str);
             return (
               <Tr key={option.Name_str}>
                 <Td dataLabel="Item" modifier="breakWord">

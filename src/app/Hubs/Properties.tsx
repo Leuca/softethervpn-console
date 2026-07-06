@@ -18,6 +18,7 @@ import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { HubAdminOptions } from '@app/Hubs/HubAdminOptions';
+import { HubExtendedOptions } from '@app/Hubs/HubExtendedOptions';
 import { HubMessage } from '@app/Hubs/HubMessage';
 
 const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
@@ -143,6 +144,9 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             </FlexItem>
             <FlexItem>
               <HubAdminOptions hub={hub} />
+            </FlexItem>
+            <FlexItem>
+              <HubExtendedOptions hub={hub} />
             </FlexItem>
           </Flex>
         </>
