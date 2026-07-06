@@ -99,6 +99,99 @@ describe('Layer3Switch', () => {
     expect(p).toMatchObject({ Name_str: 'L3SW', HubName_str: 'DEFAULT', IpAddress_ip: '10.0.0.1' });
   });
 
+  it('rejects interface addresses the server will reject', async () => {
+    setup({ ifs: [] });
+    const user = userEvent.setup();
+
+    render(<Layer3Switch />);
+    await user.click(await screen.findByRole('button', { name: 'L3SW' }));
+    await user.click(await screen.findByRole('button', { name: 'Add interface' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const ip = within(dialog).getByLabelText('IP address');
+    const mask = within(dialog).getByLabelText('Subnet mask');
+    const add = within(dialog).getByRole('button', { name: 'Add' });
+
+    await user.type(ip, '999.0.0.1');
+    await user.type(mask, '255.255.255.0');
+    expect(add).toBeDisabled();
+
+    await user.clear(ip);
+    await user.clear(mask);
+    await user.type(ip, '10.0.0.1');
+    await user.type(mask, '255.0.255.0');
+    expect(add).toBeDisabled();
+
+    await user.clear(ip);
+    await user.clear(mask);
+    await user.type(ip, '10.0.0.0');
+    await user.type(mask, '255.255.255.0');
+    expect(add).toBeDisabled();
+    expect(m('AddL3If')).not.toHaveBeenCalled();
+  });
+
+  it('adds a route to the selected switch', async () => {
+    setup({ routes: [] });
+    m('AddL3Table').mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Layer3Switch />);
+    await user.click(await screen.findByRole('button', { name: 'L3SW' }));
+    await user.click(await screen.findByRole('button', { name: 'Add route' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Network address'), '192.168.10.0');
+    await user.type(within(dialog).getByLabelText('Subnet mask'), '255.255.255.0');
+    await user.type(within(dialog).getByLabelText('Gateway address'), '192.168.0.254');
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }));
+
+    await waitFor(() => expect(m('AddL3Table')).toHaveBeenCalledTimes(1));
+    const p = m('AddL3Table').mock.calls[0][0];
+    expect(p).toMatchObject({
+      Name_str: 'L3SW',
+      NetworkAddress_ip: '192.168.10.0',
+      SubnetMask_ip: '255.255.255.0',
+      GatewayAddress_ip: '192.168.0.254',
+    });
+  });
+
+  it('rejects route entries the server will reject', async () => {
+    setup({ routes: [] });
+    const user = userEvent.setup();
+
+    render(<Layer3Switch />);
+    await user.click(await screen.findByRole('button', { name: 'L3SW' }));
+    await user.click(await screen.findByRole('button', { name: 'Add route' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const network = within(dialog).getByLabelText('Network address');
+    const mask = within(dialog).getByLabelText('Subnet mask');
+    const gateway = within(dialog).getByLabelText('Gateway address');
+    const add = within(dialog).getByRole('button', { name: 'Add' });
+
+    await user.type(network, '192.168.10.1');
+    await user.type(mask, '255.255.255.0');
+    await user.type(gateway, '192.168.0.254');
+    expect(add).toBeDisabled();
+
+    await user.clear(network);
+    await user.clear(mask);
+    await user.clear(gateway);
+    await user.type(network, '192.168.10.0');
+    await user.type(mask, '255.0.255.0');
+    await user.type(gateway, '192.168.0.254');
+    expect(add).toBeDisabled();
+
+    await user.clear(network);
+    await user.clear(mask);
+    await user.clear(gateway);
+    await user.type(network, '192.168.10.0');
+    await user.type(mask, '255.255.255.0');
+    await user.type(gateway, '0.0.0.0');
+    expect(add).toBeDisabled();
+    expect(m('AddL3Table')).not.toHaveBeenCalled();
+  });
+
   it('disables editing while the switch is running', async () => {
     setup({ switches: [{ Name_str: 'L3SW', NumInterfaces_u32: 1, NumTables_u32: 0, Active_bool: true, Online_bool: true }] });
     const user = userEvent.setup();
@@ -109,6 +202,64 @@ describe('Layer3Switch', () => {
     expect(await screen.findByText(/stop the switch to change/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add interface' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Add route' })).toBeDisabled();
+  });
+
+  it('disables editing while the switch is active but offline', async () => {
+    setup({ switches: [{ Name_str: 'L3SW', NumInterfaces_u32: 1, NumTables_u32: 0, Active_bool: true, Online_bool: false }] });
+    const user = userEvent.setup();
+
+    render(<Layer3Switch />);
+    await user.click(await screen.findByRole('button', { name: 'L3SW' }));
+
+    expect(await screen.findByText('Active (offline)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add interface' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add route' })).toBeDisabled();
+
+    const rowAction = screen.getAllByRole('button', { name: /kebab toggle/i }).find((button) => !button.hasAttribute('disabled'));
+    expect(rowAction).toBeDefined();
+    await user.click(rowAction as HTMLElement);
+    expect(await screen.findByRole('menuitem', { name: 'Stop' })).toBeInTheDocument();
+  });
+
+  it('rejects duplicate interfaces before calling the server', async () => {
+    setup();
+    const user = userEvent.setup();
+
+    render(<Layer3Switch />);
+    await user.click(await screen.findByRole('button', { name: 'L3SW' }));
+    await user.click(await screen.findByRole('button', { name: 'Add interface' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('IP address'), '10.0.0.1');
+    await user.type(within(dialog).getByLabelText('Subnet mask'), '255.255.255.0');
+
+    expect(within(dialog).getByText('This switch already has an interface for the selected hub.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(m('AddL3If')).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate routes and invalid metrics before calling the server', async () => {
+    setup();
+    const user = userEvent.setup();
+
+    render(<Layer3Switch />);
+    await user.click(await screen.findByRole('button', { name: 'L3SW' }));
+    await user.click(await screen.findByRole('button', { name: 'Add route' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Network address'), '0.0.0.0');
+    await user.type(within(dialog).getByLabelText('Subnet mask'), '0.0.0.0');
+    await user.type(within(dialog).getByLabelText('Gateway address'), '192.168.0.254');
+
+    expect(within(dialog).getByText('This routing table entry already exists.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Add' })).toBeDisabled();
+
+    await user.clear(within(dialog).getByLabelText('Metric'));
+    await user.type(within(dialog).getByLabelText('Metric'), '0');
+
+    expect(within(dialog).getByText('Metric must be a whole number from 1 to 4294967295.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(m('AddL3Table')).not.toHaveBeenCalled();
   });
 
   it('starts a stopped switch from the kebab', async () => {

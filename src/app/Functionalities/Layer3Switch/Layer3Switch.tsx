@@ -13,8 +13,11 @@ import {
   FlexItem,
   Form,
   FormGroup,
+  FormHelperText,
   FormSelect,
   FormSelectOption,
+  HelperText,
+  HelperTextItem,
   Label,
   Modal,
   ModalBody,
@@ -32,9 +35,140 @@ import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
 
-// Loose IPv4 check; empty is allowed while typing.
-const isIPv4 = (value: string): boolean => /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(value);
-const ipValidated = (value: string): 'default' | 'error' => (value === '' || isIPv4(value) ? 'default' : 'error');
+const parseIPv4 = (value: string): number | null => {
+  const parts = value.split('.');
+  if (parts.length !== 4) {
+    return null;
+  }
+
+  let result = 0;
+  for (const part of parts) {
+    if (!/^\d+$/.test(part)) {
+      return null;
+    }
+    const octet = Number(part);
+    if (octet > 255) {
+      return null;
+    }
+    result = ((result << 8) | octet) >>> 0;
+  }
+
+  return result;
+};
+
+const isIPv4 = (value: string): boolean => parseIPv4(value) !== null;
+const isHostIPv4 = (value: string): boolean => {
+  const ip = parseIPv4(value);
+  return ip !== null && ip !== 0 && ip !== 0xffffffff;
+};
+const isSubnetMask = (value: string): boolean => {
+  const mask = parseIPv4(value);
+  if (mask === null) {
+    return false;
+  }
+
+  for (let bits = 0; bits <= 32; bits++) {
+    const validMask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+    if (mask === validMask) {
+      return true;
+    }
+  }
+
+  return false;
+};
+const isInterfaceAddress = (ipValue: string, maskValue: string): boolean => {
+  const ip = parseIPv4(ipValue);
+  const mask = parseIPv4(maskValue);
+  if (ip === null || mask === null || !isHostIPv4(ipValue) || !isSubnetMask(maskValue)) {
+    return false;
+  }
+
+  return ((ip & (~mask >>> 0)) >>> 0) !== 0;
+};
+const isNetworkAddress = (ipValue: string, maskValue: string): boolean => {
+  const ip = parseIPv4(ipValue);
+  const mask = parseIPv4(maskValue);
+  return ip !== null && mask !== null && isSubnetMask(maskValue) && ((ip & mask) >>> 0) === ip;
+};
+const parseMetric = (value: string): number | null => {
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+  const metric = Number(value);
+  return metric >= 1 && metric <= 0xffffffff ? metric : null;
+};
+
+const hostIpValidated = (value: string): 'default' | 'error' => (value === '' || isHostIPv4(value) ? 'default' : 'error');
+const subnetMaskValidated = (value: string): 'default' | 'error' => (value === '' || isSubnetMask(value) ? 'default' : 'error');
+const interfaceIpValidated = (ipValue: string, maskValue: string): 'default' | 'error' => {
+  if (ipValue === '') {
+    return 'default';
+  }
+  if (!isHostIPv4(ipValue)) {
+    return 'error';
+  }
+  if (maskValue !== '' && isSubnetMask(maskValue) && !isInterfaceAddress(ipValue, maskValue)) {
+    return 'error';
+  }
+  return 'default';
+};
+const metricValidated = (value: string): 'default' | 'error' => (value === '' || parseMetric(value) !== null ? 'default' : 'error');
+
+const helperVariant = (valid: boolean): 'default' | 'error' => (valid ? 'default' : 'error');
+
+const interfaceIpHelp = (ipValue: string, maskValue: string): { variant: 'default' | 'error'; text: string } => {
+  if (ipValue === '') {
+    return { variant: 'default', text: 'Enter a host IPv4 address.' };
+  }
+  if (!isHostIPv4(ipValue)) {
+    return { variant: 'error', text: 'Enter a host IPv4 address other than 0.0.0.0 or 255.255.255.255.' };
+  }
+  if (maskValue !== '' && isSubnetMask(maskValue) && !isInterfaceAddress(ipValue, maskValue)) {
+    return { variant: 'error', text: 'The address cannot be the network address for this subnet.' };
+  }
+  return { variant: 'default', text: 'Host IPv4 address for this virtual interface.' };
+};
+const networkAddressHelp = (ipValue: string, maskValue: string): { variant: 'default' | 'error'; text: string } => {
+  if (ipValue === '') {
+    return { variant: 'default', text: 'Enter a network IPv4 address.' };
+  }
+  if (!isIPv4(ipValue)) {
+    return { variant: 'error', text: 'Enter a valid IPv4 address.' };
+  }
+  if (maskValue !== '' && isSubnetMask(maskValue) && !isNetworkAddress(ipValue, maskValue)) {
+    return { variant: 'error', text: 'The network address must match the subnet mask.' };
+  }
+  return { variant: 'default', text: 'Network IPv4 address for this route.' };
+};
+const maskHelp = (value: string): { variant: 'default' | 'error'; text: string } => ({
+  variant: helperVariant(value === '' || isSubnetMask(value)),
+  text: 'Enter a contiguous IPv4 subnet mask.',
+});
+const hostHelp = (value: string): { variant: 'default' | 'error'; text: string } => {
+  if (value === '') {
+    return { variant: 'default', text: 'Enter a gateway host IPv4 address.' };
+  }
+  if (!isHostIPv4(value)) {
+    return { variant: 'error', text: 'Enter a usable host IPv4 address other than 0.0.0.0 or 255.255.255.255.' };
+  }
+  return { variant: 'default', text: 'Next-hop gateway host address.' };
+};
+const metricHelp = (value: string): { variant: 'default' | 'error'; text: string } => ({
+  variant: helperVariant(value === '' || parseMetric(value) !== null),
+  text: 'Metric must be a whole number from 1 to 4294967295.',
+});
+const networkAddressValidated = (ipValue: string, maskValue: string): 'default' | 'error' => {
+  if (ipValue === '') {
+    return 'default';
+  }
+  if (!isIPv4(ipValue)) {
+    return 'error';
+  }
+  if (maskValue !== '' && isSubnetMask(maskValue) && !isNetworkAddress(ipValue, maskValue)) {
+    return 'error';
+  }
+  return 'default';
+};
 
 const Layer3Switch: React.FunctionComponent = () => {
   const [switches, setSwitches] = React.useState<VPN.VpnRpcEnumL3SwItem[] | null>(null);
@@ -118,7 +252,7 @@ const Layer3Switch: React.FunctionComponent = () => {
   };
 
   const selectedItem = switches?.find((s) => s.Name_str === selected) ?? null;
-  const selectedRunning = !!selectedItem && selectedItem.Online_bool && selectedItem.Active_bool;
+  const selectedActive = !!selectedItem?.Active_bool;
 
   const createSwitch = () => {
     const name = newName.trim();
@@ -134,6 +268,9 @@ const Layer3Switch: React.FunctionComponent = () => {
     setIfOpen(true);
   };
   const addIf = () => {
+    if (!ifCanCreate) {
+      return;
+    }
     setIfOpen(false);
     run(
       api.AddL3If(
@@ -155,6 +292,9 @@ const Layer3Switch: React.FunctionComponent = () => {
     setRouteOpen(true);
   };
   const addRoute = () => {
+    if (!routeCanCreate || routeMetric === null) {
+      return;
+    }
     setRouteOpen(false);
     run(
       api.AddL3Table(
@@ -163,7 +303,7 @@ const Layer3Switch: React.FunctionComponent = () => {
           NetworkAddress_ip: rNet,
           SubnetMask_ip: rMask,
           GatewayAddress_ip: rGw,
-          Metric_u32: Number(rMetric) || 0,
+          Metric_u32: routeMetric,
         }),
       ),
     );
@@ -225,8 +365,25 @@ const Layer3Switch: React.FunctionComponent = () => {
     </Button>
   );
 
-  const ifCanCreate = ifHub !== '' && isIPv4(ifIp) && isIPv4(ifMask);
-  const routeCanCreate = isIPv4(rNet) && isIPv4(rMask) && isIPv4(rGw);
+  const routeMetric = parseMetric(rMetric);
+  const duplicateIf = (ifs ?? []).some((it) => it.HubName_str === ifHub);
+  const duplicateRoute =
+    routeMetric !== null &&
+    (routes ?? []).some(
+      (rt) =>
+        rt.NetworkAddress_ip === rNet &&
+        rt.SubnetMask_ip === rMask &&
+        rt.GatewayAddress_ip === rGw &&
+        rt.Metric_u32 === routeMetric,
+    );
+  const ifIpHelper = interfaceIpHelp(ifIp, ifMask);
+  const ifMaskHelper = maskHelp(ifMask);
+  const routeNetworkHelper = networkAddressHelp(rNet, rMask);
+  const routeMaskHelper = maskHelp(rMask);
+  const routeGatewayHelper = hostHelp(rGw);
+  const routeMetricHelper = metricHelp(rMetric);
+  const ifCanCreate = ifHub !== '' && isInterfaceAddress(ifIp, ifMask) && !duplicateIf;
+  const routeCanCreate = isNetworkAddress(rNet, rMask) && isHostIPv4(rGw) && routeMetric !== null && !duplicateRoute;
 
   return (
     <AppPage
@@ -265,7 +422,9 @@ const Layer3Switch: React.FunctionComponent = () => {
               </Thead>
               <Tbody>
                 {switches.map((sw) => {
-                  const running = sw.Online_bool && sw.Active_bool;
+                  const active = !!sw.Active_bool;
+                  const statusLabel = active ? (sw.Online_bool ? 'Operational' : 'Active (offline)') : 'Stopped';
+                  const statusColor = active ? (sw.Online_bool ? 'green' : 'orange') : 'grey';
                   return (
                     <Tr key={sw.Name_str} isRowSelected={sw.Name_str === selected}>
                       <Td dataLabel="Name">
@@ -276,14 +435,14 @@ const Layer3Switch: React.FunctionComponent = () => {
                       <Td dataLabel="Interfaces">{sw.NumInterfaces_u32}</Td>
                       <Td dataLabel="Routes">{sw.NumTables_u32}</Td>
                       <Td dataLabel="Status">
-                        <Label color={running ? 'green' : 'grey'} isCompact>
-                          {running ? 'Operational' : 'Stopped'}
+                        <Label color={statusColor} isCompact>
+                          {statusLabel}
                         </Label>
                       </Td>
                       <Td isActionCell>
                         <ActionsColumn
                           items={[
-                            running
+                            active
                               ? { title: 'Stop', onClick: () => run(api.StopL3Switch(new VPN.VpnRpcL3Sw({ Name_str: sw.Name_str }))) }
                               : { title: 'Start', onClick: () => run(api.StartL3Switch(new VPN.VpnRpcL3Sw({ Name_str: sw.Name_str }))) },
                             { title: 'Manage', onClick: () => setSelected(sw.Name_str) },
@@ -315,7 +474,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                 </Flex>
               </CardTitle>
               <CardBody>
-                {selectedRunning && (
+                {selectedActive && (
                   <Alert
                     variant="info"
                     title="Stop the switch to change its interfaces and routing table"
@@ -335,7 +494,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                           variant="secondary"
                           icon={<PlusCircleIcon />}
                           onClick={openAddIf}
-                          isDisabled={busy || selectedRunning || hubs.length === 0}
+                          isDisabled={busy || selectedActive || hubs.length === 0 || ifs === null}
                         >
                           Add interface
                         </Button>
@@ -366,7 +525,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                               <Td isActionCell>
                                 <ActionsColumn
                                   items={[{ title: 'Delete', onClick: () => setPendingIf(it) }]}
-                                  isDisabled={busy || selectedRunning}
+                                  isDisabled={busy || selectedActive}
                                 />
                               </Td>
                             </Tr>
@@ -387,7 +546,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                           variant="secondary"
                           icon={<PlusCircleIcon />}
                           onClick={openAddRoute}
-                          isDisabled={busy || selectedRunning}
+                          isDisabled={busy || selectedActive || routes === null}
                         >
                           Add route
                         </Button>
@@ -420,7 +579,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                               <Td isActionCell>
                                 <ActionsColumn
                                   items={[{ title: 'Delete', onClick: () => setPendingRoute(rt) }]}
-                                  isDisabled={busy || selectedRunning}
+                                  isDisabled={busy || selectedActive}
                                 />
                               </Td>
                             </Tr>
@@ -478,19 +637,32 @@ const Layer3Switch: React.FunctionComponent = () => {
                 id="l3-if-ip"
                 value={ifIp}
                 onChange={(_event, value) => setIfIp(value)}
-                validated={ipValidated(ifIp)}
+                validated={interfaceIpValidated(ifIp, ifMask)}
                 aria-label="IP address"
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={ifIpHelper.variant}>{ifIpHelper.text}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
             <FormGroup label="Subnet mask" fieldId="l3-if-mask">
               <TextInput
                 id="l3-if-mask"
                 value={ifMask}
                 onChange={(_event, value) => setIfMask(value)}
-                validated={ipValidated(ifMask)}
+                validated={subnetMaskValidated(ifMask)}
                 aria-label="Subnet mask"
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={ifMaskHelper.variant}>{ifMaskHelper.text}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
+            {duplicateIf && (
+              <Alert variant="warning" title="This switch already has an interface for the selected hub." isInline />
+            )}
           </Form>
         </ModalBody>
         <ModalFooter>
@@ -513,27 +685,42 @@ const Layer3Switch: React.FunctionComponent = () => {
                 id="l3-r-net"
                 value={rNet}
                 onChange={(_event, value) => setRNet(value)}
-                validated={ipValidated(rNet)}
+                validated={networkAddressValidated(rNet, rMask)}
                 aria-label="Network address"
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={routeNetworkHelper.variant}>{routeNetworkHelper.text}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
             <FormGroup label="Subnet mask" fieldId="l3-r-mask">
               <TextInput
                 id="l3-r-mask"
                 value={rMask}
                 onChange={(_event, value) => setRMask(value)}
-                validated={ipValidated(rMask)}
+                validated={subnetMaskValidated(rMask)}
                 aria-label="Subnet mask"
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={routeMaskHelper.variant}>{routeMaskHelper.text}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
             <FormGroup label="Gateway address" fieldId="l3-r-gw">
               <TextInput
                 id="l3-r-gw"
                 value={rGw}
                 onChange={(_event, value) => setRGw(value)}
-                validated={ipValidated(rGw)}
+                validated={hostIpValidated(rGw)}
                 aria-label="Gateway address"
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={routeGatewayHelper.variant}>{routeGatewayHelper.text}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
             <FormGroup label="Metric" fieldId="l3-r-metric">
               <TextInput
@@ -542,9 +729,16 @@ const Layer3Switch: React.FunctionComponent = () => {
                 min={1}
                 value={rMetric}
                 onChange={(_event, value) => setRMetric(value)}
+                validated={metricValidated(rMetric)}
                 aria-label="Metric"
               />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem variant={routeMetricHelper.variant}>{routeMetricHelper.text}</HelperTextItem>
+                </HelperText>
+              </FormHelperText>
             </FormGroup>
+            {duplicateRoute && <Alert variant="warning" title="This routing table entry already exists." isInline />}
           </Form>
           <Content component="small">
             For the default gateway, set both the network address and subnet mask to 0.0.0.0.
