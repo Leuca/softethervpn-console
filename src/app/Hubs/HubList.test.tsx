@@ -15,10 +15,15 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
   },
 }));
 
+const serverState = vi.hoisted(() => ({
+  info: { ServerType_u32: 0 },
+  hideAdminOnly: false,
+}));
+
 // HubList reads the server type from the ServerContext to decide the hub type
 // on creation; a standalone server is enough for these tests.
 vi.mock('@app/ServerContext', () => ({
-  useServer: () => ({ info: { ServerType_u32: 0 } }),
+  useServer: () => serverState,
 }));
 
 const enumHub = api.EnumHub as unknown as Mock;
@@ -51,6 +56,8 @@ function renderList() {
 describe('HubList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverState.info = { ServerType_u32: 0 };
+    serverState.hideAdminOnly = false;
   });
 
   it('renders a hub row with type label and counts', async () => {
@@ -69,6 +76,16 @@ describe('HubList', () => {
     renderList();
 
     expect(await screen.findByText('No Virtual Hubs')).toBeInTheDocument();
+  });
+
+  it('hides the empty-state create action for hub administrators', async () => {
+    serverState.hideAdminOnly = true;
+    enumHub.mockResolvedValue({ HubList: [] });
+
+    renderList();
+
+    expect(await screen.findByText('No Virtual Hubs')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create virtual hub/i })).not.toBeInTheDocument();
   });
 
   it('takes a hub offline through the dedicated SetHubOnline API', async () => {
@@ -146,5 +163,22 @@ describe('HubList', () => {
     expect(deleteHub).toHaveBeenCalledOnce();
     expect(deleteHub.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
     expect(enumHub).toHaveBeenCalledTimes(2);
+  });
+
+  it('hides server-admin-only hub actions for hub administrators', async () => {
+    serverState.hideAdminOnly = true;
+    enumHub.mockResolvedValue({ HubList: [defaultHub] });
+    const user = userEvent.setup();
+
+    renderList();
+    await screen.findByText('DEFAULT');
+
+    expect(screen.queryByRole('button', { name: /create virtual hub/i })).not.toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    expect(await screen.findByText('Manage')).toBeInTheDocument();
+    expect(screen.queryByText('Delete')).not.toBeInTheDocument();
+    expect(createHub).not.toHaveBeenCalled();
+    expect(deleteHub).not.toHaveBeenCalled();
   });
 });

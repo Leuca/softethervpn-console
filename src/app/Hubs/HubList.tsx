@@ -31,7 +31,7 @@ import { formatRpcValue, hubTypeLabel } from '@app/utils/format';
 
 const HubList: React.FunctionComponent = () => {
   const navigate = useNavigate();
-  const { info } = useServer();
+  const { hideAdminOnly, info } = useServer();
 
   const [hubs, setHubs] = React.useState<VPN.VpnRpcEnumHubItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -74,6 +74,9 @@ const HubList: React.FunctionComponent = () => {
     run(api.SetHubOnline(new VPN.VpnRpcSetHubOnline({ HubName_str: hubName, Online_bool: online })));
 
   const openCreate = () => {
+    if (hideAdminOnly) {
+      return;
+    }
     setName('');
     setPassword('');
     setConfirm('');
@@ -81,9 +84,12 @@ const HubList: React.FunctionComponent = () => {
   };
 
   const passwordsMatch = password === confirm;
-  const canCreate = name.trim().length > 0 && passwordsMatch;
+  const canCreate = !hideAdminOnly && name.trim().length > 0 && passwordsMatch;
 
   const create = () => {
+    if (hideAdminOnly) {
+      return;
+    }
     // A standalone server (ServerType 0) only has standalone hubs; on a cluster
     // controller new hubs default to static.
     const isCluster = Number(info['ServerType_u32'] ?? 0) !== 0;
@@ -108,6 +114,10 @@ const HubList: React.FunctionComponent = () => {
   };
 
   const confirmDelete = () => {
+    if (hideAdminOnly) {
+      setPendingDelete(null);
+      return;
+    }
     if (pendingDelete === null) {
       return;
     }
@@ -118,7 +128,7 @@ const HubList: React.FunctionComponent = () => {
 
   const isLoading = hubs === null && error === null;
 
-  const createButton = (
+  const createButton = hideAdminOnly ? null : (
     <Button variant="primary" icon={<PlusCircleIcon />} onClick={openCreate} isDisabled={isLoading}>
       Create Virtual Hub
     </Button>
@@ -147,14 +157,20 @@ const HubList: React.FunctionComponent = () => {
         </Bullseye>
       ) : hubs !== null && hubs.length === 0 ? (
         <EmptyState titleText="No Virtual Hubs" headingLevel="h2">
-          <EmptyStateBody>Create a Virtual Hub to start accepting VPN connections.</EmptyStateBody>
-          <EmptyStateFooter>
-            <EmptyStateActions>
-              <Button variant="primary" icon={<PlusCircleIcon />} onClick={openCreate}>
-                Create Virtual Hub
-              </Button>
-            </EmptyStateActions>
-          </EmptyStateFooter>
+          <EmptyStateBody>
+            {hideAdminOnly
+              ? 'No Virtual Hubs are visible for this administrator account.'
+              : 'Create a Virtual Hub to start accepting VPN connections.'}
+          </EmptyStateBody>
+          {!hideAdminOnly && (
+            <EmptyStateFooter>
+              <EmptyStateActions>
+                <Button variant="primary" icon={<PlusCircleIcon />} onClick={openCreate}>
+                  Create Virtual Hub
+                </Button>
+              </EmptyStateActions>
+            </EmptyStateFooter>
+          )}
         </EmptyState>
       ) : hubs !== null ? (
         <Table aria-label="Virtual Hubs" variant="compact">
@@ -199,11 +215,15 @@ const HubList: React.FunctionComponent = () => {
                 <Td dataLabel="Last login">{formatRpcValue('LastLoginTime_dt', hub.LastLoginTime_dt)}</Td>
                 <Td isActionCell>
                   <ActionsColumn
-                    items={[
-                      { title: 'Manage', onClick: () => navigate(`/hubs/${encodeURIComponent(hub.HubName_str)}`) },
-                      { isSeparator: true },
-                      { title: 'Delete', onClick: () => setPendingDelete(hub.HubName_str) },
-                    ]}
+                    items={
+                      hideAdminOnly
+                        ? [{ title: 'Manage', onClick: () => navigate(`/hubs/${encodeURIComponent(hub.HubName_str)}`) }]
+                        : [
+                            { title: 'Manage', onClick: () => navigate(`/hubs/${encodeURIComponent(hub.HubName_str)}`) },
+                            { isSeparator: true },
+                            { title: 'Delete', onClick: () => setPendingDelete(hub.HubName_str) },
+                          ]
+                    }
                     isDisabled={busy}
                   />
                 </Td>
@@ -214,7 +234,7 @@ const HubList: React.FunctionComponent = () => {
       ) : null}
 
       {/* Create hub */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+      <Modal variant={ModalVariant.small} isOpen={!hideAdminOnly && createOpen} onClose={() => setCreateOpen(false)}>
         <ModalHeader title="Create Virtual Hub" />
         <ModalBody>
           <Form>
@@ -264,7 +284,7 @@ const HubList: React.FunctionComponent = () => {
       </Modal>
 
       {/* Delete confirmation */}
-      <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal variant={ModalVariant.small} isOpen={!hideAdminOnly && pendingDelete !== null} onClose={() => setPendingDelete(null)}>
         <ModalHeader title="Delete Virtual Hub" titleIconVariant="warning" />
         <ModalBody>
           Delete <strong>{pendingDelete}</strong>? All sessions are terminated and every user, group, certificate and
