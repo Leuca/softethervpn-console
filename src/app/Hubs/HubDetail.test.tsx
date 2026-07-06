@@ -44,6 +44,7 @@ describe('HubDetail', () => {
       'Access List',
       'Secure NAT',
       'Trusted CA',
+      'Logs',
       'RADIUS',
     ]) {
       expect(screen.getByRole('tab', { name })).toBeInTheDocument();

@@ -12,6 +12,7 @@ import { Properties } from '@app/Hubs/Properties';
 import { Radius } from '@app/Hubs/Radius';
 import { HubCertificates } from '@app/Hubs/HubCertificates';
 import { SecureNAT } from '@app/Hubs/SecureNAT';
+import { HubLogs } from '@app/Hubs/HubLogs';
 
 /**
  * Management views for a single Virtual Hub, laid out as tabs.
@@ -56,6 +57,9 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
           </Tab>
           <Tab eventKey="certificates" title={<TabTitleText>Trusted CA</TabTitleText>}>
             <HubCertificates hub={name} />
+          </Tab>
+          <Tab eventKey="logs" title={<TabTitleText>Logs</TabTitleText>}>
+            <HubLogs hub={name} />
           </Tab>
           <Tab eventKey="radius" title={<TabTitleText>RADIUS</TabTitleText>}>
             <Radius hub={name} />
