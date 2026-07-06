@@ -94,15 +94,22 @@ const EditConfig: React.FunctionComponent = () => {
   }, [fetchConfig]);
 
   const download = () => {
-    downloadBlob(new Blob([toConfigBytes(text ?? '')], { type: 'text/plain' }), fileName);
+    if (text === null) {
+      return;
+    }
+    downloadBlob(new Blob([toConfigBytes(text)], { type: 'text/plain' }), fileName);
   };
 
   const apply = () => {
     setConfirmOpen(false);
+    if (text === null) {
+      setError('Load the configuration before applying changes.');
+      return;
+    }
     setApplying(true);
     setError(null);
     api
-      .SetConfig(new VPN.VpnRpcConfig({ FileName_str: fileName, FileData_bin: toConfigBytes(text ?? '') }))
+      .SetConfig(new VPN.VpnRpcConfig({ FileName_str: fileName, FileData_bin: toConfigBytes(text) }))
       .then(() => {
         // The server restarts on success; wait for it to come back instead of
         // hitting it mid-restart and showing a transient error.
@@ -118,6 +125,7 @@ const EditConfig: React.FunctionComponent = () => {
   };
 
   const isLoading = text === null && error === null && !restarting;
+  const hasConfig = text !== null;
   const busy = isLoading || applying || restarting;
 
   const actions = (
@@ -135,12 +143,12 @@ const EditConfig: React.FunctionComponent = () => {
         variant="secondary"
         icon={<DownloadIcon />}
         onClick={download}
-        isDisabled={busy}
+        isDisabled={busy || !hasConfig}
         style={{ marginInlineEnd: 'var(--pf-t--global--spacer--sm)' }}
       >
         Download
       </Button>
-      <Button variant="primary" onClick={() => setConfirmOpen(true)} isDisabled={busy} isLoading={applying}>
+      <Button variant="primary" onClick={() => setConfirmOpen(true)} isDisabled={busy || !hasConfig} isLoading={applying}>
         Apply
       </Button>
     </>
@@ -181,15 +189,15 @@ const EditConfig: React.FunctionComponent = () => {
         <Bullseye>
           <Spinner size="xl" aria-label="Loading configuration" />
         </Bullseye>
-      ) : (
+      ) : hasConfig ? (
         <TextArea
-          value={text ?? ''}
+          value={text}
           onChange={(_event, value) => setText(value)}
           aria-label="VPN server configuration"
           resizeOrientation="vertical"
           style={{ minHeight: '28rem', fontFamily: 'var(--pf-t--global--font--family--mono)', whiteSpace: 'pre' }}
         />
-      )}
+      ) : null}
 
       <Modal variant={ModalVariant.small} isOpen={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <ModalHeader title="Apply configuration" titleIconVariant="warning" />
@@ -198,7 +206,7 @@ const EditConfig: React.FunctionComponent = () => {
           Existing connections are dropped. Continue?
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={apply}>
+          <Button variant="danger" onClick={apply} isDisabled={!hasConfig || applying || restarting}>
             Apply and restart
           </Button>
           <Button variant="link" onClick={() => setConfirmOpen(false)}>

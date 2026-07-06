@@ -78,7 +78,17 @@ describe('EditConfig', () => {
 
   it('shows an error when loading fails', async () => {
     getConfig.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+
     render(<EditConfig />);
+
     expect(await screen.findByText('Configuration operation failed')).toBeInTheDocument();
+    expect(screen.queryByLabelText('VPN server configuration')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(setConfig).not.toHaveBeenCalled();
   });
 });
