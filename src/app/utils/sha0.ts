@@ -1,6 +1,6 @@
 // SHA-0 (FIPS 180, the withdrawn predecessor of SHA-1). SoftEther hashes
-// cascade/user passwords with it: HashedPassword = SHA0(UpperCase(username) +
-// password), ASCII bytes. SHA-0 is identical to SHA-1 except the message
+// cascade/user passwords with it: HashedPassword = SHA0(password +
+// UpperCase(username)), ASCII bytes. SHA-0 is identical to SHA-1 except the message
 // schedule omits the 1-bit left rotate; WebCrypto does not provide it and the
 // vpnrpc client has no helper, so it is implemented here.
 
