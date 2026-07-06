@@ -117,6 +117,7 @@ const routes: AppRouteConfig[] = [
         label: 'Encryption And Network',
         path: '/settings/encryptionandnetwork',
         title: 'SoftEther VPN Console | Encryption And Network',
+        isAdmin: true,
       },
       {
         element: <ClusterConfig />,
