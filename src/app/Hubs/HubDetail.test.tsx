@@ -38,6 +38,9 @@ describe('HubDetail', () => {
 
     for (const name of [
       'Status',
+      'Sessions',
+      'Tables',
+      'Cascade',
       'Properties',
       'Users',
       'Groups',

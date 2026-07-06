@@ -73,9 +73,29 @@ describe('Sessions', () => {
     expect(await screen.findByText('Session operation failed')).toBeInTheDocument();
   });
 
-  it('opens the detail modal with the session MAC and IP tables', async () => {
+  it('opens the detail modal with session status only', async () => {
     enumSession.mockResolvedValue({ SessionList: [sid] });
     getSessionStatus.mockResolvedValue({ Username_str: 'alice', Connected_bool: true });
+    enumMacTable.mockResolvedValue({ MacTable: [] });
+    enumIpTable.mockResolvedValue({ IpTable: [] });
+    const user = userEvent.setup();
+
+    render(<Sessions hub="DEFAULT" />);
+    await screen.findByText('SID-ALICE-1');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Session details' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('alice')).toBeInTheDocument();
+    expect(within(dialog).queryByText('MAC address table')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('IP address table')).not.toBeInTheDocument();
+    expect(getSessionStatus.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Name_str: 'SID-ALICE-1' });
+    expect(enumMacTable).not.toHaveBeenCalled();
+    expect(enumIpTable).not.toHaveBeenCalled();
+  });
+
+  it('opens the selected session MAC address table', async () => {
+    enumSession.mockResolvedValue({ SessionList: [sid] });
     enumMacTable.mockResolvedValue({
       MacTable: [
         {
@@ -89,6 +109,23 @@ describe('Sessions', () => {
         { Key_u32: 2, SessionName_str: 'SID-OTHER', MacAddress_bin: '', VlanId_u32: 0 },
       ],
     });
+    enumIpTable.mockResolvedValue({ IpTable: [] });
+    const user = userEvent.setup();
+
+    render(<Sessions hub="DEFAULT" />);
+    await screen.findByText('SID-ALICE-1');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'MAC address table' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('AA:BB:CC:DD:EE:FF')).toBeInTheDocument();
+    expect(within(dialog).queryByText('SID-OTHER')).not.toBeInTheDocument();
+    expect(enumMacTable.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+  });
+
+  it('opens the selected session IP address table', async () => {
+    enumSession.mockResolvedValue({ SessionList: [sid] });
+    enumMacTable.mockResolvedValue({ MacTable: [] });
     enumIpTable.mockResolvedValue({
       IpTable: [
         {
@@ -99,6 +136,7 @@ describe('Sessions', () => {
           CreatedTime_dt: '2026-07-04T10:00:00.000Z',
           UpdatedTime_dt: '2026-07-04T10:05:00.000Z',
         },
+        { Key_u32: 2, SessionName_str: 'SID-OTHER', IpAddress_ip: '192.168.30.11' },
       ],
     });
     const user = userEvent.setup();
@@ -106,14 +144,12 @@ describe('Sessions', () => {
     render(<Sessions hub="DEFAULT" />);
     await screen.findByText('SID-ALICE-1');
     await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Session details' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'IP address table' }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('AA:BB:CC:DD:EE:FF')).toBeInTheDocument();
-    expect(within(dialog).getByText('192.168.30.10')).toBeInTheDocument();
-    // The other session's MAC entry is filtered out.
+    expect(await within(dialog).findByText('192.168.30.10')).toBeInTheDocument();
     expect(within(dialog).queryByText('SID-OTHER')).not.toBeInTheDocument();
-    expect(getSessionStatus.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Name_str: 'SID-ALICE-1' });
+    expect(enumIpTable.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
   });
 
   it('disconnects a session after confirmation', async () => {

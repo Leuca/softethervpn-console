@@ -30,8 +30,7 @@ import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { useServer } from '@app/ServerContext';
-import { binToBytes } from '@app/utils/blob_utils';
-import { formatRpcValue } from '@app/utils/format';
+import { formatMacAddress, formatRpcValue } from '@app/utils/format';
 import { api } from '@app/utils/vpnrpc_settings';
 
 const MIN_MTU = 64;
@@ -69,16 +68,6 @@ const capValue = (capsList: unknown[], name: string): number | null => {
 };
 
 const capBool = (capsList: unknown[], name: string): boolean => capValue(capsList, name) !== 0;
-
-const formatMac = (value: unknown): string => {
-  const bytes = binToBytes(value);
-  if (!bytes) {
-    return '';
-  }
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0').toUpperCase())
-    .join(':');
-};
 
 const parseMac = (value: string): Uint8Array | null => {
   const normalized = value.replace(/[-:.\s]/g, '');
@@ -236,7 +225,7 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         const option = normalizeSecureNatOption(secureNatOption as unknown as Record<string, unknown>);
         setEnabled(currentEnabled);
         setConfig(option);
-        setMac(formatMac(option.MacAddress_bin));
+        setMac(formatMacAddress(option.MacAddress_bin, ''));
 
         if (!currentEnabled) {
           return;
@@ -680,7 +669,7 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     {runtime.dhcp.map((item) => (
                       <Tr key={item.Id_u32}>
                         <Td dataLabel="ID">{item.Id_u32}</Td>
-                        <Td dataLabel="MAC address">{formatMac(item.MacAddress_bin)}</Td>
+                        <Td dataLabel="MAC address">{formatMacAddress(item.MacAddress_bin, '')}</Td>
                         <Td dataLabel="IP address">{item.IpAddress_ip}</Td>
                         <Td dataLabel="Hostname">{item.Hostname_str || '-'}</Td>
                         <Td dataLabel="Leased">{formatRpcValue('LeasedTime_dt', item.LeasedTime_dt)}</Td>

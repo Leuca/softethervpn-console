@@ -1,4 +1,5 @@
 import * as VPN from 'vpnrpc/dist/vpnrpc';
+import { binToBytes } from '@app/utils/blob_utils';
 
 /**
  * Format a raw JSON-RPC field value for display. SoftEther's API suffixes field
@@ -21,6 +22,17 @@ export function formatRpcValue(key: string, value: unknown): string {
     return value ? 'Yes' : 'No';
   }
   return String(value);
+}
+
+/** Format a binary MAC address as AA:BB:CC:DD:EE:FF. */
+export function formatMacAddress(value: unknown, empty = '-'): string {
+  const bytes = binToBytes(value);
+  if (!bytes) {
+    return empty;
+  }
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0').toUpperCase())
+    .join(':');
 }
 
 const connectionTypeLabels: Record<number, string> = {
