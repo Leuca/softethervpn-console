@@ -5,18 +5,27 @@ import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HubMessage } from './HubMessage';
 import { api } from '@app/utils/vpnrpc_settings';
 
+let serverUser = 'Administrator';
+
 vi.mock('@app/utils/vpnrpc_settings', () => ({
-  api: { GetHubMsg: vi.fn(), SetHubMsg: vi.fn() },
+  api: { GetHubMsg: vi.fn(), SetHubMsg: vi.fn(), GetHubAdminOptions: vi.fn() },
+}));
+
+vi.mock('@app/ServerContext', () => ({
+  useServer: () => ({ user: serverUser }),
 }));
 
 const getHubMsg = api.GetHubMsg as unknown as Mock;
 const setHubMsg = api.SetHubMsg as unknown as Mock;
+const getHubAdminOptions = api.GetHubAdminOptions as unknown as Mock;
 
 const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
 
 describe('HubMessage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverUser = 'Administrator';
+    getHubAdminOptions.mockResolvedValue({ AdminOptionList: [] });
   });
 
   it('loads the current hub message', async () => {
@@ -29,6 +38,7 @@ describe('HubMessage', () => {
     await waitFor(() => expect(screen.getByLabelText('Show Message')).toBeChecked());
     expect(screen.getByLabelText('Message')).toHaveValue('Maintenance at 22:00');
     expect(getHubMsg.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+    expect(getHubAdminOptions.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
   });
 
   it('loads an empty message as disabled', async () => {
@@ -100,5 +110,30 @@ describe('HubMessage', () => {
     const sent = setHubMsg.mock.calls[0][0];
     expect(sent.HubName_str).toBe('DEFAULT');
     expect(sent.Msg_bin).toHaveLength(0);
+  });
+
+  it('keeps the message read-only when hub admins are denied', async () => {
+    serverUser = 'Hub Administrator';
+    getHubMsg.mockResolvedValue({ Msg_bin: bytes('Read only') });
+    getHubAdminOptions.mockResolvedValue({
+      AdminOptionList: [
+        {
+          Name_str: 'no_change_msg',
+          Value_u32: 1,
+          Descrption_utf: 'Deny hub admins changing the client connection message.',
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    render(<HubMessage hub="DEFAULT" />);
+
+    await user.click(screen.getByRole('button', { name: 'Set the Message' }));
+
+    expect(await screen.findByText('Message is read-only')).toBeInTheDocument();
+    expect(screen.getByLabelText('Show Message')).toBeDisabled();
+    expect(screen.getByLabelText('Message')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(setHubMsg).not.toHaveBeenCalled();
   });
 });

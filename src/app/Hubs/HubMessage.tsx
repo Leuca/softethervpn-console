@@ -16,6 +16,7 @@ import {
 } from '@patternfly/react-core';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { binToBytes } from '@app/utils/blob_utils';
+import { useServer } from '@app/ServerContext';
 import { api } from '@app/utils/vpnrpc_settings';
 
 const MAX_MESSAGE_LENGTH = 20000;
@@ -30,11 +31,17 @@ const decodeMessage = (value: unknown): string => {
 
 const encodeMessage = (value: string): Uint8Array => new TextEncoder().encode(value);
 
+const canChangeMessage = (user: string, options: VPN.VpnAdminOption[]): boolean =>
+  user === 'Administrator' ||
+  !options.some((option) => option.Name_str.toLowerCase() === 'no_change_msg' && option.Value_u32 !== 0);
+
 const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
+  const { user } = useServer();
   const [open, setOpen] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
   const [useMessage, setUseMessage] = React.useState(false);
   const [message, setMessage] = React.useState('');
+  const [adminOptions, setAdminOptions] = React.useState<VPN.VpnAdminOption[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
@@ -43,12 +50,19 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setError(null);
     setUseMessage(false);
     setMessage('');
-    api
-      .GetHubMsg(new VPN.VpnRpcMsg({ HubName_str: hub }))
-      .then((response) => {
+    setAdminOptions([]);
+    Promise.all([
+      api.GetHubMsg(new VPN.VpnRpcMsg({ HubName_str: hub })),
+      api
+        .GetHubAdminOptions(new VPN.VpnRpcAdminOption({ HubName_str: hub }))
+        .then((response) => response.AdminOptionList ?? [])
+        .catch(() => []),
+    ])
+      .then(([response, options]) => {
         const text = decodeMessage((response as unknown as Record<string, unknown>).Msg_bin);
         setMessage(text);
         setUseMessage(text.length > 0);
+        setAdminOptions(options);
         setLoaded(true);
       })
       .catch((e) => setError(String(e)));
@@ -66,6 +80,9 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   };
 
   const save = () => {
+    if (!canChange) {
+      return;
+    }
     setSaving(true);
     api
       .SetHubMsg(
@@ -86,6 +103,7 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   const isLoading = !loaded && error === null;
   const isValid = !useMessage || (message.length > 0 && message.length <= MAX_MESSAGE_LENGTH);
+  const canChange = canChangeMessage(user, adminOptions);
 
   return (
     <>
@@ -103,6 +121,11 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               {error}
             </Alert>
           )}
+          {!canChange && loaded && (
+            <Alert variant="info" title="Message is read-only" isInline>
+              This connection cannot modify the client connection message.
+            </Alert>
+          )}
 
           {isLoading ? (
             <Bullseye>
@@ -115,6 +138,7 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   id="hub-message-enabled"
                   label="Show Message"
                   isChecked={useMessage}
+                  isDisabled={!canChange}
                   onChange={(_event, checked) => setUseMessage(checked)}
                 />
               </FormGroup>
@@ -123,7 +147,7 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   id="hub-message-text"
                   value={message}
                   maxLength={MAX_MESSAGE_LENGTH}
-                  isDisabled={!useMessage}
+                  isDisabled={!useMessage || !canChange}
                   onChange={(_event, value) => setMessage(value)}
                   aria-label="Message"
                   resizeOrientation="vertical"
@@ -135,7 +159,12 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           ) : null}
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={save} isDisabled={!loaded || saving || !isValid} isLoading={saving}>
+          <Button
+            variant="primary"
+            onClick={save}
+            isDisabled={!loaded || saving || !isValid || !canChange}
+            isLoading={saving}
+          >
             Save
           </Button>
           <Button variant="link" onClick={closeModal} isDisabled={saving}>
