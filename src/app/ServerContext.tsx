@@ -1,7 +1,27 @@
 import * as React from 'react';
 import { api } from '@app/utils/vpnrpc_settings';
 
-const adminErrorString = 'Error: Code=52, Message=Error code 52: Not enough privileges.';
+const notEnoughPrivilegesCode = 52;
+
+const probeErrorCode = (error: unknown): number | null => {
+  const rpcCode = (error as { Error?: { code?: unknown } }).Error?.code;
+  if (typeof rpcCode === 'number') {
+    return rpcCode;
+  }
+  if (typeof rpcCode === 'string' && rpcCode.trim() !== '') {
+    return Number(rpcCode);
+  }
+  const match = String(error).match(/\bCode=(\d+)\b/);
+  return match ? Number(match[1]) : null;
+};
+
+const isNotEnoughPrivilegesError = (error: unknown): boolean => probeErrorCode(error) === notEnoughPrivilegesCode;
+
+const logUnexpectedProbeError = (probe: string, error: unknown) => {
+  if (!isNotEnoughPrivilegesError(error)) {
+    console.warn(`Server probe ${probe} failed`, error);
+  }
+};
 
 export interface ServerState {
   loading: boolean;
@@ -84,12 +104,12 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
       .EnumConnection()
       .then(() => merge({ user: 'Administrator' }))
       .catch((error) => {
-        if (error.toString() === adminErrorString) {
+        if (isNotEnoughPrivilegesError(error)) {
           merge({ user: 'Hub Administrator', hideAdminOnly: true });
         } else {
+          logUnexpectedProbeError('EnumConnection', error);
           merge({});
         }
-        console.log(error);
       });
 
     // Cluster member/controller servers hide the routes not available in a cluster
@@ -106,7 +126,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
         });
       })
       .catch((error) => {
-        console.log(error);
+        logUnexpectedProbeError('GetFarmSetting', error);
         merge({});
       });
 
@@ -119,7 +139,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
           .then((azure) => merge({ ddnsHostname: response.CurrentHostName_str, azure: azure.IsEnabled_bool })),
       )
       .catch((error) => {
-        console.log(error);
+        logUnexpectedProbeError('GetDDnsClientStatus/GetAzureStatus', error);
         merge({});
       });
 
@@ -156,7 +176,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
         });
       })
       .catch((error) => {
-        console.log(error);
+        logUnexpectedProbeError('GetCaps', error);
         merge({});
       });
 
@@ -171,7 +191,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
         merge({ info: response as unknown as Record<string, unknown>, hiddenLabels: hidden });
       })
       .catch((error) => {
-        console.log(error);
+        logUnexpectedProbeError('GetServerInfo', error);
         merge({});
       });
   }, []);
