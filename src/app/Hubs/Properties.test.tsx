@@ -18,13 +18,18 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
     SetHubAdminOptions: vi.fn(),
     GetHubExtOptions: vi.fn(),
     SetHubExtOptions: vi.fn(),
+    GetAcList: vi.fn(),
+    SetAcList: vi.fn(),
   },
 }));
 
 vi.mock('@app/ServerContext', () => ({
   useServer: () => ({
     user: serverUser,
-    capsList: [{ CapsName_str: 'b_support_hub_admin_option', CapsValue_u32: 1 }],
+    capsList: [
+      { CapsName_str: 'b_support_hub_admin_option', CapsValue_u32: 1 },
+      { CapsName_str: 'b_support_ipv6_ac', CapsValue_u32: 1 },
+    ],
   }),
 }));
 
@@ -36,6 +41,8 @@ const getDefaultHubAdminOptions = api.GetDefaultHubAdminOptions as unknown as Mo
 const setHubAdminOptions = api.SetHubAdminOptions as unknown as Mock;
 const getHubExtOptions = api.GetHubExtOptions as unknown as Mock;
 const setHubExtOptions = api.SetHubExtOptions as unknown as Mock;
+const getAcList = api.GetAcList as unknown as Mock;
+const setAcList = api.SetAcList as unknown as Mock;
 
 // GetHub is not relied on to echo HubName_str; the save sets it from the prop.
 const hubConfig = {
@@ -80,6 +87,18 @@ describe('Properties', () => {
         },
       ],
     });
+    getAcList.mockResolvedValue({
+      ACList: [
+        {
+          Id_u32: 1,
+          Priority_u32: 100,
+          Deny_bool: false,
+          Masked_bool: false,
+          IpAddress_ip: '192.0.2.10',
+          SubnetMask_ip: '',
+        },
+      ],
+    });
   });
 
   it('loads the hub config and shows current values', async () => {
@@ -90,6 +109,7 @@ describe('Properties', () => {
     expect(await screen.findByLabelText('Max sessions')).toHaveValue(10);
     expect(screen.getByRole('button', { name: 'Set the Message' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Extended Options' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Source IP Access Control' })).toBeInTheDocument();
     expect(getHub.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
   });
 
@@ -260,5 +280,150 @@ describe('Properties', () => {
     expect(await within(extDialog).findByText('Options are read-only')).toBeInTheDocument();
     expect(within(extDialog).getByRole('button', { name: 'Save options' })).toBeDisabled();
     expect(within(extDialog).getByLabelText('Value for NoIpTable')).toBeDisabled();
+  });
+
+  it('loads source IP access control rules', async () => {
+    getHub.mockResolvedValue({ ...hubConfig });
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await screen.findByLabelText('Max sessions');
+    expect(getAcList).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Source IP Access Control' }));
+    const acDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+
+    expect(await within(acDialog).findByText('192.0.2.10')).toBeInTheDocument();
+    expect(within(acDialog).getByText('Allow')).toBeInTheDocument();
+    expect(getAcList.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+    expect(getHubAdminOptions.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+  });
+
+  it('shows an error when source IP access control fails to load', async () => {
+    getHub.mockResolvedValue({ ...hubConfig });
+    getAcList.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await user.click(await screen.findByRole('button', { name: 'Source IP Access Control' }));
+
+    expect(await screen.findByText('Could not load or save source IP access control')).toBeInTheDocument();
+  });
+
+  it('adds and saves source IP access control rules', async () => {
+    getHub.mockResolvedValue({ ...hubConfig });
+    setAcList.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await user.click(await screen.findByRole('button', { name: 'Source IP Access Control' }));
+    const acDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+    await within(acDialog).findByText('192.0.2.10');
+
+    await user.click(within(acDialog).getByRole('button', { name: 'Add rule' }));
+    const ruleDialog = await screen.findByRole('dialog', { name: 'Source IP rule' });
+    await user.selectOptions(within(ruleDialog).getByLabelText('Action'), 'deny');
+    await user.type(within(ruleDialog).getByLabelText('IP address'), '198.51.100.25');
+    await user.click(within(ruleDialog).getByRole('button', { name: 'Add rule' }));
+
+    const updatedDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+    expect(await within(updatedDialog).findByText('198.51.100.25')).toBeInTheDocument();
+    await user.click(within(updatedDialog).getByRole('button', { name: 'Save rules' }));
+
+    const sent = setAcList.mock.calls[0][0];
+    expect(sent.HubName_str).toBe('DEFAULT');
+    expect(sent.ACList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ IpAddress_ip: '192.0.2.10', Deny_bool: false, Priority_u32: 100 }),
+        expect.objectContaining({ IpAddress_ip: '198.51.100.25', Deny_bool: true, Priority_u32: 200 }),
+      ]),
+    );
+  });
+
+  it('converts IPv6 prefix masks before saving source IP access control rules', async () => {
+    getHub.mockResolvedValue({ ...hubConfig });
+    getAcList.mockResolvedValue({ ACList: [] });
+    setAcList.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await user.click(await screen.findByRole('button', { name: 'Source IP Access Control' }));
+    const acDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+    await within(acDialog).findByText('No source IP access control rules');
+
+    await user.click(within(acDialog).getByRole('button', { name: 'Add rule' }));
+    const ruleDialog = await screen.findByRole('dialog', { name: 'Source IP rule' });
+    await user.click(within(ruleDialog).getByLabelText('IPv6'));
+    await user.click(within(ruleDialog).getByLabelText('Subnet'));
+    await user.type(within(ruleDialog).getByLabelText('IP address'), '2001:db8::');
+    await user.type(within(ruleDialog).getByLabelText('Subnet mask'), '/64');
+    await user.click(within(ruleDialog).getByRole('button', { name: 'Add rule' }));
+
+    const updatedDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+    await user.click(within(updatedDialog).getByRole('button', { name: 'Save rules' }));
+
+    expect(setAcList.mock.calls[0][0].ACList).toEqual([
+      expect.objectContaining({
+        IpAddress_ip: '2001:db8::',
+        SubnetMask_ip: 'ffff:ffff:ffff:ffff:0:0:0:0',
+        Masked_bool: true,
+      }),
+    ]);
+  });
+
+  it('edits and deletes source IP access control rules before saving', async () => {
+    getHub.mockResolvedValue({ ...hubConfig });
+    setAcList.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await user.click(await screen.findByRole('button', { name: 'Source IP Access Control' }));
+    const acDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+    await within(acDialog).findByText('192.0.2.10');
+
+    await user.click(within(acDialog).getByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+    const editDialog = await screen.findByRole('dialog', { name: 'Source IP rule' });
+    const priority = within(editDialog).getByLabelText('Priority');
+    await user.clear(priority);
+    await user.type(priority, '50');
+    await user.click(within(editDialog).getByLabelText('Subnet'));
+    await user.type(within(editDialog).getByLabelText('Subnet mask'), '255.255.255.0');
+    await user.click(within(editDialog).getByRole('button', { name: 'Save rule' }));
+
+    const updatedDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+    expect(await within(updatedDialog).findByText('192.0.2.10/255.255.255.0')).toBeInTheDocument();
+    await user.click(within(updatedDialog).getByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Delete'));
+    const deleteDialog = await screen.findByRole('dialog', { name: 'Delete source IP rule' });
+    await user.click(within(deleteDialog).getByRole('button', { name: 'Delete' }));
+    const afterDeleteDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+    expect(within(afterDeleteDialog).queryByText('192.0.2.10/255.255.255.0')).not.toBeInTheDocument();
+
+    await user.click(within(afterDeleteDialog).getByRole('button', { name: 'Save rules' }));
+    expect(setAcList.mock.calls[0][0].ACList).toEqual([]);
+  });
+
+  it('keeps source IP access control read-only when hub admins are denied', async () => {
+    serverUser = 'Hub Administrator';
+    getHub.mockResolvedValue({ ...hubConfig });
+    getHubAdminOptions.mockResolvedValue({
+      AdminOptionList: [
+        {
+          Name_str: 'no_change_access_control_list',
+          Value_u32: 1,
+          Descrption_utf: 'Deny access control list changes.',
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    render(<Properties hub="DEFAULT" />);
+    await user.click(await screen.findByRole('button', { name: 'Source IP Access Control' }));
+    const acDialog = await screen.findByRole('dialog', { name: 'Source IP Access Control' });
+
+    expect(await within(acDialog).findByText('Rules are read-only')).toBeInTheDocument();
+    expect(within(acDialog).getByRole('button', { name: 'Add rule' })).toBeDisabled();
+    expect(within(acDialog).getByRole('button', { name: 'Save rules' })).toBeDisabled();
   });
 });

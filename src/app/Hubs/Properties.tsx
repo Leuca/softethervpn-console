@@ -20,6 +20,7 @@ import { api } from '@app/utils/vpnrpc_settings';
 import { HubAdminOptions } from '@app/Hubs/HubAdminOptions';
 import { HubExtendedOptions } from '@app/Hubs/HubExtendedOptions';
 import { HubMessage } from '@app/Hubs/HubMessage';
+import { HubSourceAccessControl } from '@app/Hubs/HubSourceAccessControl';
 
 const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the full GetHub response, plus an optional new admin password.
@@ -147,6 +148,9 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             </FlexItem>
             <FlexItem>
               <HubExtendedOptions hub={hub} />
+            </FlexItem>
+            <FlexItem>
+              <HubSourceAccessControl hub={hub} />
             </FlexItem>
           </Flex>
         </>
