@@ -4,18 +4,38 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, test, vi } from 'vitest';
 
-// The server probes performed on mount cannot reach a real VPN server in
-// tests; reject them all so the app settles into the "plain admin" state.
+// The server probes performed on mount cannot reach a real VPN server in tests;
+// return a small supported-server shape so the app settles without console
+// warnings.
 vi.mock('@app/utils/vpnrpc_settings', () => {
-  const reject = () => Promise.reject(new Error('no server in tests'));
+  const resolve = <T,>(value: T) => () => Promise.resolve(value);
   return {
     api: {
-      EnumConnection: reject,
-      GetFarmSetting: reject,
-      GetDDnsClientStatus: reject,
-      GetAzureStatus: reject,
-      GetCaps: reject,
-      GetServerInfo: reject,
+      EnumConnection: resolve({}),
+      GetFarmSetting: resolve({ ServerType_u32: 0 }),
+      GetDDnsClientStatus: resolve({ CurrentHostName_str: 'vpn.example.test' }),
+      GetAzureStatus: resolve({ IsEnabled_bool: false }),
+      GetCaps: resolve({
+        CapsList: [],
+        caps_b_local_bridge_u32: 1,
+        caps_b_support_cluster_u32: 1,
+        caps_b_support_layer3_u32: 1,
+        caps_b_support_azure_u32: 1,
+        caps_b_support_ddns_u32: 1,
+        caps_b_support_ipsec_u32: 1,
+        caps_b_support_openvpn_u32: 1,
+        caps_b_support_sstp_u32: 1,
+        caps_b_tap_supported_u32: 1,
+        caps_b_bridge_u32: 0,
+        caps_b_vpn4_u32: 0,
+        caps_b_support_ddns_proxy_u32: 0,
+      }),
+      GetServerInfo: resolve({
+        ServerType_u32: 0,
+        ServerProductName_str: 'SoftEther VPN Server',
+        ServerVersionString_str: 'Version 5.02',
+        ServerHostName_str: 'vpn.example.test',
+      }),
     },
   };
 });
@@ -42,10 +62,11 @@ async function withDesktopWidth(fn: () => Promise<void>) {
 }
 
 describe('App tests', () => {
-  test('should render default App component', () => {
+  test('should render default App component', async () => {
     const { asFragment } = render(<App />);
 
     expect(asFragment()).toMatchSnapshot();
+    await screen.findByRole('button', { name: 'Global navigation' });
   });
 
   it('should render a nav-toggle button once the server probes settle', async () => {
