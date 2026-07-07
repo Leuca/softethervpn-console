@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { binToBytes } from './blob_utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { binToBytes, downloadBlob } from './blob_utils';
 
 describe('binToBytes', () => {
   it('decodes a base64 string (the RPC representation) to bytes', () => {
@@ -19,4 +19,23 @@ describe('binToBytes', () => {
     expect(binToBytes(null)).toBeNull();
     expect(binToBytes(undefined)).toBeNull();
   });
+
+  it('revokes blob URLs after dispatching a download link', () => {
+    const blob = new Blob(['hello'], { type: 'text/plain' });
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const appendChild = vi.spyOn(document.body, 'appendChild');
+    const removeChild = vi.spyOn(document.body, 'removeChild');
+
+    downloadBlob(blob, 'payload.txt');
+
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(appendChild).toHaveBeenCalled();
+    expect(removeChild).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:test');
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });

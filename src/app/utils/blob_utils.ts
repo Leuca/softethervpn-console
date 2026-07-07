@@ -52,14 +52,21 @@ export function downloadBlob(blob: Blob, name = 'file.txt') {
 
   // Dispatch click event on the link
   // This is necessary as link.click() does not work on the latest firefox
-  link.dispatchEvent(
-    new MouseEvent('click', {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-    })
-  );
+  if (typeof (link as HTMLAnchorElement).click === 'function') {
+    link.click();
+  } else {
+    link.dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }
 
   // Remove link from body
   document.body.removeChild(link);
+
+  // Clean up the object URL so repeated downloads do not accumulate
+  // stale browser references.
+  URL.revokeObjectURL(blobUrl);
 }
