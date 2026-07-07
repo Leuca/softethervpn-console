@@ -18,7 +18,7 @@ import {
   SkipToContent,
 } from '@patternfly/react-core';
 import { BarsIcon, UserIcon } from '@patternfly/react-icons';
-import { IAppRoute, IAppRouteGroup, routes } from '@app/routes';
+import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from '@app/routes';
 import { useServer } from '@app/ServerContext';
 import logo from '@app/bgimages/icons8-softether-vpn.svg';
 
@@ -60,10 +60,12 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
 
   const isRouteVisible = (route: IAppRoute): boolean =>
     !!route.label &&
-    !hiddenLabels.has(route.label) &&
-    !(hideAdminOnly && route.isAdmin) &&
-    !(hideNonCluster && route.isCluster === false) &&
-    !(hideNonBridge && route.isBridge === false);
+    isRouteAccessible(route, {
+      hideAdminOnly,
+      hideNonCluster,
+      hideNonBridge,
+      hiddenLabels,
+    });
 
   const isGroupVisible = (group: IAppRouteGroup): boolean =>
     !hiddenLabels.has(group.label) && !(hideAdminOnly && group.isAdmin) && group.routes.some(isRouteVisible);

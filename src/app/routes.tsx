@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Dashboard } from '@app/Dashboard/Dashboard';
 import { Hubs } from '@app/Hubs/Hubs';
 import { LocalBridge } from '@app/Functionalities/LocalBridge/LocalBridge';
@@ -16,7 +16,9 @@ import { EditConfig } from '@app/Settings/EditConfig/EditConfig';
 import { ConnectionsList } from '@app/Settings/ConnectionsList/ConnectionsList';
 import { ServerStatus } from '@app/Settings/ServerStatus/ServerStatus';
 import { About } from '@app/Settings/About/AboutThisServer';
+import { PermissionNotice } from '@app/PermissionNotice/PermissionNotice';
 import { NotFound } from '@app/NotFound/NotFound';
+import { useServer } from '@app/ServerContext';
 import { useDocumentTitle } from '@app/utils/useDocumentTitle';
 
 export interface IAppRoute {
@@ -37,6 +39,73 @@ export interface IAppRouteGroup {
 }
 
 export type AppRouteConfig = IAppRoute | IAppRouteGroup;
+
+export interface IRoutePermissionState {
+  hideAdminOnly: boolean;
+  hideNonCluster: boolean;
+  hideNonBridge: boolean;
+  hiddenLabels: Set<string>;
+}
+
+export const isRouteAccessible = (
+  route: IAppRoute,
+  { hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels }: IRoutePermissionState,
+): boolean =>
+  !(route.label && hiddenLabels.has(route.label)) &&
+  !(hideAdminOnly && route.isAdmin) &&
+  !(hideNonCluster && route.isCluster === false) &&
+  !(hideNonBridge && route.isBridge === false);
+
+export const routePermissionReason = (
+  route: IAppRoute,
+  { hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels }: IRoutePermissionState,
+): string | null => {
+  if (route.label && hiddenLabels.has(route.label)) {
+    return `${route.label} is not available with this server's capabilities`;
+  }
+  if (hideAdminOnly && route.isAdmin) {
+    return 'This page requires server administrator privileges';
+  }
+  if (hideNonCluster && route.isCluster === false) {
+    return 'This page is unavailable in cluster mode';
+  }
+  if (hideNonBridge && route.isBridge === false) {
+    return 'This page is unavailable in bridge mode';
+  }
+  return null;
+};
+
+const RouteGate: React.FunctionComponent<{ route: IAppRoute; children: React.ReactElement }> = ({ route, children }) => {
+  const { hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels } = useServer();
+  const location = useLocation();
+
+  if (
+    !isRouteAccessible(route, {
+      hideAdminOnly,
+      hideNonCluster,
+      hideNonBridge,
+      hiddenLabels,
+    })
+  ) {
+    return (
+      <Navigate
+        to="/permission-required"
+        replace
+        state={{
+          requestedPath: location.pathname,
+          reason: routePermissionReason(route, {
+            hideAdminOnly,
+            hideNonCluster,
+            hideNonBridge,
+            hiddenLabels,
+          }),
+        }}
+      />
+    );
+  }
+
+  return children;
+};
 
 const routes: AppRouteConfig[] = [
   {
@@ -161,6 +230,11 @@ const routes: AppRouteConfig[] = [
       },
     ],
   },
+  {
+    element: <PermissionNotice />,
+    path: '/permission-required',
+    title: 'SoftEther VPN Console | Permission Required',
+  },
 ];
 
 const TitledRoute: React.FunctionComponent<{ title: string; children: React.ReactElement }> = ({ title, children }) => {
@@ -175,8 +249,16 @@ const flattenedRoutes: IAppRoute[] = routes.reduce(
 
 const AppRoutes = (): React.ReactElement => (
   <Routes>
-    {flattenedRoutes.map(({ path, element, title }, idx) => (
-      <Route path={path} element={<TitledRoute title={title}>{element}</TitledRoute>} key={idx} />
+    {flattenedRoutes.map((route, idx) => (
+      <Route
+        path={route.path}
+        element={
+          <RouteGate route={route}>
+            <TitledRoute title={route.title}>{route.element}</TitledRoute>
+          </RouteGate>
+        }
+        key={idx}
+      />
     ))}
     <Route path="*" element={<NotFound />} />
   </Routes>

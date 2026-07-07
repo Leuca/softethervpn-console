@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IAppRoute, IAppRouteGroup, routes } from './routes';
+import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from './routes';
 
 const flattenedRoutes = routes.reduce(
   (items, route) => [...items, ...(route.routes ? route.routes : [route])],
@@ -27,5 +27,27 @@ describe('routes', () => {
 
   it('keeps the Functionalities group administrator-only', () => {
     expect(findGroup('Functionalities')?.isAdmin).toBe(true);
+  });
+
+  it('applies navigation restrictions from server probes', () => {
+    const editConfig = findRoute('Edit Configuration');
+    expect(editConfig).toBeDefined();
+
+    const editableState = {
+      hideAdminOnly: true,
+      hideNonCluster: false,
+      hideNonBridge: false,
+      hiddenLabels: new Set<string>(),
+    };
+
+    const fullAdmin = {
+      hideAdminOnly: false,
+      hideNonCluster: false,
+      hideNonBridge: false,
+      hiddenLabels: new Set<string>(),
+    };
+
+    expect(isRouteAccessible(editConfig as IAppRoute, editableState)).toBe(false);
+    expect(isRouteAccessible(editConfig as IAppRoute, fullAdmin)).toBe(true);
   });
 });

@@ -2,20 +2,21 @@ import * as React from 'react';
 import App from '@app/index';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, test, vi } from 'vitest';
+import { type Mock, afterEach, describe, expect, it, test, vi } from 'vitest';
+import { api } from '@app/utils/vpnrpc_settings';
 
 // The server probes performed on mount cannot reach a real VPN server in tests;
 // return a small supported-server shape so the app settles without console
 // warnings.
 vi.mock('@app/utils/vpnrpc_settings', () => {
-  const resolve = <T,>(value: T) => () => Promise.resolve(value);
   return {
     api: {
-      EnumConnection: resolve({}),
-      GetFarmSetting: resolve({ ServerType_u32: 0 }),
-      GetDDnsClientStatus: resolve({ CurrentHostName_str: 'vpn.example.test' }),
-      GetAzureStatus: resolve({ IsEnabled_bool: false }),
-      GetCaps: resolve({
+      EnumConnection: vi.fn(() => Promise.resolve({})),
+      GetFarmSetting: vi.fn(() => Promise.resolve({ ServerType_u32: 0 })),
+      GetDDnsClientStatus: vi.fn(() => Promise.resolve({ CurrentHostName_str: 'vpn.example.test' })),
+      GetAzureStatus: vi.fn(() => Promise.resolve({ IsEnabled_bool: false })),
+      GetCaps: vi.fn(() =>
+        Promise.resolve({
         CapsList: [],
         caps_b_local_bridge_u32: 1,
         caps_b_support_cluster_u32: 1,
@@ -29,13 +30,14 @@ vi.mock('@app/utils/vpnrpc_settings', () => {
         caps_b_bridge_u32: 0,
         caps_b_vpn4_u32: 0,
         caps_b_support_ddns_proxy_u32: 0,
-      }),
-      GetServerInfo: resolve({
+      })),
+      GetServerInfo: vi.fn(() =>
+        Promise.resolve({
         ServerType_u32: 0,
         ServerProductName_str: 'SoftEther VPN Server',
         ServerVersionString_str: 'Version 5.02',
         ServerHostName_str: 'vpn.example.test',
-      }),
+      })),
     },
   };
 });
@@ -62,6 +64,12 @@ async function withDesktopWidth(fn: () => Promise<void>) {
 }
 
 describe('App tests', () => {
+  const enumConnection = api.EnumConnection as unknown as Mock;
+
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
+  });
+
   test('should render default App component', async () => {
     const { asFragment } = render(<App />);
 
@@ -118,5 +126,16 @@ describe('App tests', () => {
 
       expect(button.getAttribute('aria-expanded')).toBe('true');
     });
+  });
+
+  it('redirects unauthorized users to permission notice on direct protected URLs', async () => {
+    enumConnection.mockRejectedValueOnce(new Error('Error: Code=52, Message=Error code 52: Not enough privileges.'));
+    window.history.pushState({}, '', '/#/settings/listeners');
+
+    render(<App />);
+
+    expect(await screen.findByText('Permission required')).toBeVisible();
+    expect(await screen.findByText(/server administrator privileges/i)).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Take me home' })).toBeVisible();
   });
 });
