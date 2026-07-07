@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Content, Divider, Flex, FlexItem, PageSection, Title } from '@patternfly/react-core';
+import { Content, Flex, FlexItem, PageSection, Title } from '@patternfly/react-core';
 
 interface AppPageProps {
   /** Page title, rendered as the single h1 of the view. */
@@ -18,7 +18,7 @@ interface AppPageProps {
  */
 const AppPage: React.FunctionComponent<AppPageProps> = ({ title, description, actions, children }) => (
   <>
-    <PageSection>
+    <PageSection className="se-app-page__header">
       <Flex
         justifyContent={{ default: 'justifyContentSpaceBetween' }}
         alignItems={{ default: 'alignItemsCenter' }}
@@ -43,7 +43,6 @@ const AppPage: React.FunctionComponent<AppPageProps> = ({ title, description, ac
         {actions && <FlexItem>{actions}</FlexItem>}
       </Flex>
     </PageSection>
-    <Divider />
     <PageSection isFilled>{children}</PageSection>
   </>
 );

@@ -103,6 +103,16 @@ body,
   z-index: var(--pf-t--global--z-index--md);
 }
 
+/* Keep page-level actions, such as Refresh and Create buttons, available while
+   long pages scroll. */
+.se-app-page__header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--pf-t--global--z-index--sm);
+  background-color: var(--pf-t--global--background--color--primary--default);
+  box-shadow: var(--pf-t--global--box-shadow--sm--bottom);
+}
+
 /* PatternFly's floating content panel (inset margins, border radius) only
    applies at the xl breakpoint (75rem); below it the panel is flush edge to
    edge. PatternFly insets the panel left and right there but leaves the top
