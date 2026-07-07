@@ -14,21 +14,24 @@ interface IAlertEntry {
   title: string;
   variant: keyof typeof AlertVariant;
   child?: React.ReactNode;
-  key: number;
+  key: string;
 }
 
 const ToastAlertGroup: React.FunctionComponent<IToastAlertGroup> = ({ add, title, variant, child }) => {
   const [alerts, setAlerts] = React.useState<IAlertEntry[]>([]);
   const prevAdd = React.useRef(false);
+  const alertId = React.useRef(0);
 
   React.useEffect(() => {
     if (add && !prevAdd.current) {
-      setAlerts((current) => [...current, { title, variant, child, key: new Date().getTime() }]);
+      alertId.current += 1;
+      const key = `${Date.now()}-${alertId.current}`;
+      setAlerts((current) => [...current, { title, variant, child, key }]);
     }
     prevAdd.current = add;
   }, [add, title, variant, child]);
 
-  const removeAlert = (key: number) => {
+  const removeAlert = (key: string) => {
     setAlerts((current) => current.filter((el) => el.key !== key));
   };
 
