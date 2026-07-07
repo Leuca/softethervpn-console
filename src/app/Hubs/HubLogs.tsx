@@ -56,6 +56,8 @@ const packetTypes = [
   'Ethernet packet log',
 ];
 
+const PREVIEW_MAX_BYTES = 1_000_000;
+
 const capValue = (capsList: unknown[], name: string): number | null => {
   const cap = capsList.find((item) => (item as VPN.VpnCaps).CapsName_str === name) as VPN.VpnCaps | undefined;
   return cap ? cap.CapsValue_u32 : null;
@@ -75,7 +77,71 @@ const normalizeLogSettings = (response: VPN.VpnRpcHubLog): VPN.VpnRpcHubLog => {
 const safeLogFileName = (file: VPN.VpnRpcEnumLogFileItem): string =>
   `${file.ServerName_str || 'server'}_${file.FilePath_str || 'log.txt'}`.replace(/[^A-Za-z0-9_.-]+/g, '_');
 
-const bytesToText = (bytes: Uint8Array): string => new TextDecoder('utf-8').decode(bytes);
+type LogReadChunkHandler = (chunk: Uint8Array) => void;
+
+const readLogFile = async (
+  file: VPN.VpnRpcEnumLogFileItem,
+  onChunk: LogReadChunkHandler,
+  maxBytes?: number,
+): Promise<{ truncated: boolean; totalBytes: number }> => {
+  let offset = 0;
+  let totalBytes = 0;
+  let truncated = false;
+  let done = false;
+
+  while (!done) {
+    const response = await api.ReadLogFile(
+      new VPN.VpnRpcReadLogFile({
+        ServerName_str: file.ServerName_str,
+        FilePath_str: file.FilePath_str,
+        Offset_u32: offset,
+      }),
+    );
+    const bytes = binToBytes(response.Buffer_bin);
+    if (!bytes || bytes.length === 0) {
+      done = true;
+    } else if (maxBytes !== undefined && totalBytes + bytes.length > maxBytes) {
+      const remaining = maxBytes - totalBytes;
+      if (remaining > 0) {
+        onChunk(bytes.slice(0, remaining));
+        totalBytes += remaining;
+      }
+      truncated = true;
+      done = true;
+    } else {
+      onChunk(bytes);
+      totalBytes += bytes.length;
+      offset += bytes.length;
+    }
+  }
+
+  return { truncated, totalBytes };
+};
+
+const readLogFileText = async (
+  file: VPN.VpnRpcEnumLogFileItem,
+): Promise<{ text: string; truncated: boolean; totalBytes: number }> => {
+  const decoder = new TextDecoder('utf-8');
+  let chunks = '';
+  let truncated = false;
+
+  const result = await readLogFile(file, (chunk) => {
+    chunks += decoder.decode(chunk, { stream: true });
+  }, PREVIEW_MAX_BYTES);
+
+  chunks += decoder.decode();
+  truncated = result.truncated;
+
+  return { text: chunks, truncated, totalBytes: result.totalBytes };
+};
+
+const readLogFileBlob = async (file: VPN.VpnRpcEnumLogFileItem): Promise<Blob> => {
+  const chunks: BlobPart[] = [];
+  await readLogFile(file, (chunk) => {
+    chunks.push(chunk);
+  });
+  return new Blob(chunks, { type: 'text/plain' });
+};
 
 const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean }> = ({ hub, supported }) => {
   const [config, setConfig] = React.useState<VPN.VpnRpcHubLog | null>(null);
@@ -241,6 +307,8 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
   const [activeFile, setActiveFile] = React.useState<VPN.VpnRpcEnumLogFileItem | null>(null);
   const [downloading, setDownloading] = React.useState<string | null>(null);
   const [preview, setPreview] = React.useState<{ file: VPN.VpnRpcEnumLogFileItem; text: string } | null>(null);
+  const previewRequestRef = React.useRef(0);
+  const downloadRequestRef = React.useRef(0);
 
   const load = React.useCallback(() => {
     if (!supported) {
@@ -260,58 +328,50 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
     load();
   }, [load]);
 
-  const readLogFile = async (file: VPN.VpnRpcEnumLogFileItem): Promise<Uint8Array> => {
-    let offset = 0;
-    const chunks: Uint8Array[] = [];
-    let done = false;
-
-    while (!done) {
-      const response = await api.ReadLogFile(
-        new VPN.VpnRpcReadLogFile({
-          ServerName_str: file.ServerName_str,
-          FilePath_str: file.FilePath_str,
-          Offset_u32: offset,
-        }),
-      );
-      const bytes = binToBytes(response.Buffer_bin);
-      if (!bytes) {
-        done = true;
-      } else {
-        chunks.push(bytes);
-        offset += bytes.length;
-      }
-    }
-
-    const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const result = new Uint8Array(total);
-    let position = 0;
-    for (const chunk of chunks) {
-      result.set(chunk, position);
-      position += chunk.length;
-    }
-    return result;
-  };
-
   const openPreview = (file: VPN.VpnRpcEnumLogFileItem) => {
     setActiveFile(file);
     setDownloading(file.FilePath_str);
+    setPreview(null);
     setError(null);
-    readLogFile(file)
-      .then((bytes) => setPreview({ file, text: bytesToText(bytes) }))
-      .catch((e) => setError(String(e)))
+    const requestId = ++previewRequestRef.current;
+    readLogFileText(file)
+      .then((result) => {
+        if (requestId === previewRequestRef.current) {
+          setPreview({
+            file,
+            text: result.text + (result.truncated ? '\n\n[Preview truncated due to size.]' : ''),
+          });
+        }
+      })
+      .catch((e) => {
+        if (requestId === previewRequestRef.current) {
+          setError(String(e));
+        }
+      })
       .finally(() => {
-        setDownloading(null);
-        setActiveFile(null);
+        if (requestId === previewRequestRef.current) {
+          setDownloading(null);
+          setActiveFile(null);
+        }
       });
   };
 
   const downloadFile = (file: VPN.VpnRpcEnumLogFileItem) => {
     setDownloading(file.FilePath_str);
     setError(null);
-    readLogFile(file)
-      .then((bytes) => downloadBlob(new Blob([bytes], { type: 'text/plain' }), safeLogFileName(file)))
+    const requestId = ++downloadRequestRef.current;
+    readLogFileBlob(file)
+      .then((blob) => {
+        if (requestId === downloadRequestRef.current) {
+          downloadBlob(blob, safeLogFileName(file));
+        }
+      })
       .catch((e) => setError(String(e)))
-      .finally(() => setDownloading(null));
+      .finally(() => {
+        if (requestId === downloadRequestRef.current) {
+          setDownloading(null);
+        }
+      });
   };
 
   const isLoading = supported && files === null && error === null;

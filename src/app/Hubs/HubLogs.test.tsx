@@ -137,6 +137,24 @@ describe('HubLogs', () => {
     expect(download.mock.calls[0][1]).toBe('vpn1__security_log_DEFAULT_20260706.log');
   });
 
+  it('truncates oversized previews without reading the full file', async () => {
+    getHubLog.mockResolvedValue({ ...logConfig });
+    enumLogFile.mockResolvedValue({ LogFiles: [logFile] });
+    const largePayload = b64('x'.repeat(1_100_000));
+    readLogFile.mockResolvedValueOnce({ Buffer_bin: largePayload });
+    const user = userEvent.setup();
+
+    render(<HubLogs hub="DEFAULT" />);
+    await user.click(screen.getByRole('tab', { name: 'Files' }));
+    const row = screen.getByText('@security_log/DEFAULT/20260706.log').closest('tr') as HTMLTableRowElement;
+    await user.click(within(row).getByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'View' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/Preview truncated due to size/i)).toBeInTheDocument();
+    expect(readLogFile).toHaveBeenCalledTimes(1);
+  });
+
   it('shows capability messages when log RPCs are unsupported', async () => {
     serverState.capsList = [
       { CapsName_str: 'b_support_config_log', CapsValue_u32: 0 },
