@@ -65,8 +65,26 @@ async function withDesktopWidth(fn: () => Promise<void>) {
 
 describe('App tests', () => {
   const enumConnection = api.EnumConnection as unknown as Mock;
+  const getCaps = api.GetCaps as unknown as Mock;
+  const getFarmSetting = api.GetFarmSetting as unknown as Mock;
+  const defaultCaps = {
+    CapsList: [],
+    caps_b_local_bridge_u32: 1,
+    caps_b_support_cluster_u32: 1,
+    caps_b_support_layer3_u32: 1,
+    caps_b_support_azure_u32: 1,
+    caps_b_support_ddns_u32: 1,
+    caps_b_support_ipsec_u32: 1,
+    caps_b_support_openvpn_u32: 1,
+    caps_b_support_sstp_u32: 1,
+    caps_b_tap_supported_u32: 1,
+    caps_b_bridge_u32: 0,
+    caps_b_vpn4_u32: 0,
+    caps_b_support_ddns_proxy_u32: 0,
+  };
 
   afterEach(() => {
+    vi.clearAllMocks();
     window.history.replaceState({}, '', '/');
   });
 
@@ -137,5 +155,32 @@ describe('App tests', () => {
     expect(await screen.findByText('Permission required')).toBeVisible();
     expect(await screen.findByText(/server administrator privileges/i)).toBeVisible();
     expect(await screen.findByRole('button', { name: 'Take me home' })).toBeVisible();
+  });
+
+  it('shows capability-based route-denial reason on direct functional URLs', async () => {
+    getCaps.mockResolvedValueOnce({
+      ...defaultCaps,
+      caps_b_local_bridge_u32: 0,
+    });
+
+    window.history.pushState({}, '', '/#/functionalities/localbridge');
+
+    render(<App />);
+
+    expect(await screen.findByText('Permission required')).toBeVisible();
+    expect(
+      await screen.findByText(/Local Bridge is not available with this server's capabilities/i),
+    ).toBeVisible();
+  });
+
+  it('shows cluster-mode route-denial reason on direct server URLs', async () => {
+    getFarmSetting.mockResolvedValueOnce({ ServerType_u32: 1 });
+
+    window.history.pushState({}, '', '/#/settings/clusterconfig');
+
+    render(<App />);
+
+    expect(await screen.findByText('Permission required')).toBeVisible();
+    expect(await screen.findByText(/This page is unavailable in cluster mode/i)).toBeVisible();
   });
 });

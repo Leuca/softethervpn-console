@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from './routes';
+import { IAppRoute, IAppRouteGroup, isRouteAccessible, routePermissionReason, routes } from './routes';
 
 const flattenedRoutes = routes.reduce(
   (items, route) => [...items, ...(route.routes ? route.routes : [route])],
@@ -49,5 +49,51 @@ describe('routes', () => {
 
     expect(isRouteAccessible(editConfig as IAppRoute, editableState)).toBe(false);
     expect(isRouteAccessible(editConfig as IAppRoute, fullAdmin)).toBe(true);
+  });
+
+  it('returns clear reasons for route denial states', () => {
+    const listeners = findRoute('Listeners');
+    const localBridge = findRoute('Local Bridge');
+    const clusterConfig = findRoute('Clustering Configuration');
+    const layer3 = findRoute('Layer 3 Switch');
+    const adminState = {
+      hideAdminOnly: true,
+      hideNonCluster: false,
+      hideNonBridge: false,
+      hiddenLabels: new Set<string>(),
+    };
+
+    expect(listeners).toBeDefined();
+    expect(localBridge).toBeDefined();
+    expect(clusterConfig).toBeDefined();
+    expect(layer3).toBeDefined();
+
+    expect(routePermissionReason(listeners as IAppRoute, adminState)).toBe(
+      'This page requires server administrator privileges',
+    );
+    expect(routePermissionReason(localBridge as IAppRoute, {
+      hideAdminOnly: false,
+      hideNonCluster: false,
+      hideNonBridge: false,
+      hiddenLabels: new Set(['Local Bridge']),
+    })).toBe("Local Bridge is not available with this server's capabilities");
+    expect(routePermissionReason(clusterConfig as IAppRoute, {
+      hideAdminOnly: false,
+      hideNonCluster: true,
+      hideNonBridge: false,
+      hiddenLabels: new Set<string>(),
+    })).toBe('This page is unavailable in cluster mode');
+    expect(routePermissionReason(layer3 as IAppRoute, {
+      hideAdminOnly: false,
+      hideNonCluster: false,
+      hideNonBridge: true,
+      hiddenLabels: new Set<string>(),
+    })).toBe('This page is unavailable in bridge mode');
+    expect(routePermissionReason(listeners as IAppRoute, {
+      hideAdminOnly: false,
+      hideNonCluster: false,
+      hideNonBridge: false,
+      hiddenLabels: new Set<string>(),
+    })).toBeNull();
   });
 });

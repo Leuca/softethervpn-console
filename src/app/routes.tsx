@@ -194,6 +194,7 @@ const routes: AppRouteConfig[] = [
         path: '/settings/clusterconfig',
         title: 'SoftEther VPN Console | Clustering Configuration',
         isAdmin: true,
+        isCluster: false,
         isBridge: false,
       },
       {
