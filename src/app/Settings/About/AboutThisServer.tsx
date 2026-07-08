@@ -9,7 +9,7 @@ import {
   Stack,
   StackItem,
 } from '@patternfly/react-core';
-import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { Table, Tbody, Td, Th, Tr } from '@patternfly/react-table';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
@@ -90,17 +90,13 @@ const About: React.FunctionComponent = () => {
               <CardTitle>Server capabilities</CardTitle>
               <CardBody>
                 <Table aria-label="Server capabilities" variant="compact">
-                  <Thead>
-                    <Tr>
-                      <Th width={40}>Capability</Th>
-                      <Th>Value</Th>
-                    </Tr>
-                  </Thead>
                   <Tbody>
                     {orderCaps(caps).map((cap) => (
                       <Tr key={cap.CapsName_str}>
-                        <Td dataLabel="Capability">{cap.CapsDescrption_utf}</Td>
-                        <Td dataLabel="Value">{capsValue(cap)}</Td>
+                        <Th scope="row" width={40} visibility={['hidden', 'visibleOnMd']}>
+                          {cap.CapsDescrption_utf}
+                        </Th>
+                        <Td dataLabel={cap.CapsDescrption_utf}>{capsValue(cap)}</Td>
                       </Tr>
                     ))}
                   </Tbody>

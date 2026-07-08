@@ -58,7 +58,7 @@ const AdminOptionEditor: React.FunctionComponent<AdminOptionEditorProps> = ({
       <Table aria-label={ariaLabel} variant="compact" gridBreakPoint="grid-md">
         <Thead>
           <Tr>
-            <Th width={30}>Item</Th>
+            <Th width={30}>Option</Th>
             <Th width={15}>Value</Th>
             <Th>Description</Th>
           </Tr>
@@ -68,7 +68,7 @@ const AdminOptionEditor: React.FunctionComponent<AdminOptionEditorProps> = ({
             const numeric = numericOptions.has(option.Name_str);
             return (
               <Tr key={option.Name_str}>
-                <Td dataLabel="Item" modifier="breakWord">
+                <Td dataLabel="Option" modifier="breakWord">
                   {option.Name_str}
                 </Td>
                 <Td dataLabel="Value">
