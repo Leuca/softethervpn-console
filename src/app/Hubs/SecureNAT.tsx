@@ -31,6 +31,7 @@ import { KeyValueTable } from '@app/components/KeyValueTable';
 import { useServer } from '@app/ServerContext';
 import { capBool, capValue } from '@app/utils/caps';
 import { formatMacAddress, formatRpcValue } from '@app/utils/format';
+import { useAutoRefresh } from '@app/utils/useAutoRefresh';
 import { api } from '@app/utils/vpnrpc_settings';
 
 const MIN_MTU = 64;
@@ -57,7 +58,7 @@ const tcpStateLabels: Record<number, string> = {
 };
 
 interface RuntimeState {
-  status: VPN.VpnRpcNatStatus | null;
+  status: VPN.VpnRpcNatStatus;
   nat: VPN.VpnRpcEnumNatItem[];
   dhcp: VPN.VpnRpcEnumDhcpItem[];
 }
@@ -190,11 +191,178 @@ const validationErrors = (config: Record<string, unknown>, mac: string): string[
   return errors;
 };
 
+const fetchRuntime = (hub: string): Promise<RuntimeState> =>
+  Promise.all([
+    api.GetSecureNATStatus(new VPN.VpnRpcNatStatus({ HubName_str: hub })),
+    api.EnumNAT(new VPN.VpnRpcEnumNat({ HubName_str: hub })),
+    api.EnumDHCP(new VPN.VpnRpcEnumDhcp({ HubName_str: hub })),
+  ]).then(([status, nat, dhcp]) => ({
+    status,
+    nat: nat.NatTable ?? [],
+    dhcp: dhcp.DhcpTable ?? [],
+  }));
+
+const runtimeTrigger = (open: () => void) => (
+  <Button
+    variant="plain"
+    aria-label="View runtime tables"
+    onClick={open}
+    style={{
+      alignItems: 'stretch',
+      background: 'var(--pf-t--global--background--color--primary--default)',
+      border: 'var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default)',
+      borderRadius: 'var(--pf-t--global--border--radius--medium)',
+      display: 'block',
+      marginBlockStart: 'var(--pf-t--global--spacer--md)',
+      padding: 'var(--pf-t--global--spacer--md)',
+      textAlign: 'start',
+      whiteSpace: 'normal',
+      width: '100%',
+    }}
+  >
+    <span style={{ display: 'grid', gap: 'var(--pf-t--global--spacer--xs)', minWidth: 0, whiteSpace: 'normal' }}>
+      <Button
+        component="span"
+        variant="link"
+        isInline
+        style={{ justifySelf: 'start', overflowWrap: 'anywhere', whiteSpace: 'normal' }}
+      >
+        View runtime tables
+      </Button>
+      <span
+        style={{
+          color: 'var(--pf-t--global--text--color--subtle)',
+          fontSize: 'var(--pf-t--global--font--size--sm)',
+          overflowWrap: 'anywhere',
+          whiteSpace: 'normal',
+        }}
+      >
+        Inspect operating status, NAT sessions, and DHCP leases while Secure NAT is running.
+      </span>
+    </span>
+  </Button>
+);
+
+const SecureNatRuntimeModal: React.FunctionComponent<{ hub: string; isOpen: boolean; onClose: () => void }> = ({
+  hub,
+  isOpen,
+  onClose,
+}) => {
+  const loadRuntime = React.useCallback(() => fetchRuntime(hub), [hub]);
+  const { data: runtime, error, refreshing, lastUpdated } = useAutoRefresh(loadRuntime);
+  const isInitialLoading = runtime === null && error === null;
+
+  return (
+    <Modal variant={ModalVariant.large} isOpen={isOpen} onClose={onClose} aria-label="Secure NAT runtime information">
+      <ModalHeader title="Secure NAT runtime information" />
+      <ModalBody>
+        <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+          <Content component="p">
+            {refreshing && runtime !== null
+              ? 'Refreshing...'
+              : lastUpdated
+                ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                : 'Auto-refreshes every 10s'}
+          </Content>
+
+          {error && (
+            <Alert variant="danger" title="Could not load Secure NAT runtime information" isInline>
+              {error}
+            </Alert>
+          )}
+
+          {isInitialLoading ? (
+            <Bullseye>
+              <Spinner size="xl" aria-label="Loading Secure NAT runtime information" />
+            </Bullseye>
+          ) : runtime !== null ? (
+            <>
+              <Content component="h2">Operating status</Content>
+              <KeyValueTable data={runtime.status as unknown as Record<string, unknown>} ariaLabel="Secure NAT status" />
+
+              <Content component="h2">NAT table</Content>
+              {runtime.nat.length === 0 ? (
+                <EmptyState titleText="No NAT sessions" headingLevel="h3">
+                  <EmptyStateBody>No Virtual NAT sessions are currently active.</EmptyStateBody>
+                </EmptyState>
+              ) : (
+                <Table aria-label="NAT table" variant="compact">
+                  <Thead>
+                    <Tr>
+                      <Th>ID</Th>
+                      <Th>Protocol</Th>
+                      <Th>Source</Th>
+                      <Th>Destination</Th>
+                      <Th>Last communication</Th>
+                      <Th>Transfer</Th>
+                      <Th>TCP state</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {runtime.nat.map((item) => (
+                      <Tr key={item.Id_u32}>
+                        <Td dataLabel="ID">{item.Id_u32}</Td>
+                        <Td dataLabel="Protocol">{protocolLabels[item.Protocol_u32] ?? `Protocol ${item.Protocol_u32}`}</Td>
+                        <Td dataLabel="Source">{`${item.SrcIp_ip}:${item.SrcPort_u32}`}</Td>
+                        <Td dataLabel="Destination">{`${item.DestIp_ip}:${item.DestPort_u32}`}</Td>
+                        <Td dataLabel="Last communication">{formatRpcValue('LastCommTime_dt', item.LastCommTime_dt)}</Td>
+                        <Td dataLabel="Transfer">{`${item.SendSize_u64.toLocaleString()} sent / ${item.RecvSize_u64.toLocaleString()} received`}</Td>
+                        <Td dataLabel="TCP state">{tcpStateLabels[item.TcpStatus_u32] ?? '-'}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              )}
+
+              <Content component="h2">DHCP leases</Content>
+              {runtime.dhcp.length === 0 ? (
+                <EmptyState titleText="No DHCP leases" headingLevel="h3">
+                  <EmptyStateBody>No DHCP clients currently have leases from Secure NAT.</EmptyStateBody>
+                </EmptyState>
+              ) : (
+                <Table aria-label="DHCP leases" variant="compact">
+                  <Thead>
+                    <Tr>
+                      <Th>ID</Th>
+                      <Th>MAC address</Th>
+                      <Th>IP address</Th>
+                      <Th>Hostname</Th>
+                      <Th>Leased</Th>
+                      <Th>Expires</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {runtime.dhcp.map((item) => (
+                      <Tr key={item.Id_u32}>
+                        <Td dataLabel="ID">{item.Id_u32}</Td>
+                        <Td dataLabel="MAC address">{formatMacAddress(item.MacAddress_bin, '')}</Td>
+                        <Td dataLabel="IP address">{item.IpAddress_ip}</Td>
+                        <Td dataLabel="Hostname">{item.Hostname_str || '-'}</Td>
+                        <Td dataLabel="Leased">{formatRpcValue('LeasedTime_dt', item.LeasedTime_dt)}</Td>
+                        <Td dataLabel="Expires">{formatRpcValue('ExpireTime_dt', item.ExpireTime_dt)}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              )}
+            </>
+          ) : null}
+        </Flex>
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="link" onClick={onClose}>
+          Close
+        </Button>
+      </ModalFooter>
+    </Modal>
+  );
+};
+
 const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const { capsList, hideNonCluster } = useServer();
   const [config, setConfig] = React.useState<Record<string, unknown> | null>(null);
   const [enabled, setEnabled] = React.useState(false);
-  const [runtime, setRuntime] = React.useState<RuntimeState>({ status: null, nat: [], dhcp: [] });
+  const [runtimeOpen, setRuntimeOpen] = React.useState(false);
   const [mac, setMac] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -217,22 +385,6 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         setEnabled(currentEnabled);
         setConfig(option);
         setMac(formatMacAddress(option.MacAddress_bin, ''));
-
-        if (!currentEnabled) {
-          return;
-        }
-
-        return Promise.all([
-          api.GetSecureNATStatus(new VPN.VpnRpcNatStatus({ HubName_str: hub })),
-          api.EnumNAT(new VPN.VpnRpcEnumNat({ HubName_str: hub })),
-          api.EnumDHCP(new VPN.VpnRpcEnumDhcp({ HubName_str: hub })),
-        ]).then(([status, nat, dhcp]) =>
-          setRuntime({
-            status,
-            nat: nat.NatTable ?? [],
-            dhcp: dhcp.DhcpTable ?? [],
-          }),
-        );
       })
       .catch((e) => setError(String(e)));
   }, [hub]);
@@ -287,6 +439,9 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     const call = nextEnabled ? api.EnableSecureNAT(payload) : api.DisableSecureNAT(payload);
     call
       .then(() => {
+        if (!nextEnabled) {
+          setRuntimeOpen(false);
+        }
         setToggling(false);
         load();
       })
@@ -590,82 +745,18 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </Form>
 
           {enabled && (
-            <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
-              <Content component="h2">Operating status</Content>
-              {runtime.status ? (
-                <KeyValueTable data={runtime.status as unknown as Record<string, unknown>} ariaLabel="Secure NAT status" />
-              ) : (
-                <Bullseye>
-                  <Spinner size="lg" aria-label="Loading Secure NAT status" />
-                </Bullseye>
-              )}
+            <section>
+              <Content component="h2">Runtime information</Content>
+              <Content component="p">
+                Inspect the current Secure NAT operating status, NAT sessions, and DHCP leases. The runtime view
+                auto-refreshes while open.
+              </Content>
+              {runtimeTrigger(() => setRuntimeOpen(true))}
+            </section>
+          )}
 
-              <Content component="h2">NAT table</Content>
-              {runtime.nat.length === 0 ? (
-                <EmptyState titleText="No NAT sessions" headingLevel="h3">
-                  <EmptyStateBody>No Virtual NAT sessions are currently active.</EmptyStateBody>
-                </EmptyState>
-              ) : (
-                <Table aria-label="NAT table" variant="compact">
-                  <Thead>
-                    <Tr>
-                      <Th>ID</Th>
-                      <Th>Protocol</Th>
-                      <Th>Source</Th>
-                      <Th>Destination</Th>
-                      <Th>Last communication</Th>
-                      <Th>Transfer</Th>
-                      <Th>TCP state</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {runtime.nat.map((item) => (
-                      <Tr key={item.Id_u32}>
-                        <Td dataLabel="ID">{item.Id_u32}</Td>
-                        <Td dataLabel="Protocol">{protocolLabels[item.Protocol_u32] ?? `Protocol ${item.Protocol_u32}`}</Td>
-                        <Td dataLabel="Source">{`${item.SrcIp_ip}:${item.SrcPort_u32}`}</Td>
-                        <Td dataLabel="Destination">{`${item.DestIp_ip}:${item.DestPort_u32}`}</Td>
-                        <Td dataLabel="Last communication">{formatRpcValue('LastCommTime_dt', item.LastCommTime_dt)}</Td>
-                        <Td dataLabel="Transfer">{`${item.SendSize_u64.toLocaleString()} sent / ${item.RecvSize_u64.toLocaleString()} received`}</Td>
-                        <Td dataLabel="TCP state">{tcpStateLabels[item.TcpStatus_u32] ?? '-'}</Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              )}
-
-              <Content component="h2">DHCP leases</Content>
-              {runtime.dhcp.length === 0 ? (
-                <EmptyState titleText="No DHCP leases" headingLevel="h3">
-                  <EmptyStateBody>No DHCP clients currently have leases from Secure NAT.</EmptyStateBody>
-                </EmptyState>
-              ) : (
-                <Table aria-label="DHCP leases" variant="compact">
-                  <Thead>
-                    <Tr>
-                      <Th>ID</Th>
-                      <Th>MAC address</Th>
-                      <Th>IP address</Th>
-                      <Th>Hostname</Th>
-                      <Th>Leased</Th>
-                      <Th>Expires</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {runtime.dhcp.map((item) => (
-                      <Tr key={item.Id_u32}>
-                        <Td dataLabel="ID">{item.Id_u32}</Td>
-                        <Td dataLabel="MAC address">{formatMacAddress(item.MacAddress_bin, '')}</Td>
-                        <Td dataLabel="IP address">{item.IpAddress_ip}</Td>
-                        <Td dataLabel="Hostname">{item.Hostname_str || '-'}</Td>
-                        <Td dataLabel="Leased">{formatRpcValue('LeasedTime_dt', item.LeasedTime_dt)}</Td>
-                        <Td dataLabel="Expires">{formatRpcValue('ExpireTime_dt', item.ExpireTime_dt)}</Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              )}
-            </Flex>
+          {runtimeOpen && (
+            <SecureNatRuntimeModal hub={hub} isOpen={runtimeOpen} onClose={() => setRuntimeOpen(false)} />
           )}
         </>
       ) : null}

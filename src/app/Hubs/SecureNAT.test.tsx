@@ -98,6 +98,7 @@ describe('SecureNAT', () => {
 
   it('loads runtime status and tables when Secure NAT is enabled', async () => {
     getHubStatus.mockResolvedValue({ HubName_str: 'DEFAULT', SecureNATEnabled_bool: true });
+    const user = userEvent.setup();
     enumNAT.mockResolvedValue({
       NatTable: [
         {
@@ -130,6 +131,10 @@ describe('SecureNAT', () => {
     render(<SecureNAT hub="DEFAULT" />);
 
     expect(await screen.findByText('Secure NAT is enabled')).toBeInTheDocument();
+    expect(getSecureNATStatus).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'View runtime tables' }));
+    expect(await screen.findByRole('dialog', { name: 'Secure NAT runtime information' })).toBeInTheDocument();
     expect(await screen.findByText('192.168.30.20:50000')).toBeInTheDocument();
     expect(screen.getByText('AA:BB:CC:DD:EE:FF')).toBeInTheDocument();
     expect(getSecureNATStatus.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
