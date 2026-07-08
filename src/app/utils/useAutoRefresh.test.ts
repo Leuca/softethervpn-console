@@ -58,6 +58,27 @@ describe('useAutoRefresh', () => {
     expect(result.current.data).toBe('fresh');
   });
 
+  it('does not stack interval requests while a refresh is already in flight', async () => {
+    const slow = deferred();
+    const fetch = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce('second');
+    const { result } = renderHook(() => useAutoRefresh(fetch, 10000));
+
+    await act(async () => {
+      vi.advanceTimersByTime(10000);
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    await act(async () => slow.resolve('first'));
+    expect(result.current.data).toBe('first');
+
+    await act(async () => {
+      vi.advanceTimersByTime(10000);
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    await act(async () => {});
+    expect(result.current.data).toBe('second');
+  });
+
   it('keeps the previous error visible until a request settles', async () => {
     const fetch = vi.fn().mockRejectedValueOnce(new Error('down'));
     const { result } = renderHook(() => useAutoRefresh(fetch, 10000));

@@ -28,9 +28,14 @@ export function useAutoRefresh<T>(fetch: () => Promise<T>, intervalMs = 10000): 
   const [refreshing, setRefreshing] = React.useState(false);
   const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
   const seq = React.useRef(0);
+  const inFlight = React.useRef(false);
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback((force = true) => {
+    if (!force && inFlight.current) {
+      return;
+    }
     const id = ++seq.current;
+    inFlight.current = true;
     setRefreshing(true);
     fetch()
       .then((result) => {
@@ -47,6 +52,7 @@ export function useAutoRefresh<T>(fetch: () => Promise<T>, intervalMs = 10000): 
       })
       .finally(() => {
         if (id === seq.current) {
+          inFlight.current = false;
           setRefreshing(false);
         }
       });
@@ -54,7 +60,7 @@ export function useAutoRefresh<T>(fetch: () => Promise<T>, intervalMs = 10000): 
 
   React.useEffect(() => {
     load();
-    const timer = window.setInterval(load, intervalMs);
+    const timer = window.setInterval(() => load(false), intervalMs);
     return () => window.clearInterval(timer);
   }, [load, intervalMs]);
 
