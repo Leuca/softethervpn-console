@@ -121,6 +121,24 @@ describe('HubLogs', () => {
     expect(readLogFile.mock.calls[1][0]).toMatchObject({ Offset_u32: 11 });
   });
 
+  it('shows newest log files first by reversing the server order', async () => {
+    getHubLog.mockResolvedValue({ ...logConfig });
+    enumLogFile.mockResolvedValue({
+      LogFiles: [
+        { ...logFile, FilePath_str: '@security_log/DEFAULT/20260705.log' },
+        { ...logFile, FilePath_str: '@security_log/DEFAULT/20260706.log' },
+      ],
+    });
+    const user = userEvent.setup();
+
+    render(<HubLogs hub="DEFAULT" />);
+    await user.click(screen.getByRole('tab', { name: 'Files' }));
+
+    const rows = await screen.findAllByRole('row');
+    expect(within(rows[1]).getByText('@security_log/DEFAULT/20260706.log')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('@security_log/DEFAULT/20260705.log')).toBeInTheDocument();
+  });
+
   it('downloads a log file', async () => {
     getHubLog.mockResolvedValue({ ...logConfig });
     enumLogFile.mockResolvedValue({ LogFiles: [logFile] });

@@ -313,7 +313,7 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
     setError(null);
     api
       .EnumLogFile()
-      .then((response) => setFiles(response.LogFiles ?? []))
+      .then((response) => setFiles([...(response.LogFiles ?? [])].reverse()))
       .catch((e) => setError(String(e)));
   }, [supported]);
 
