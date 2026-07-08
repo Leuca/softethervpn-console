@@ -36,7 +36,11 @@ const toConfigBytes = (text: string): Uint8Array => {
 
 const EditConfig: React.FunctionComponent = () => {
   const [fileName, setFileName] = React.useState('vpn_server.config');
-  const [text, setText] = React.useState<string | null>(null);
+  // The loaded config seeds an uncontrolled textarea: configs can be large
+  // and a controlled value would re-render the page on every keystroke.
+  // Edits are read from the ref when downloading or applying.
+  const [loadedText, setLoadedText] = React.useState<string | null>(null);
+  const configRef = React.useRef<HTMLTextAreaElement>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [applying, setApplying] = React.useState(false);
   const [restarting, setRestarting] = React.useState(false);
@@ -59,7 +63,7 @@ const EditConfig: React.FunctionComponent = () => {
         const bytes = binToBytes(response.FileData_bin);
         // TextDecoder strips a leading BOM; guard in case one survives.
         const decoded = bytes ? new TextDecoder().decode(bytes) : '';
-        setText(decoded.replace(/^\uFEFF/, ''));
+        setLoadedText(decoded.replace(/^\uFEFF/, ''));
       }),
     [],
   );
@@ -93,28 +97,33 @@ const EditConfig: React.FunctionComponent = () => {
     timerRef.current = window.setTimeout(attempt, RESTART_WAIT_MS);
   }, [fetchConfig]);
 
+  // The edited text if the editor is mounted, else the loaded text.
+  const currentText = (): string | null => configRef.current?.value ?? loadedText;
+
   const download = () => {
-    if (text === null) {
+    const value = currentText();
+    if (value === null) {
       return;
     }
-    downloadBlob(new Blob([toConfigBytes(text)], { type: 'text/plain' }), fileName);
+    downloadBlob(new Blob([toConfigBytes(value)], { type: 'text/plain' }), fileName);
   };
 
   const apply = () => {
     setConfirmOpen(false);
-    if (text === null) {
+    const value = currentText();
+    if (value === null) {
       setError('Load the configuration before applying changes.');
       return;
     }
     setApplying(true);
     setError(null);
     api
-      .SetConfig(new VPN.VpnRpcConfig({ FileName_str: fileName, FileData_bin: toConfigBytes(text) }))
+      .SetConfig(new VPN.VpnRpcConfig({ FileName_str: fileName, FileData_bin: toConfigBytes(value) }))
       .then(() => {
         // The server restarts on success; wait for it to come back instead of
         // hitting it mid-restart and showing a transient error.
         setApplying(false);
-        setText(null);
+        setLoadedText(null);
         setRestarting(true);
         waitForRestart();
       })
@@ -124,8 +133,8 @@ const EditConfig: React.FunctionComponent = () => {
       });
   };
 
-  const isLoading = text === null && error === null && !restarting;
-  const hasConfig = text !== null;
+  const isLoading = loadedText === null && error === null && !restarting;
+  const hasConfig = loadedText !== null;
   const busy = isLoading || applying || restarting;
 
   const actions = (
@@ -182,8 +191,8 @@ const EditConfig: React.FunctionComponent = () => {
         </Bullseye>
       ) : hasConfig ? (
         <TextArea
-          value={text}
-          onChange={(_event, value) => setText(value)}
+          ref={configRef}
+          defaultValue={loadedText ?? ''}
           aria-label="VPN server configuration"
           resizeOrientation="vertical"
           style={{ minHeight: '28rem', fontFamily: 'var(--pf-t--global--font--family--mono)', whiteSpace: 'pre' }}

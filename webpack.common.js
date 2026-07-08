@@ -114,11 +114,17 @@ module.exports = (env) => {
       new HtmlWebpackPlugin({
         template: path.resolve(__dirname, 'src', 'index.html'),
       }),
-      new Dotenv({
-        systemvars: true,
-        silent: true,
-        defaults: true,
-      }),
+      // .env holds dev-only VPN server credentials; keep it out of production
+      // builds so a future process.env reference cannot inline a secret.
+      ...(env === 'development'
+        ? [
+            new Dotenv({
+              systemvars: true,
+              silent: true,
+              defaults: true,
+            }),
+          ]
+        : []),
       new CopyPlugin({
         patterns: [{ from: './src/favicon.png', to: 'images' }],
       }),
