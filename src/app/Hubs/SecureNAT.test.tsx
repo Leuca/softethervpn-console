@@ -18,6 +18,9 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
   },
 }));
 
+// Advertise the caps a supported server would; missing caps gate closed.
+const supportedCaps = [{ CapsName_str: 'b_suppport_push_route_config', CapsValue_u32: 1 }];
+
 const serverState = {
   capsList: [] as unknown[],
   hideNonCluster: false,
@@ -62,7 +65,7 @@ const option = {
 describe('SecureNAT', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    serverState.capsList = [];
+    serverState.capsList = [...supportedCaps];
     serverState.hideNonCluster = false;
     getHubStatus.mockResolvedValue({ HubName_str: 'DEFAULT', SecureNATEnabled_bool: false });
     getSecureNATOption.mockResolvedValue({ ...option });

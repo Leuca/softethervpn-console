@@ -23,6 +23,7 @@ import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/reac
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { useServer } from '@app/ServerContext';
+import { capBool } from '@app/utils/caps';
 import { api } from '@app/utils/vpnrpc_settings';
 
 type RuleDraft = {
@@ -143,11 +144,6 @@ const normalizeSubnetMask = (draft: RuleDraft): string => {
     return ipv6MaskFromPrefix(Number(mask.slice(1)));
   }
   return mask;
-};
-
-const capBool = (capsList: unknown[], name: string): boolean => {
-  const cap = capsList.find((item) => (item as VPN.VpnCaps).CapsName_str === name) as VPN.VpnCaps | undefined;
-  return cap ? cap.CapsValue_u32 !== 0 : false;
 };
 
 const canChangeAccessControl = (user: string, adminOptions: VPN.VpnAdminOption[]): boolean =>

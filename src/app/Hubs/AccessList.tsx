@@ -32,6 +32,7 @@ import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { binToBytes } from '@app/utils/blob_utils';
+import { capBool, capValue } from '@app/utils/caps';
 import { useServer } from '@app/ServerContext';
 
 const PROTOCOLS: Record<number, string> = { 0: 'Any', 1: 'ICMPv4', 6: 'TCP', 17: 'UDP', 58: 'ICMPv6' };
@@ -96,13 +97,6 @@ type AccessCaps = {
   maxRules: number;
 };
 
-const capValue = (capsList: unknown[], name: string): number | null => {
-  const cap = capsList.find((item) => (item as VPN.VpnCaps).CapsName_str === name) as VPN.VpnCaps | undefined;
-  return cap ? cap.CapsValue_u32 : null;
-};
-
-const capBool = (capsList: unknown[], name: string): boolean => capValue(capsList, name) !== 0;
-
 const accessCapsFromServer = (capsList: unknown[]): AccessCaps => ({
   supportIpv6: capBool(capsList, 'b_support_ipv6_acl'),
   supportMac: capBool(capsList, 'b_support_check_mac'),
@@ -110,7 +104,8 @@ const accessCapsFromServer = (capsList: unknown[]): AccessCaps => ({
   supportSimulation: capBool(capsList, 'b_support_ex_acl'),
   supportRedirect: capBool(capsList, 'b_support_redirect_url_acl'),
   supportGroups: capBool(capsList, 'b_support_acl_group'),
-  maxRules: capValue(capsList, 'i_max_access_lists') ?? Number.POSITIVE_INFINITY,
+  // Native parity (SmAccessListDlgUpdate): 0 means no rules can be created.
+  maxRules: capValue(capsList, 'i_max_access_lists'),
 });
 
 const parseInteger = (value: string): number | null => {

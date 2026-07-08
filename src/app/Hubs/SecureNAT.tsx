@@ -29,6 +29,7 @@ import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { useServer } from '@app/ServerContext';
+import { capBool, capValue } from '@app/utils/caps';
 import { formatMacAddress, formatRpcValue } from '@app/utils/format';
 import { api } from '@app/utils/vpnrpc_settings';
 
@@ -60,13 +61,6 @@ interface RuntimeState {
   nat: VPN.VpnRpcEnumNatItem[];
   dhcp: VPN.VpnRpcEnumDhcpItem[];
 }
-
-const capValue = (capsList: unknown[], name: string): number | null => {
-  const cap = capsList.find((item) => (item as VPN.VpnCaps).CapsName_str === name) as VPN.VpnCaps | undefined;
-  return cap ? cap.CapsValue_u32 : null;
-};
-
-const capBool = (capsList: unknown[], name: string): boolean => capValue(capsList, name) !== 0;
 
 const parseMac = (value: string): Uint8Array | null => {
   const normalized = value.replace(/[-:.\s]/g, '');

@@ -14,17 +14,8 @@ import {
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { AdminOptionEditor } from '@app/Hubs/AdminOptionEditor';
 import { useServer } from '@app/ServerContext';
+import { capBool } from '@app/utils/caps';
 import { api } from '@app/utils/vpnrpc_settings';
-
-const capValue = (capsList: unknown[], name: string): number | null => {
-  const cap = capsList.find((item) => (item as VPN.VpnCaps).CapsName_str === name) as VPN.VpnCaps | undefined;
-  return cap ? cap.CapsValue_u32 : null;
-};
-
-const capBool = (capsList: unknown[], name: string): boolean => {
-  const value = capValue(capsList, name);
-  return value === null ? true : value !== 0;
-};
 
 const canChangeAdminOptions = (user: string, options: VPN.VpnAdminOption[]): boolean =>
   user === 'Administrator' ||

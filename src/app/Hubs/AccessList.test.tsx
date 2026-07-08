@@ -9,6 +9,17 @@ const serverState = vi.hoisted(() => ({
   capsList: [] as unknown[],
 }));
 
+// Advertise the caps a supported server would; missing caps gate closed.
+const fullCaps = [
+  { CapsName_str: 'b_support_ipv6_acl', CapsValue_u32: 1 },
+  { CapsName_str: 'b_support_check_mac', CapsValue_u32: 1 },
+  { CapsName_str: 'b_support_check_tcp_state', CapsValue_u32: 1 },
+  { CapsName_str: 'b_support_ex_acl', CapsValue_u32: 1 },
+  { CapsName_str: 'b_support_redirect_url_acl', CapsValue_u32: 1 },
+  { CapsName_str: 'b_support_acl_group', CapsValue_u32: 1 },
+  { CapsName_str: 'i_max_access_lists', CapsValue_u32: 4096 },
+];
+
 vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: {
     EnumAccess: vi.fn(),
@@ -44,7 +55,7 @@ const rule = {
 describe('AccessList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    serverState.capsList = [];
+    serverState.capsList = [...fullCaps];
   });
 
   it('lists rules with action, protocol and endpoints', async () => {

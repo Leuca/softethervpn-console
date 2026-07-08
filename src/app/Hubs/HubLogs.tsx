@@ -28,6 +28,7 @@ import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { useServer } from '@app/ServerContext';
 import { binToBytes, downloadBlob } from '@app/utils/blob_utils';
+import { capBool } from '@app/utils/caps';
 import { formatRpcValue } from '@app/utils/format';
 
 const logSwitchOptions = [
@@ -57,13 +58,6 @@ const packetTypes = [
 ];
 
 const PREVIEW_MAX_BYTES = 1_000_000;
-
-const capValue = (capsList: unknown[], name: string): number | null => {
-  const cap = capsList.find((item) => (item as VPN.VpnCaps).CapsName_str === name) as VPN.VpnCaps | undefined;
-  return cap ? cap.CapsValue_u32 : null;
-};
-
-const capBool = (capsList: unknown[], name: string): boolean => capValue(capsList, name) !== 0;
 
 const normalizeLogSettings = (response: VPN.VpnRpcHubLog): VPN.VpnRpcHubLog => {
   const config = new VPN.VpnRpcHubLog(response);
