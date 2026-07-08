@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Breadcrumb, BreadcrumbItem, Tab, TabTitleText, Tabs } from '@patternfly/react-core';
 import { AppPage } from '@app/components/AppPage';
 import { HubStatus } from '@app/Hubs/HubStatus';
@@ -19,15 +19,25 @@ import { HubTables } from '@app/Hubs/HubTables';
  * Management views for a single Virtual Hub, laid out as tabs.
  */
 const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState<string>('status');
 
   return (
     <>
       <Breadcrumb style={{ padding: 'var(--pf-t--global--spacer--md) var(--pf-t--global--spacer--lg) 0' }}>
-        <BreadcrumbItem to="#" onClick={() => navigate('/hubs')}>
-          Virtual Hubs
-        </BreadcrumbItem>
+        <BreadcrumbItem
+          render={({ className, ariaCurrent }) => (
+            <Link to="/" className={className} aria-current={ariaCurrent}>
+              Dashboard
+            </Link>
+          )}
+        />
+        <BreadcrumbItem
+          render={({ className, ariaCurrent }) => (
+            <Link to="/hubs" className={className} aria-current={ariaCurrent}>
+              Virtual Hubs
+            </Link>
+          )}
+        />
         <BreadcrumbItem isActive>{name}</BreadcrumbItem>
       </Breadcrumb>
       <AppPage title={name} description="Virtual Hub management.">
