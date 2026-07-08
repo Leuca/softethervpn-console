@@ -4,6 +4,7 @@ import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { hubTypeLabel } from '@app/utils/format';
+import { useAutoRefresh } from '@app/utils/useAutoRefresh';
 
 // Replace the coded status fields with readable values before the generic
 // KeyValueTable renders them (it would otherwise show a bare enum number for
@@ -23,29 +24,14 @@ function prettifyStatus(status: Record<string, unknown>): Record<string, unknown
 }
 
 const HubStatus: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
-  const [status, setStatus] = React.useState<Record<string, unknown> | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
-
-  const load = React.useCallback(() => {
-    setRefreshing(true);
-    setError(null);
-    api
-      .GetHubStatus(new VPN.VpnRpcHubStatus({ HubName_str: hub }))
-      .then((response) => {
-        setStatus(prettifyStatus(response as unknown as Record<string, unknown>));
-        setLastUpdated(new Date());
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setRefreshing(false));
-  }, [hub]);
-
-  React.useEffect(() => {
-    load();
-    const timer = window.setInterval(load, 10000);
-    return () => window.clearInterval(timer);
-  }, [load]);
+  const fetchStatus = React.useCallback(
+    () =>
+      api
+        .GetHubStatus(new VPN.VpnRpcHubStatus({ HubName_str: hub }))
+        .then((response) => prettifyStatus(response as unknown as Record<string, unknown>)),
+    [hub],
+  );
+  const { data: status, error, refreshing, lastUpdated } = useAutoRefresh(fetchStatus);
 
   const isInitialLoading = status === null && error === null;
 

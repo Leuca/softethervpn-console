@@ -92,6 +92,21 @@ describe('AccessList', () => {
     expect(sent.AccessList[0]).toMatchObject({ Id_u32: 1, Active_bool: false });
   });
 
+  it('aborts a whole-list save when the rule was deleted concurrently', async () => {
+    // Initial load shows the rule; the refetch before SetAccessList finds it
+    // gone (another administrator deleted it), so nothing is overwritten.
+    enumAccess.mockResolvedValueOnce({ AccessList: [rule] }).mockResolvedValueOnce({ AccessList: [] });
+    const user = userEvent.setup();
+
+    render(<AccessList hub="DEFAULT" />);
+    await screen.findByText('block guests');
+    await user.click(screen.getByLabelText('Rule 1 active'));
+
+    expect(await screen.findByText(/The rule no longer exists on the server/)).toBeInTheDocument();
+    expect(setAccessList).not.toHaveBeenCalled();
+    expect(await screen.findByText('No access list rules')).toBeInTheDocument();
+  });
+
   it('creates an IPv4 rule via AddAccess', async () => {
     enumAccess.mockResolvedValue({ AccessList: [] });
     addAccess.mockResolvedValue({});

@@ -597,18 +597,36 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     load();
   }, [load]);
 
-  const replaceList = (next: VPN.VpnAccess[]) => {
+  // SetAccessList replaces the whole list, so build it from a fresh
+  // EnumAccess rather than from rows loaded earlier: a concurrent change by
+  // another administrator is kept instead of silently overwritten. mutate
+  // returns null when its target rule no longer exists on the server.
+  const replaceList = (mutate: (fresh: VPN.VpnAccess[]) => VPN.VpnAccess[] | null, onSaved?: () => void) => {
     setBusy(true);
+    setError(null);
     api
-      .SetAccessList(
-        new VPN.VpnRpcEnumAccessList({
-          HubName_str: hub,
-          AccessList: next.map(normalizeRuleForSave),
-        }),
-      )
-      .then(() => {
-        setBusy(false);
-        load();
+      .EnumAccess(new VPN.VpnRpcEnumAccessList({ HubName_str: hub }))
+      .then((response) => {
+        const fresh = response.AccessList ?? [];
+        const next = mutate(fresh);
+        if (next === null) {
+          setRules(fresh);
+          setBusy(false);
+          setError('The rule no longer exists on the server; the list has been refreshed.');
+          return undefined;
+        }
+        return api
+          .SetAccessList(
+            new VPN.VpnRpcEnumAccessList({
+              HubName_str: hub,
+              AccessList: next.map(normalizeRuleForSave),
+            }),
+          )
+          .then(() => {
+            onSaved?.();
+            setBusy(false);
+            load();
+          });
       })
       .catch((e) => {
         setError(String(e));
@@ -617,10 +635,11 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   };
 
   const toggleActive = (id: number, active: boolean) => {
-    if (!rules) {
-      return;
-    }
-    replaceList(rules.map((r) => (r.Id_u32 === id ? { ...r, Active_bool: active } : r)) as VPN.VpnAccess[]);
+    replaceList((fresh) =>
+      fresh.some((r) => r.Id_u32 === id)
+        ? (fresh.map((r) => (r.Id_u32 === id ? { ...r, Active_bool: active } : r)) as VPN.VpnAccess[])
+        : null,
+    );
   };
 
   const openCreate = (ipv6: boolean) => {
@@ -646,8 +665,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       return;
     }
     const rule = ruleFromDraft(editor.draft, caps);
-    setBusy(true);
     if (editor.mode === 'create' || editor.mode === 'clone') {
+      setBusy(true);
       api
         .AddAccess(new VPN.VpnRpcAddAccess({ HubName_str: hub, AccessListSingle: [rule] }))
         .then(() => {
@@ -661,18 +680,13 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         });
       return;
     }
-    const next = rules.map((item) => (item.Id_u32 === editor.draft.id ? rule : item));
-    api
-      .SetAccessList(new VPN.VpnRpcEnumAccessList({ HubName_str: hub, AccessList: next.map(normalizeRuleForSave) }))
-      .then(() => {
-        setEditor(null);
-        setBusy(false);
-        load();
-      })
-      .catch((e) => {
-        setError(String(e));
-        setBusy(false);
-      });
+    replaceList(
+      (fresh) =>
+        fresh.some((item) => item.Id_u32 === editor.draft.id)
+          ? fresh.map((item) => (item.Id_u32 === editor.draft.id ? rule : item))
+          : null,
+      () => setEditor(null),
+    );
   };
 
   const confirmDelete = () => {

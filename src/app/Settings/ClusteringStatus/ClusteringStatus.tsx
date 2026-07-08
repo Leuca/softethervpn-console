@@ -28,6 +28,7 @@ import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { binToBytes } from '@app/utils/blob_utils';
 import { formatOptionalDate } from '@app/utils/format';
+import { useAutoRefresh } from '@app/utils/useAutoRefresh';
 
 // Fields rendered outside the flat KeyValueTable (binary cert, or nested lists).
 const FARM_INFO_OMIT = new Set(['ServerCert_bin', 'HubsList']);
@@ -191,29 +192,11 @@ const ControllerView: React.FunctionComponent = () => {
 
 // The cluster member view: this server's connection state to its controller.
 const MemberView: React.FunctionComponent = () => {
-  const [status, setStatus] = React.useState<Record<string, unknown> | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
-
-  const load = React.useCallback(() => {
-    setRefreshing(true);
-    setError(null);
-    api
-      .GetFarmConnectionStatus()
-      .then((response) => {
-        setStatus(response as unknown as Record<string, unknown>);
-        setLastUpdated(new Date());
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setRefreshing(false));
-  }, []);
-
-  React.useEffect(() => {
-    load();
-    const timer = window.setInterval(load, 10000);
-    return () => window.clearInterval(timer);
-  }, [load]);
+  const fetchStatus = React.useCallback(
+    () => api.GetFarmConnectionStatus().then((response) => response as unknown as Record<string, unknown>),
+    [],
+  );
+  const { data: status, error, refreshing, lastUpdated } = useAutoRefresh(fetchStatus);
 
   const isInitialLoading = status === null && error === null;
 

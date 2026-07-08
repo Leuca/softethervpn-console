@@ -21,6 +21,7 @@ import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/reac
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { formatMacAddress, formatRpcValue } from '@app/utils/format';
 import { api } from '@app/utils/vpnrpc_settings';
+import { useAutoRefresh } from '@app/utils/useAutoRefresh';
 
 type TableKind = 'mac' | 'ip';
 
@@ -47,38 +48,29 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
   initialTab = 'mac',
   confirmInline = false,
 }) => {
-  const [mac, setMac] = React.useState<VPN.VpnRpcEnumMacTableItem[] | null>(null);
-  const [ip, setIp] = React.useState<VPN.VpnRpcEnumIpTableItem[] | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const fetchTables = React.useCallback(
+    () =>
+      Promise.all([
+        api.EnumMacTable(new VPN.VpnRpcEnumMacTable({ HubName_str: hub })),
+        api.EnumIpTable(new VPN.VpnRpcEnumIpTable({ HubName_str: hub })),
+      ]).then(([macResponse, ipResponse]) => {
+        const macTable = macResponse.MacTable ?? [];
+        const ipTable = ipResponse.IpTable ?? [];
+        return {
+          mac: sessionName ? macTable.filter((entry) => entry.SessionName_str === sessionName) : macTable,
+          ip: sessionName ? ipTable.filter((entry) => entry.SessionName_str === sessionName) : ipTable,
+        };
+      }),
+    [hub, sessionName],
+  );
+  const { data: tables, error, refreshing, lastUpdated, load } = useAutoRefresh(fetchTables);
+  const mac = tables?.mac ?? null;
+  const ip = tables?.ip ?? null;
+  // Kept apart from the load error so an auto-refresh does not clear it.
+  const [actionError, setActionError] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState<TableKind>(singleKind ?? initialTab);
   const [pendingDelete, setPendingDelete] = React.useState<PendingDelete | null>(null);
   const [deleting, setDeleting] = React.useState(false);
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
-
-  const load = React.useCallback(() => {
-    setRefreshing(true);
-    setError(null);
-    Promise.all([
-      api.EnumMacTable(new VPN.VpnRpcEnumMacTable({ HubName_str: hub })),
-      api.EnumIpTable(new VPN.VpnRpcEnumIpTable({ HubName_str: hub })),
-    ])
-      .then(([macResponse, ipResponse]) => {
-        const macTable = macResponse.MacTable ?? [];
-        const ipTable = ipResponse.IpTable ?? [];
-        setMac(sessionName ? macTable.filter((entry) => entry.SessionName_str === sessionName) : macTable);
-        setIp(sessionName ? ipTable.filter((entry) => entry.SessionName_str === sessionName) : ipTable);
-        setLastUpdated(new Date());
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setRefreshing(false));
-  }, [hub, sessionName]);
-
-  React.useEffect(() => {
-    load();
-    const timer = window.setInterval(load, 10000);
-    return () => window.clearInterval(timer);
-  }, [load]);
 
   const confirmDelete = () => {
     if (!pendingDelete) {
@@ -86,6 +78,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
     }
     const entry = pendingDelete;
     setDeleting(true);
+    setActionError(null);
     const payload = new VPN.VpnRpcDeleteTable({ HubName_str: hub, Key_u32: entry.key });
     const request = entry.kind === 'mac' ? api.DeleteMacTable(payload) : api.DeleteIpTable(payload);
     request
@@ -95,7 +88,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
         load();
       })
       .catch((e) => {
-        setError(String(e));
+        setActionError(String(e));
         setPendingDelete(null);
         setDeleting(false);
       });
@@ -228,9 +221,9 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
         </FlexItem>
       </Flex>
 
-      {error && (
+      {(actionError ?? error) && (
         <Alert variant="danger" title="Address table operation failed" isInline>
-          {error}
+          {actionError ?? error}
         </Alert>
       )}
 

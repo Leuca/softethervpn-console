@@ -19,6 +19,7 @@ import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { HubTables } from '@app/Hubs/HubTables';
+import { useAutoRefresh } from '@app/utils/useAutoRefresh';
 
 type SessionTableKind = 'mac' | 'ip';
 
@@ -53,33 +54,18 @@ interface SessionTableState {
 }
 
 const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
-  const [sessions, setSessions] = React.useState<VPN.VpnRpcEnumSessionItem[] | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
+  const fetchSessions = React.useCallback(
+    () =>
+      api.EnumSession(new VPN.VpnRpcEnumSession({ HubName_str: hub })).then((response) => response.SessionList ?? []),
+    [hub],
+  );
+  const { data: sessions, error, refreshing, lastUpdated, load } = useAutoRefresh(fetchSessions);
+  // Kept apart from the load error so an auto-refresh does not clear it.
+  const [actionError, setActionError] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<DetailState | null>(null);
   const [sessionTable, setSessionTable] = React.useState<SessionTableState | null>(null);
   const [pendingDisconnect, setPendingDisconnect] = React.useState<string | null>(null);
   const [disconnecting, setDisconnecting] = React.useState(false);
-
-  const load = React.useCallback(() => {
-    setRefreshing(true);
-    setError(null);
-    api
-      .EnumSession(new VPN.VpnRpcEnumSession({ HubName_str: hub }))
-      .then((response) => {
-        setSessions(response.SessionList ?? []);
-        setLastUpdated(new Date());
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setRefreshing(false));
-  }, [hub]);
-
-  React.useEffect(() => {
-    load();
-    const timer = window.setInterval(load, 10000);
-    return () => window.clearInterval(timer);
-  }, [load]);
 
   const openDetail = (name: string) => {
     setDetail({ name, status: null, error: null });
@@ -101,6 +87,7 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     }
     const name = pendingDisconnect;
     setDisconnecting(true);
+    setActionError(null);
     api
       .DeleteSession(new VPN.VpnRpcDeleteSession({ HubName_str: hub, Name_str: name }))
       .then(() => {
@@ -109,7 +96,7 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         load();
       })
       .catch((e) => {
-        setError(String(e));
+        setActionError(String(e));
         setPendingDisconnect(null);
         setDisconnecting(false);
       });
@@ -149,9 +136,9 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </FlexItem>
       </Flex>
 
-      {error && (
+      {(actionError ?? error) && (
         <Alert variant="danger" title="Session operation failed" isInline>
-          {error}
+          {actionError ?? error}
         </Alert>
       )}
 
