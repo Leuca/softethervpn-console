@@ -23,44 +23,72 @@ import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
 
 const VPN_AZURE_URL = 'https://www.vpnazure.net/en/';
+const CONNECTING_REFRESH_MS = 1000;
 
 const VpnAzure: React.FunctionComponent = () => {
   const navigate = useNavigate();
 
   const [enabled, setEnabled] = React.useState<boolean | null>(null);
-  const [connected, setConnected] = React.useState(false);
+  const [connected, setConnected] = React.useState<boolean | null>(false);
   const [hostname, setHostname] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
-  const load = React.useCallback(() => {
-    setError(null);
+  const refreshStatus = React.useCallback(() =>
     api
       .GetAzureStatus()
       .then((status) => {
         setConnected(status.IsConnected_bool);
         setEnabled(status.IsEnabled_bool);
         if (status.IsEnabled_bool) {
-          return api.GetDDnsClientStatus().then((ddns) => setHostname(ddns.CurrentHostName_str));
+          return api.GetDDnsClientStatus().then((ddns) => {
+            setHostname(ddns.CurrentHostName_str);
+            return status;
+          });
         }
         setHostname('');
-        return undefined;
-      })
-      .catch((e) => setError(String(e)));
-  }, []);
+        return status;
+      }), []);
+
+  const load = React.useCallback(() => {
+    setError(null);
+    refreshStatus().catch((e) => setError(String(e)));
+  }, [refreshStatus]);
 
   React.useEffect(() => {
     load();
   }, [load]);
+
+  React.useEffect(() => {
+    if (connected !== null) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      refreshStatus().catch((e) => setError(String(e)));
+    }, CONNECTING_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [connected, refreshStatus]);
 
   const toggle = (_event: React.FormEvent<HTMLInputElement>, isChecked: boolean) => {
     setBusy(true);
     setError(null);
     api
       .SetAzureStatus(new VPN.VpnRpcAzureStatus({ IsEnabled_bool: isChecked }))
-      .then(() => {
-        setBusy(false);
-        load();
+      .then((status) => {
+        const nextEnabled = typeof status.IsEnabled_bool === 'boolean' ? status.IsEnabled_bool : isChecked;
+        setEnabled(nextEnabled);
+        if (nextEnabled) {
+          setConnected(null);
+          return api.GetDDnsClientStatus().then((ddns) => {
+            setHostname(ddns.CurrentHostName_str);
+            setBusy(false);
+          });
+        } else {
+          setConnected(false);
+          setHostname('');
+          setBusy(false);
+          return undefined;
+        }
       })
       .catch((e) => {
         setError(String(e));
@@ -126,8 +154,8 @@ const VpnAzure: React.FunctionComponent = () => {
                       <DescriptionListGroup>
                         <DescriptionListTerm>Status</DescriptionListTerm>
                         <DescriptionListDescription>
-                          <Label color={connected ? 'green' : 'grey'} isCompact>
-                            {connected ? 'Connected' : 'Not connected'}
+                          <Label color={connected === null ? 'blue' : connected ? 'green' : 'grey'} isCompact>
+                            {connected === null ? 'Connecting' : connected ? 'Connected' : 'Not connected'}
                           </Label>
                         </DescriptionListDescription>
                       </DescriptionListGroup>

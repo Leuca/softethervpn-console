@@ -2,7 +2,7 @@ import * as React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VpnAzure } from './VPNAzure';
 import { api } from '@app/utils/vpnrpc_settings';
 
@@ -31,6 +31,11 @@ const renderPage = () =>
 describe('VpnAzure', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows the hostname and connected status when enabled', async () => {
@@ -56,12 +61,13 @@ describe('VpnAzure', () => {
   });
 
   it('enables VPN Azure via the toggle and reloads status', async () => {
+    vi.useFakeTimers();
     getAzureStatus
       .mockResolvedValueOnce({ IsEnabled_bool: false, IsConnected_bool: false })
-      .mockResolvedValueOnce({ IsEnabled_bool: true, IsConnected_bool: false });
+      .mockResolvedValueOnce({ IsEnabled_bool: true, IsConnected_bool: true });
     getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: 'vpn123456' });
-    setAzureStatus.mockResolvedValue({ IsEnabled_bool: true, IsConnected_bool: false });
-    const user = userEvent.setup();
+    setAzureStatus.mockResolvedValue({ IsEnabled_bool: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     renderPage();
     await screen.findByText('Not connected');
@@ -70,8 +76,14 @@ describe('VpnAzure', () => {
 
     await waitFor(() => expect(setAzureStatus).toHaveBeenCalledTimes(1));
     expect(setAzureStatus.mock.calls[0][0].IsEnabled_bool).toBe(true);
-    // after reload the hostname appears
+    await waitFor(() => expect(screen.getByRole('switch')).toBeChecked());
+    expect(screen.getByText('Connecting')).toBeInTheDocument();
     expect(await screen.findByText('vpn123456.vpnazure.net')).toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    expect(getAzureStatus).toHaveBeenCalledTimes(2);
   });
 
   it('navigates to the DDNS page from Change hostname', async () => {
