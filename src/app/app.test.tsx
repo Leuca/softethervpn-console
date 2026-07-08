@@ -173,6 +173,32 @@ describe('App tests', () => {
     ).toBeVisible();
   });
 
+  it('denies functionalities pages to hub administrators on direct URLs', async () => {
+    // The Functionalities group is admin-only at group level; the flattened
+    // routes must inherit that flag so RouteGate matches the nav.
+    enumConnection.mockRejectedValueOnce(new Error('Error: Code=52, Message=Error code 52: Not enough privileges.'));
+    window.history.pushState({}, '', '/#/functionalities/localbridge');
+
+    render(<App />);
+
+    expect(await screen.findByText('Permission required')).toBeVisible();
+    expect(await screen.findByText(/server administrator privileges/i)).toBeVisible();
+  });
+
+  it('denies the EtherIP detail page in bridge mode on direct URLs', async () => {
+    getCaps.mockResolvedValueOnce({
+      ...defaultCaps,
+      caps_b_bridge_u32: 1,
+    });
+
+    window.history.pushState({}, '', '/#/functionalities/legacyprotocols/etherip');
+
+    render(<App />);
+
+    expect(await screen.findByText('Permission required')).toBeVisible();
+    expect(await screen.findByText(/This page is unavailable in bridge mode/i)).toBeVisible();
+  });
+
   it('keeps clustering configuration reachable in cluster mode', async () => {
     // Cluster members must still reach the page to change or leave clustering.
     getFarmSetting.mockResolvedValue({ ServerType_u32: 1 });

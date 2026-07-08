@@ -154,6 +154,7 @@ const routes: AppRouteConfig[] = [
         element: <EtherIPDetailed />,
         path: '/functionalities/legacyprotocols/etherip',
         title: 'SoftEther VPN Console | EtherIP / L2TPv3 detailed settings',
+        isBridge: false,
       },
       {
         element: <DynDNS />,
@@ -242,8 +243,13 @@ const TitledRoute: React.FunctionComponent<{ title: string; children: React.Reac
   return children;
 };
 
+// Children inherit the group's isAdmin flag so RouteGate enforces the same
+// access rules as the nav, which hides the whole group.
 const flattenedRoutes: IAppRoute[] = routes.reduce(
-  (flattened, route) => [...flattened, ...(route.routes ? route.routes : [route])],
+  (flattened, route) => [
+    ...flattened,
+    ...(route.routes ? route.routes.map((child) => ({ ...child, isAdmin: child.isAdmin ?? route.isAdmin })) : [route]),
+  ],
   [] as IAppRoute[],
 );
 
