@@ -3,9 +3,6 @@ import {
   Alert,
   Bullseye,
   Button,
-  Card,
-  CardBody,
-  CardTitle,
   Content,
   EmptyState,
   EmptyStateBody,
@@ -463,135 +460,133 @@ const Layer3Switch: React.FunctionComponent = () => {
 
         {selectedItem && (
           <StackItem>
-            <Card>
-              <CardTitle>
+            <Stack hasGutter>
+              <StackItem>
                 <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
-                  <FlexItem>Switch: {selectedItem.Name_str}</FlexItem>
+                  <FlexItem>
+                    <Content component="h2">Switch: {selectedItem.Name_str}</Content>
+                  </FlexItem>
                   <FlexItem>
                     <Button variant="link" isInline onClick={() => setSelected(null)}>
                       Close
                     </Button>
                   </FlexItem>
                 </Flex>
-              </CardTitle>
-              <CardBody>
-                {selectedActive && (
-                  <Alert
-                    variant="info"
-                    title="Stop the switch to change its interfaces and routing table"
-                    isInline
-                    style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
-                  />
-                )}
-                <Stack hasGutter>
-                  {/* Virtual interfaces */}
-                  <StackItem>
-                    <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
-                      <FlexItem>
-                        <Content component="h3">Virtual interfaces</Content>
-                      </FlexItem>
-                      <FlexItem>
-                        <Button
-                          variant="secondary"
-                          icon={<PlusCircleIcon />}
-                          onClick={openAddIf}
-                          isDisabled={busy || selectedActive || hubs.length === 0 || ifs === null}
-                        >
-                          Add interface
-                        </Button>
-                      </FlexItem>
-                    </Flex>
-                    {ifs === null ? (
-                      <Bullseye>
-                        <Spinner size="lg" aria-label="Loading interfaces" />
-                      </Bullseye>
-                    ) : ifs.length === 0 ? (
-                      <Content component="small">No interfaces defined.</Content>
-                    ) : (
-                      <Table aria-label="Virtual interfaces" variant="compact">
-                        <Thead>
-                          <Tr>
-                            <Th>Virtual Hub</Th>
-                            <Th>IP address</Th>
-                            <Th>Subnet mask</Th>
-                            <Th screenReaderText="Actions" />
-                          </Tr>
-                        </Thead>
-                        <Tbody>
-                          {ifs.map((it) => (
-                            <Tr key={`${it.HubName_str}/${it.IpAddress_ip}`}>
-                              <Td dataLabel="Virtual Hub">{it.HubName_str}</Td>
-                              <Td dataLabel="IP address">{it.IpAddress_ip}</Td>
-                              <Td dataLabel="Subnet mask">{it.SubnetMask_ip}</Td>
-                              <Td isActionCell>
-                                <ActionsColumn
-                                  items={[{ title: 'Delete', onClick: () => setPendingIf(it) }]}
-                                  isDisabled={busy || selectedActive}
-                                />
-                              </Td>
-                            </Tr>
-                          ))}
-                        </Tbody>
-                      </Table>
-                    )}
-                  </StackItem>
+              </StackItem>
+              {selectedActive && (
+                <StackItem>
+                  <Alert variant="info" title="Stop the switch to change its interfaces and routing table" isInline />
+                </StackItem>
+              )}
 
-                  {/* Routing table */}
-                  <StackItem>
-                    <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
-                      <FlexItem>
-                        <Content component="h3">Routing table</Content>
-                      </FlexItem>
-                      <FlexItem>
-                        <Button
-                          variant="secondary"
-                          icon={<PlusCircleIcon />}
-                          onClick={openAddRoute}
-                          isDisabled={busy || selectedActive || routes === null}
-                        >
-                          Add route
-                        </Button>
-                      </FlexItem>
-                    </Flex>
-                    {routes === null ? (
-                      <Bullseye>
-                        <Spinner size="lg" aria-label="Loading routing table" />
-                      </Bullseye>
-                    ) : routes.length === 0 ? (
-                      <Content component="small">No routes defined.</Content>
-                    ) : (
-                      <Table aria-label="Routing table" variant="compact">
-                        <Thead>
-                          <Tr>
-                            <Th>Network address</Th>
-                            <Th>Subnet mask</Th>
-                            <Th>Gateway</Th>
-                            <Th>Metric</Th>
-                            <Th screenReaderText="Actions" />
-                          </Tr>
-                        </Thead>
-                        <Tbody>
-                          {routes.map((rt) => (
-                            <Tr key={`${rt.NetworkAddress_ip}/${rt.SubnetMask_ip}/${rt.GatewayAddress_ip}`}>
-                              <Td dataLabel="Network address">{rt.NetworkAddress_ip}</Td>
-                              <Td dataLabel="Subnet mask">{rt.SubnetMask_ip}</Td>
-                              <Td dataLabel="Gateway">{rt.GatewayAddress_ip}</Td>
-                              <Td dataLabel="Metric">{rt.Metric_u32}</Td>
-                              <Td isActionCell>
-                                <ActionsColumn
-                                  items={[{ title: 'Delete', onClick: () => setPendingRoute(rt) }]}
-                                  isDisabled={busy || selectedActive}
-                                />
-                              </Td>
-                            </Tr>
-                          ))}
-                        </Tbody>
-                      </Table>
-                    )}
-                  </StackItem>
-                </Stack>
-              </CardBody>
-            </Card>
+              {/* Virtual interfaces */}
+              <StackItem>
+                <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+                  <FlexItem>
+                    <Content component="h3">Virtual interfaces</Content>
+                  </FlexItem>
+                  <FlexItem>
+                    <Button
+                      variant="link"
+                      isInline
+                      icon={<PlusCircleIcon />}
+                      onClick={openAddIf}
+                      isDisabled={busy || selectedActive || hubs.length === 0 || ifs === null}
+                    >
+                      Add interface
+                    </Button>
+                  </FlexItem>
+                </Flex>
+                {ifs === null ? (
+                  <Bullseye>
+                    <Spinner size="lg" aria-label="Loading interfaces" />
+                  </Bullseye>
+                ) : ifs.length === 0 ? (
+                  <Content component="small">No interfaces defined.</Content>
+                ) : (
+                  <Table aria-label="Virtual interfaces" variant="compact">
+                    <Thead>
+                      <Tr>
+                        <Th>Virtual Hub</Th>
+                        <Th>IP address</Th>
+                        <Th>Subnet mask</Th>
+                        <Th screenReaderText="Actions" />
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {ifs.map((it) => (
+                        <Tr key={`${it.HubName_str}/${it.IpAddress_ip}`}>
+                          <Td dataLabel="Virtual Hub">{it.HubName_str}</Td>
+                          <Td dataLabel="IP address">{it.IpAddress_ip}</Td>
+                          <Td dataLabel="Subnet mask">{it.SubnetMask_ip}</Td>
+                          <Td isActionCell>
+                            <ActionsColumn
+                              items={[{ title: 'Delete', onClick: () => setPendingIf(it) }]}
+                              isDisabled={busy || selectedActive}
+                            />
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                )}
+              </StackItem>
+
+              {/* Routing table */}
+              <StackItem>
+                <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+                  <FlexItem>
+                    <Content component="h3">Routing table</Content>
+                  </FlexItem>
+                  <FlexItem>
+                    <Button
+                      variant="link"
+                      isInline
+                      icon={<PlusCircleIcon />}
+                      onClick={openAddRoute}
+                      isDisabled={busy || selectedActive || routes === null}
+                    >
+                      Add route
+                    </Button>
+                  </FlexItem>
+                </Flex>
+                {routes === null ? (
+                  <Bullseye>
+                    <Spinner size="lg" aria-label="Loading routing table" />
+                  </Bullseye>
+                ) : routes.length === 0 ? (
+                  <Content component="small">No routes defined.</Content>
+                ) : (
+                  <Table aria-label="Routing table" variant="compact">
+                    <Thead>
+                      <Tr>
+                        <Th>Network address</Th>
+                        <Th>Subnet mask</Th>
+                        <Th>Gateway</Th>
+                        <Th>Metric</Th>
+                        <Th screenReaderText="Actions" />
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {routes.map((rt) => (
+                        <Tr key={`${rt.NetworkAddress_ip}/${rt.SubnetMask_ip}/${rt.GatewayAddress_ip}`}>
+                          <Td dataLabel="Network address">{rt.NetworkAddress_ip}</Td>
+                          <Td dataLabel="Subnet mask">{rt.SubnetMask_ip}</Td>
+                          <Td dataLabel="Gateway">{rt.GatewayAddress_ip}</Td>
+                          <Td dataLabel="Metric">{rt.Metric_u32}</Td>
+                          <Td isActionCell>
+                            <ActionsColumn
+                              items={[{ title: 'Delete', onClick: () => setPendingRoute(rt) }]}
+                              isDisabled={busy || selectedActive}
+                            />
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                )}
+              </StackItem>
+            </Stack>
           </StackItem>
         )}
       </Stack>
