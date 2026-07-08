@@ -15,7 +15,6 @@ import {
   Spinner,
 } from '@patternfly/react-core';
 import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { KeyValueTable } from '@app/components/KeyValueTable';
@@ -56,22 +55,30 @@ interface SessionTableState {
 const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [sessions, setSessions] = React.useState<VPN.VpnRpcEnumSessionItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
   const [detail, setDetail] = React.useState<DetailState | null>(null);
   const [sessionTable, setSessionTable] = React.useState<SessionTableState | null>(null);
   const [pendingDisconnect, setPendingDisconnect] = React.useState<string | null>(null);
   const [disconnecting, setDisconnecting] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setSessions(null);
+    setRefreshing(true);
     setError(null);
     api
       .EnumSession(new VPN.VpnRpcEnumSession({ HubName_str: hub }))
-      .then((response) => setSessions(response.SessionList ?? []))
-      .catch((e) => setError(String(e)));
+      .then((response) => {
+        setSessions(response.SessionList ?? []);
+        setLastUpdated(new Date());
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setRefreshing(false));
   }, [hub]);
 
   React.useEffect(() => {
     load();
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
   }, [load]);
 
   const openDetail = (name: string) => {
@@ -130,11 +137,15 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       gap={{ default: 'gapMd' }}
       style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }}>
+      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
         <FlexItem>
-          <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading}>
-            Refresh
-          </Button>
+          <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+            {refreshing && sessions !== null
+              ? 'Refreshing...'
+              : lastUpdated
+                ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                : 'Auto-refreshes every 10s'}
+          </span>
         </FlexItem>
       </Flex>
 

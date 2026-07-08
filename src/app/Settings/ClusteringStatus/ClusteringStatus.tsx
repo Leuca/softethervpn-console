@@ -6,6 +6,8 @@ import {
   Content,
   EmptyState,
   EmptyStateBody,
+  Flex,
+  FlexItem,
   Label,
   LabelGroup,
   Modal,
@@ -192,43 +194,60 @@ const ControllerView: React.FunctionComponent = () => {
 const MemberView: React.FunctionComponent = () => {
   const [status, setStatus] = React.useState<Record<string, unknown> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
 
   const load = React.useCallback(() => {
-    setStatus(null);
+    setRefreshing(true);
     setError(null);
     api
       .GetFarmConnectionStatus()
-      .then((response) => setStatus(response as unknown as Record<string, unknown>))
-      .catch((e) => setError(String(e)));
+      .then((response) => {
+        setStatus(response as unknown as Record<string, unknown>);
+        setLastUpdated(new Date());
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setRefreshing(false));
   }, []);
 
   React.useEffect(() => {
     load();
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
   }, [load]);
 
-  const refresh = (
-    <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={status === null && error === null}>
-      Refresh
-    </Button>
-  );
+  const isInitialLoading = status === null && error === null;
 
   return (
     <AppPage
       title="Clustering Status"
       description="This server's connection to its cluster controller."
-      actions={refresh}
     >
-      {error ? (
-        <Alert variant="danger" title="Could not load controller connection status" isInline>
-          {error}
-        </Alert>
-      ) : status === null ? (
-        <Bullseye>
-          <Spinner size="xl" aria-label="Loading controller connection status" />
-        </Bullseye>
-      ) : (
-        <KeyValueTable data={status} ariaLabel="Controller connection status" />
-      )}
+      <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+        <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
+          <FlexItem>
+            <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+              {refreshing && status !== null
+                ? 'Refreshing...'
+                : lastUpdated
+                  ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                  : 'Auto-refreshes every 10s'}
+            </span>
+          </FlexItem>
+        </Flex>
+        {error && (
+          <Alert variant="danger" title="Could not load controller connection status" isInline>
+            {error}
+          </Alert>
+        )}
+        {isInitialLoading ? (
+          <Bullseye>
+            <Spinner size="xl" aria-label="Loading controller connection status" />
+          </Bullseye>
+        ) : status !== null ? (
+          <KeyValueTable data={status} ariaLabel="Controller connection status" />
+        ) : null}
+      </Flex>
     </AppPage>
   );
 };

@@ -18,7 +18,6 @@ import {
   Tabs,
 } from '@patternfly/react-core';
 import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { formatMacAddress, formatRpcValue } from '@app/utils/format';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -54,10 +53,11 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
   const [activeTab, setActiveTab] = React.useState<TableKind>(singleKind ?? initialTab);
   const [pendingDelete, setPendingDelete] = React.useState<PendingDelete | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
 
   const load = React.useCallback(() => {
-    setMac(null);
-    setIp(null);
+    setRefreshing(true);
     setError(null);
     Promise.all([
       api.EnumMacTable(new VPN.VpnRpcEnumMacTable({ HubName_str: hub })),
@@ -68,12 +68,16 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
         const ipTable = ipResponse.IpTable ?? [];
         setMac(sessionName ? macTable.filter((entry) => entry.SessionName_str === sessionName) : macTable);
         setIp(sessionName ? ipTable.filter((entry) => entry.SessionName_str === sessionName) : ipTable);
+        setLastUpdated(new Date());
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setRefreshing(false));
   }, [hub, sessionName]);
 
   React.useEffect(() => {
     load();
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
   }, [load]);
 
   const confirmDelete = () => {
@@ -97,7 +101,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
       });
   };
 
-  const isLoading = mac === null && ip === null && error === null;
+  const isInitialLoading = mac === null && ip === null && error === null;
   const scopedText = sessionName ? ' for this session' : ' for this hub';
 
   const confirmMessage = pendingDelete ? (
@@ -212,11 +216,15 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
       gap={{ default: 'gapMd' }}
       style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }}>
+      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
         <FlexItem>
-          <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading}>
-            Refresh
-          </Button>
+          <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+            {refreshing && mac !== null && ip !== null
+              ? 'Refreshing...'
+              : lastUpdated
+                ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                : 'Auto-refreshes every 10s'}
+          </span>
         </FlexItem>
       </Flex>
 
@@ -243,7 +251,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
         </Alert>
       )}
 
-      {isLoading ? (
+      {isInitialLoading ? (
         <Bullseye>
           <Spinner size="xl" aria-label="Loading address tables" />
         </Bullseye>

@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { Alert, Bullseye, Button, Flex, FlexItem, Spinner, Stack, StackItem } from '@patternfly/react-core';
-import { SyncAltIcon } from '@patternfly/react-icons';
+import { Alert, Bullseye, Flex, FlexItem, Spinner } from '@patternfly/react-core';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { KeyValueTable } from '@app/components/KeyValueTable';
@@ -26,53 +25,60 @@ function prettifyStatus(status: Record<string, unknown>): Record<string, unknown
 const HubStatus: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [status, setStatus] = React.useState<Record<string, unknown> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
 
   const load = React.useCallback(() => {
-    setStatus(null);
+    setRefreshing(true);
     setError(null);
     api
       .GetHubStatus(new VPN.VpnRpcHubStatus({ HubName_str: hub }))
-      .then((response) => setStatus(prettifyStatus(response as unknown as Record<string, unknown>)))
-      .catch((e) => setError(String(e)));
+      .then((response) => {
+        setStatus(prettifyStatus(response as unknown as Record<string, unknown>));
+        setLastUpdated(new Date());
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setRefreshing(false));
   }, [hub]);
 
   React.useEffect(() => {
     load();
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
   }, [load]);
 
+  const isInitialLoading = status === null && error === null;
+
   return (
-    <Stack hasGutter>
-      <StackItem>
-        <Flex
-          justifyContent={{ default: 'justifyContentFlexEnd' }}
-          style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
-        >
-          <FlexItem>
-            <Button
-              variant="secondary"
-              icon={<SyncAltIcon />}
-              onClick={load}
-              isDisabled={status === null && error === null}
-            >
-              Refresh
-            </Button>
-          </FlexItem>
-        </Flex>
-      </StackItem>
-      <StackItem>
-        {error ? (
-          <Alert variant="danger" title="Could not load hub status" isInline>
-            {error}
-          </Alert>
-        ) : status === null ? (
-          <Bullseye>
-            <Spinner size="xl" aria-label="Loading hub status" />
-          </Bullseye>
-        ) : (
-          <KeyValueTable data={status} ariaLabel={`Status for ${hub}`} />
-        )}
-      </StackItem>
-    </Stack>
+    <Flex
+      direction={{ default: 'column' }}
+      gap={{ default: 'gapMd' }}
+      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+    >
+      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
+        <FlexItem>
+          <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+            {refreshing && status !== null
+              ? 'Refreshing...'
+              : lastUpdated
+                ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                : 'Auto-refreshes every 10s'}
+          </span>
+        </FlexItem>
+      </Flex>
+      {error && (
+        <Alert variant="danger" title="Could not load hub status" isInline>
+          {error}
+        </Alert>
+      )}
+      {isInitialLoading ? (
+        <Bullseye>
+          <Spinner size="xl" aria-label="Loading hub status" />
+        </Bullseye>
+      ) : status !== null ? (
+        <KeyValueTable data={status} ariaLabel={`Status for ${hub}`} />
+      ) : null}
+    </Flex>
   );
 };
 
