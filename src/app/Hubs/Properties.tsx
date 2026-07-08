@@ -4,6 +4,7 @@ import {
   Bullseye,
   Button,
   Checkbox,
+  Content,
   Flex,
   FlexItem,
   Form,
@@ -20,6 +21,47 @@ import { HubAdminOptions } from '@app/Hubs/HubAdminOptions';
 import { HubExtendedOptions } from '@app/Hubs/HubExtendedOptions';
 import { HubMessage } from '@app/Hubs/HubMessage';
 import { HubSourceAccessControl } from '@app/Hubs/HubSourceAccessControl';
+
+const settingsTrigger = (title: string, description: string) => (open: () => void) => (
+  <Button
+    variant="plain"
+    aria-label={title}
+    onClick={open}
+    style={{
+      alignItems: 'stretch',
+      background: 'var(--pf-t--global--background--color--primary--default)',
+      border: 'var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default)',
+      borderRadius: 'var(--pf-t--global--border--radius--medium)',
+      display: 'block',
+      minHeight: '100%',
+      padding: 'var(--pf-t--global--spacer--md)',
+      textAlign: 'start',
+      whiteSpace: 'normal',
+      width: '100%',
+    }}
+  >
+    <span style={{ display: 'grid', gap: 'var(--pf-t--global--spacer--xs)', minWidth: 0, whiteSpace: 'normal' }}>
+      <Button
+        component="span"
+        variant="link"
+        isInline
+        style={{ justifySelf: 'start', overflowWrap: 'anywhere', whiteSpace: 'normal' }}
+      >
+        {title}
+      </Button>
+      <span
+        style={{
+          color: 'var(--pf-t--global--text--color--subtle)',
+          fontSize: 'var(--pf-t--global--font--size--sm)',
+          overflowWrap: 'anywhere',
+          whiteSpace: 'normal',
+        }}
+      >
+        {description}
+      </span>
+    </span>
+  </Button>
+);
 
 const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the full GetHub response, plus an optional new admin password.
@@ -132,20 +174,37 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               />
             </FormGroup>
           </Form>
-          <Flex gap={{ default: 'gapSm' }}>
-            <FlexItem>
-              <HubMessage hub={hub} />
-            </FlexItem>
-            <FlexItem>
-              <HubAdminOptions hub={hub} />
-            </FlexItem>
-            <FlexItem>
-              <HubExtendedOptions hub={hub} />
-            </FlexItem>
-            <FlexItem>
-              <HubSourceAccessControl hub={hub} />
-            </FlexItem>
-          </Flex>
+          <section>
+            <Content component="h2">Related hub settings</Content>
+            <Content component="p">
+              Open focused tools for settings that are related to this hub but managed in their own dialogs.
+            </Content>
+            <div
+              style={{
+                display: 'grid',
+                gap: 'var(--pf-t--global--spacer--md)',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))',
+                marginBlockStart: 'var(--pf-t--global--spacer--md)',
+              }}
+            >
+              <HubMessage
+                hub={hub}
+                trigger={settingsTrigger('Set the Message', 'Show a short notice to clients when they connect.')}
+              />
+              <HubAdminOptions
+                hub={hub}
+                trigger={settingsTrigger('Administration Options', 'Configure limits and permissions for hub administrators.')}
+              />
+              <HubExtendedOptions
+                hub={hub}
+                trigger={settingsTrigger('Extended Options', 'Tune low-level hub behavior and compatibility switches.')}
+              />
+              <HubSourceAccessControl
+                hub={hub}
+                trigger={settingsTrigger('Source IP Access Control', 'Restrict access to this hub by source address.')}
+              />
+            </div>
+          </section>
         </>
       ) : null}
     </Flex>

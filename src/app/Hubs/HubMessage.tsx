@@ -35,7 +35,12 @@ const canChangeMessage = (user: string, options: VPN.VpnAdminOption[]): boolean 
   user === 'Administrator' ||
   !options.some((option) => option.Name_str.toLowerCase() === 'no_change_msg' && option.Value_u32 !== 0);
 
-const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
+interface HubMessageProps {
+  hub: string;
+  trigger?: (open: () => void) => React.ReactNode;
+}
+
+const HubMessage: React.FunctionComponent<HubMessageProps> = ({ hub, trigger }) => {
   const { user } = useServer();
   const [open, setOpen] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
@@ -103,11 +108,15 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <>
-      <FormGroup label="Client connection message" fieldId="hub-message-open">
-        <Button id="hub-message-open" variant="secondary" aria-label="Set the Message" onClick={openModal}>
-          Set the Message
-        </Button>
-      </FormGroup>
+      {trigger ? (
+        trigger(openModal)
+      ) : (
+        <FormGroup label="Client connection message" fieldId="hub-message-open">
+          <Button id="hub-message-open" variant="secondary" aria-label="Set the Message" onClick={openModal}>
+            Set the Message
+          </Button>
+        </FormGroup>
+      )}
 
       <Modal variant={ModalVariant.medium} isOpen={open} onClose={closeModal}>
         <ModalHeader title="Set the Message" />

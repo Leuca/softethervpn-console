@@ -152,6 +152,11 @@ const canChangeAccessControl = (user: string, adminOptions: VPN.VpnAdminOption[]
     (option) => option.Name_str.toLowerCase() === 'no_change_access_control_list' && option.Value_u32 !== 0,
   );
 
+interface HubSourceAccessControlProps {
+  hub: string;
+  trigger?: (open: () => void) => React.ReactNode;
+}
+
 const ruleAddress = (rule: VPN.VpnAc): string =>
   rule.Masked_bool ? `${rule.IpAddress_ip}/${rule.SubnetMask_ip}` : rule.IpAddress_ip;
 
@@ -219,7 +224,7 @@ const ruleFromDraft = (draft: RuleDraft): VPN.VpnAc =>
     SubnetMask_ip: normalizeSubnetMask(draft),
   });
 
-const HubSourceAccessControl: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
+const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProps> = ({ hub, trigger }) => {
   const { capsList, user } = useServer();
   const supportsIpv6 = capBool(capsList, 'b_support_ipv6_ac');
   const [open, setOpen] = React.useState(false);
@@ -300,9 +305,13 @@ const HubSourceAccessControl: React.FunctionComponent<{ hub: string }> = ({ hub 
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
-        Source IP Access Control
-      </Button>
+      {trigger ? (
+        trigger(() => setOpen(true))
+      ) : (
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          Source IP Access Control
+        </Button>
+      )}
 
       <Modal
         variant={ModalVariant.large}

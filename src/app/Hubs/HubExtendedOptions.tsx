@@ -40,7 +40,12 @@ const canChangeExtendedOptions = (user: string, adminOptions: VPN.VpnAdminOption
     (option) => option.Name_str.toLowerCase() === 'deny_hub_admin_change_ext_option' && option.Value_u32 !== 0,
   );
 
-const HubExtendedOptions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
+interface HubExtendedOptionsProps {
+  hub: string;
+  trigger?: (open: () => void) => React.ReactNode;
+}
+
+const HubExtendedOptions: React.FunctionComponent<HubExtendedOptionsProps> = ({ hub, trigger }) => {
   const { user } = useServer();
   const [open, setOpen] = React.useState(false);
   const [options, setOptions] = React.useState<VPN.VpnAdminOption[] | null>(null);
@@ -90,9 +95,13 @@ const HubExtendedOptions: React.FunctionComponent<{ hub: string }> = ({ hub }) =
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
-        Extended Options
-      </Button>
+      {trigger ? (
+        trigger(() => setOpen(true))
+      ) : (
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          Extended Options
+        </Button>
+      )}
 
       <Modal
         variant={ModalVariant.large}

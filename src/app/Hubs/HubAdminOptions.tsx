@@ -23,7 +23,12 @@ const canChangeAdminOptions = (user: string, options: VPN.VpnAdminOption[]): boo
     (option) => option.Name_str.toLowerCase() === 'allow_hub_admin_change_option' && option.Value_u32 !== 0,
   );
 
-const HubAdminOptions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
+interface HubAdminOptionsProps {
+  hub: string;
+  trigger?: (open: () => void) => React.ReactNode;
+}
+
+const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, trigger }) => {
   const { capsList, user } = useServer();
   const supported = capBool(capsList, 'b_support_hub_admin_option');
   const [open, setOpen] = React.useState(false);
@@ -83,9 +88,13 @@ const HubAdminOptions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
-        Administration Options
-      </Button>
+      {trigger ? (
+        trigger(() => setOpen(true))
+      ) : (
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          Administration Options
+        </Button>
+      )}
 
       <Modal
         variant={ModalVariant.large}
