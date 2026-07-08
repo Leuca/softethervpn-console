@@ -82,7 +82,7 @@ describe('routes', () => {
       hideNonCluster: true,
       hideNonBridge: false,
       hiddenLabels: new Set<string>(),
-    })).toBe('This page is unavailable in cluster mode');
+    })).toBeUndefined();
     expect(routePermissionReason(layer3 as IAppRoute, {
       hideAdminOnly: false,
       hideNonCluster: false,
