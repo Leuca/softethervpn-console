@@ -48,8 +48,6 @@ const HubAdminOptions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       setError(null);
       return;
     }
-    setOptions(null);
-    setDefaultOptions([]);
     setError(null);
     Promise.all([
       api.GetHubAdminOptions(new VPN.VpnRpcAdminOption({ HubName_str: hub })),

@@ -34,7 +34,6 @@ const VpnAzure: React.FunctionComponent = () => {
   const [busy, setBusy] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setEnabled(null);
     setError(null);
     api
       .GetAzureStatus()

@@ -51,7 +51,6 @@ const Listeners: React.FunctionComponent = () => {
   const [pendingDelete, setPendingDelete] = React.useState<number | null>(null);
 
   const load = React.useCallback(() => {
-    setListeners(null);
     setError(null);
     api
       .EnumListener()

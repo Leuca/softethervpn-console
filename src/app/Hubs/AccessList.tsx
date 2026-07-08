@@ -591,7 +591,6 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [editor, setEditor] = React.useState<EditorState | null>(null);
 
   const load = React.useCallback(() => {
-    setRules(null);
     setError(null);
     api
       .EnumAccess(new VPN.VpnRpcEnumAccessList({ HubName_str: hub }))

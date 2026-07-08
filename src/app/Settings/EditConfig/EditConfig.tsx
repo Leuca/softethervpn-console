@@ -65,7 +65,6 @@ const EditConfig: React.FunctionComponent = () => {
   );
 
   const load = React.useCallback(() => {
-    setText(null);
     setError(null);
     fetchConfig().catch((e) => setError(String(e)));
   }, [fetchConfig]);

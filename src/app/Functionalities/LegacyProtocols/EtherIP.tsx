@@ -46,7 +46,6 @@ const EtherIPDetailed: React.FunctionComponent = () => {
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
-    setSettings(null);
     setError(null);
     Promise.all([api.EnumEtherIpId(), api.EnumHub()])
       .then(([list, hubList]) => {

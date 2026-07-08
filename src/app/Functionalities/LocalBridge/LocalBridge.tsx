@@ -62,7 +62,6 @@ const LocalBridge: React.FunctionComponent = () => {
   const [pendingDelete, setPendingDelete] = React.useState<VPN.VpnRpcLocalBridge | null>(null);
 
   const load = React.useCallback(() => {
-    setBridges(null);
     setError(null);
     Promise.all([api.GetBridgeSupport(), api.EnumLocalBridge(), api.EnumHub(), api.EnumEthernet()])
       .then(([support, bridgeList, hubList, ethList]) => {

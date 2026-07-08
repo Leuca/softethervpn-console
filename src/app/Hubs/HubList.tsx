@@ -45,7 +45,6 @@ const HubList: React.FunctionComponent = () => {
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
-    setHubs(null);
     setError(null);
     api
       .EnumHub()

@@ -41,7 +41,6 @@ const ConnectionsList: React.FunctionComponent = () => {
   const [disconnecting, setDisconnecting] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setConnections(null);
     setError(null);
     api
       .EnumConnection()

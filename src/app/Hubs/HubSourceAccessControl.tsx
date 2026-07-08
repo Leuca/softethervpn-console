@@ -235,8 +235,6 @@ const HubSourceAccessControl: React.FunctionComponent<{ hub: string }> = ({ hub 
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setRules(null);
-    setAdminOptions([]);
     setDraft(null);
     setPendingDelete(null);
     setError(null);

@@ -68,7 +68,6 @@ const DdnsSection: React.FunctionComponent = () => {
   const [certDone, setCertDone] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setStatus(null);
     setError(null);
     api
       .GetDDnsClientStatus()
@@ -313,7 +312,6 @@ const ProxySection: React.FunctionComponent = () => {
   const [password, setPassword] = React.useState('');
 
   const load = React.useCallback(() => {
-    setLoaded(false);
     setError(null);
     setUnsupported(false);
     api

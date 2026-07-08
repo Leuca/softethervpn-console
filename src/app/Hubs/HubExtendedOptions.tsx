@@ -49,8 +49,6 @@ const HubExtendedOptions: React.FunctionComponent<{ hub: string }> = ({ hub }) =
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setOptions(null);
-    setAdminOptions([]);
     setError(null);
     Promise.all([
       api.GetHubExtOptions(new VPN.VpnRpcAdminOption({ HubName_str: hub })),

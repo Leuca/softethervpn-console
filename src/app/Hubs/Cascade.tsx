@@ -681,7 +681,6 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [editTouched, setEditTouched] = React.useState<Set<string>>(() => new Set());
 
   const load = React.useCallback(() => {
-    setLinks(null);
     setError(null);
     api
       .EnumLink(new VPN.VpnRpcEnumLink({ HubName_str: hub }))

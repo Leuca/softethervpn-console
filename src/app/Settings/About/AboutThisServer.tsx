@@ -47,8 +47,6 @@ const About: React.FunctionComponent = () => {
   const [error, setError] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
-    setInfo(null);
-    setCaps(null);
     setError(null);
     Promise.all([api.GetServerInfo(), api.GetCaps()])
       .then(([serverInfo, capsList]) => {

@@ -31,7 +31,7 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
         <BreadcrumbItem isActive>{name}</BreadcrumbItem>
       </Breadcrumb>
       <AppPage title={name} description="Virtual Hub management.">
-        <Tabs activeKey={activeTab} onSelect={(_event, key) => setActiveTab(String(key))} mountOnEnter unmountOnExit>
+        <Tabs key={name} activeKey={activeTab} onSelect={(_event, key) => setActiveTab(String(key))} mountOnEnter unmountOnExit>
           <Tab eventKey="status" title={<TabTitleText>Status</TabTitleText>}>
             <HubStatus hub={name} />
           </Tab>

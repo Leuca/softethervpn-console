@@ -43,7 +43,6 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
-    setGroups(null);
     setError(null);
     api
       .EnumGroup(new VPN.VpnRpcEnumGroup({ HubName_str: hub }))

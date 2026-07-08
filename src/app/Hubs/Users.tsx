@@ -417,7 +417,6 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [policyOpen, setPolicyOpen] = React.useState<'create' | 'edit' | null>(null);
 
   const load = React.useCallback(() => {
-    setUsers(null);
     setError(null);
     api
       .EnumUser(new VPN.VpnRpcEnumUser({ HubName_str: hub }))

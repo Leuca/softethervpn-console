@@ -37,8 +37,6 @@ const LegacyProtocols: React.FunctionComponent = () => {
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setIpsec(null);
-    setOvpn(null);
     setError(null);
     Promise.all([api.GetIPsecServices(), api.GetOpenVpnSstpConfig(), api.EnumHub()])
       .then(([ipsecResp, ovpnResp, hubList]) => {

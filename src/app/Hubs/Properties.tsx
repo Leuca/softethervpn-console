@@ -29,7 +29,6 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [newPassword, setNewPassword] = React.useState('');
 
   const load = React.useCallback(() => {
-    setConfig(null);
     setError(null);
     setNewPassword('');
     api

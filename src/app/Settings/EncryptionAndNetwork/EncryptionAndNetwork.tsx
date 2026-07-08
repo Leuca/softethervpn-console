@@ -123,7 +123,6 @@ const ServerCertCard: React.FunctionComponent = () => {
   const keyBytes = React.useRef<Uint8Array | null>(null);
 
   const load = React.useCallback(() => {
-    setLoaded(false);
     setError(null);
     api
       .GetServerCert()
@@ -258,7 +257,6 @@ const CipherCard: React.FunctionComponent = () => {
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setCipher(null);
     setError(null);
     api.GetServerCipher().then((r) => setCipher(r.String_str)).catch((e) => setError(String(e)));
   }, []);
@@ -303,7 +301,6 @@ const KeepAliveCard: React.FunctionComponent = () => {
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setKeep(null);
     setError(null);
     api.GetKeep(new VPN.VpnRpcKeep()).then((r) => setKeep(r as unknown as Record<string, unknown>)).catch((e) => setError(String(e)));
   }, []);
@@ -359,7 +356,6 @@ const SyslogCard: React.FunctionComponent = () => {
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setSyslog(null);
     setError(null);
     api
       .GetSysLog(new VPN.VpnSyslogSetting())
@@ -444,7 +440,6 @@ const SpecialListenerCard: React.FunctionComponent = () => {
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setListener(null);
     setError(null);
     api.GetSpecialListener().then((r) => setListener(r as unknown as Record<string, unknown>)).catch((e) => setError(String(e)));
   }, []);

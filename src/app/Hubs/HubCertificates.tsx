@@ -233,8 +233,6 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const importingRef = React.useRef(false);
 
   const load = React.useCallback(() => {
-    setCerts(null);
-    setCrls(null);
     setError(null);
     Promise.all([
       api.EnumCa(new VPN.VpnRpcHubEnumCA({ HubName_str: hub })),

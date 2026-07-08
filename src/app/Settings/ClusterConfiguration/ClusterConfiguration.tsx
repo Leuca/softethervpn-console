@@ -98,7 +98,6 @@ const ClusterConfig: React.FunctionComponent = () => {
   );
 
   const load = React.useCallback(() => {
-    setForm(null);
     setError(null);
     fetchSettings().catch((e) => setError(String(e)));
   }, [fetchSettings]);

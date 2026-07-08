@@ -154,7 +154,6 @@ const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean 
       setError(null);
       return;
     }
-    setConfig(null);
     setError(null);
     api
       .GetHubLog(new VPN.VpnRpcHubLog({ HubName_str: hub }))
@@ -311,7 +310,6 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
       setError(null);
       return;
     }
-    setFiles(null);
     setError(null);
     api
       .EnumLogFile()

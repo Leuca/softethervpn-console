@@ -49,7 +49,6 @@ const ControllerView: React.FunctionComponent = () => {
   const [certOpen, setCertOpen] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setMembers(null);
     setError(null);
     api
       .EnumFarmMember()

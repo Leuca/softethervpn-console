@@ -198,9 +198,11 @@ const Layer3Switch: React.FunctionComponent = () => {
   const [pendingIf, setPendingIf] = React.useState<VPN.VpnRpcL3If | null>(null);
   const [pendingRoute, setPendingRoute] = React.useState<VPN.VpnRpcL3Table | null>(null);
 
-  const loadDetail = React.useCallback((name: string) => {
-    setIfs(null);
-    setRoutes(null);
+  const loadDetail = React.useCallback((name: string, preserveCurrent = false) => {
+    if (!preserveCurrent) {
+      setIfs(null);
+      setRoutes(null);
+    }
     api
       .EnumL3If(new VPN.VpnRpcEnumL3If({ Name_str: name }))
       .then((response) => setIfs(response.L3IFList ?? []))
@@ -212,7 +214,6 @@ const Layer3Switch: React.FunctionComponent = () => {
   }, []);
 
   const load = React.useCallback(() => {
-    setSwitches(null);
     setError(null);
     Promise.all([api.EnumL3Switch(), api.EnumHub()])
       .then(([sw, hubList]) => {
@@ -242,7 +243,7 @@ const Layer3Switch: React.FunctionComponent = () => {
         load();
         after?.();
         if (selected !== null) {
-          loadDetail(selected);
+          loadDetail(selected, true);
         }
       })
       .catch((e) => {

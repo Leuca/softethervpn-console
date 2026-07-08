@@ -211,8 +211,6 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const pushRoutesSupported = capBool(capsList, 'b_suppport_push_route_config');
 
   const load = React.useCallback(() => {
-    setConfig(null);
-    setRuntime({ status: null, nat: [], dhcp: [] });
     setError(null);
 
     Promise.all([

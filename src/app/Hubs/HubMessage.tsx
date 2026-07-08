@@ -46,11 +46,7 @@ const HubMessage: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
-    setLoaded(false);
     setError(null);
-    setUseMessage(false);
-    setMessage('');
-    setAdminOptions([]);
     Promise.all([
       api.GetHubMsg(new VPN.VpnRpcMsg({ HubName_str: hub })),
       api

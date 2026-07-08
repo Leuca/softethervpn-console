@@ -33,7 +33,6 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [newSecret, setNewSecret] = React.useState('');
 
   const load = React.useCallback(() => {
-    setConfig(null);
     setError(null);
     setNewSecret('');
     api
