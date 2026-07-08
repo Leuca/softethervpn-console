@@ -73,12 +73,13 @@ const EditConfig: React.FunctionComponent = () => {
     load();
   }, [load]);
 
-  // Poll for the server coming back after a restart, then show the reloaded config.
+  // Poll for the server coming back after a restart, then reload the app so
+  // server capabilities, routes, and navigation are rebuilt.
   const waitForRestart = React.useCallback(() => {
     let attempts = 0;
     const attempt = () => {
       fetchConfig()
-        .then(() => setRestarting(false))
+        .then(() => window.location.reload())
         .catch(() => {
           attempts += 1;
           if (attempts >= MAX_RETRIES) {

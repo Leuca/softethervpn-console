@@ -106,12 +106,13 @@ const ClusterConfig: React.FunctionComponent = () => {
     load();
   }, [load]);
 
-  // Poll for the server coming back after the restart, then reload the form.
+  // Poll for the server coming back after the restart, then reload the app so
+  // server capabilities, routes, and navigation are rebuilt.
   const waitForRestart = React.useCallback(() => {
     let attempts = 0;
     const attempt = () => {
       fetchSettings()
-        .then(() => setRestarting(false))
+        .then(() => window.location.reload())
         .catch(() => {
           attempts += 1;
           if (attempts >= MAX_RETRIES) {
