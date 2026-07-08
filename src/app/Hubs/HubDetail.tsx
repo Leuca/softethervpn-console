@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Breadcrumb, BreadcrumbItem, Tab, TabTitleText, Tabs } from '@patternfly/react-core';
 import { AppPage } from '@app/components/AppPage';
 import { HubStatus } from '@app/Hubs/HubStatus';
@@ -18,8 +18,83 @@ import { HubTables } from '@app/Hubs/HubTables';
 /**
  * Management views for a single Virtual Hub, laid out as tabs.
  */
+const hubTabKeys = new Set([
+  'status',
+  'sessions',
+  'tables',
+  'cascade',
+  'properties',
+  'users',
+  'groups',
+  'accesslist',
+  'securenat',
+  'certificates',
+  'logs',
+  'radius',
+]);
+
 const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
-  const [activeTab, setActiveTab] = React.useState<string>('status');
+  const activeTabRef = React.useRef<HTMLButtonElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab = tabParam && hubTabKeys.has(tabParam) ? tabParam : 'status';
+  const selectedTabRef = (key: string) => (activeTab === key ? activeTabRef : undefined);
+
+  const selectTab = (_event: React.MouseEvent<HTMLElement>, key: string | number) => {
+    const nextTab = String(key);
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (nextTab === 'status') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', nextTab);
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  React.useLayoutEffect(() => {
+    let frame = 0;
+    let observer: ResizeObserver | null = null;
+    const timers: number[] = [];
+
+    const reveal = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const activeTabButton = activeTabRef.current;
+        const activeTabItem = activeTabButton?.closest<HTMLElement>('li');
+        const tabList = activeTabButton?.closest<HTMLElement>('.pf-v6-c-tabs__list');
+
+        if (!activeTabItem || !tabList) {
+          return;
+        }
+
+        const activeTabRect = activeTabItem.getBoundingClientRect();
+        const tabListRect = tabList.getBoundingClientRect();
+
+        if (activeTabRect.left < tabListRect.left) {
+          tabList.scrollLeft += activeTabRect.left - tabListRect.left;
+        } else if (activeTabRect.right > tabListRect.right) {
+          tabList.scrollLeft += activeTabRect.right - tabListRect.right;
+        }
+      });
+    };
+
+    reveal();
+    timers.push(window.setTimeout(reveal, 100), window.setTimeout(reveal, 250));
+
+    const tabList = activeTabRef.current?.closest<HTMLElement>('.pf-v6-c-tabs__list');
+    if (tabList && window.ResizeObserver) {
+      observer = new ResizeObserver(reveal);
+      observer.observe(tabList);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      timers.forEach((timer) => window.clearTimeout(timer));
+      observer?.disconnect();
+    };
+  }, [activeTab, name]);
 
   return (
     <>
@@ -41,41 +116,41 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
         <BreadcrumbItem isActive>{name}</BreadcrumbItem>
       </Breadcrumb>
       <AppPage title={name} description="Virtual Hub management.">
-        <Tabs key={name} activeKey={activeTab} onSelect={(_event, key) => setActiveTab(String(key))} mountOnEnter unmountOnExit>
-          <Tab eventKey="status" title={<TabTitleText>Status</TabTitleText>}>
+        <Tabs key={name} activeKey={activeTab} onSelect={selectTab} mountOnEnter unmountOnExit>
+          <Tab ref={selectedTabRef('status')} eventKey="status" title={<TabTitleText>Status</TabTitleText>}>
             <HubStatus hub={name} />
           </Tab>
-          <Tab eventKey="sessions" title={<TabTitleText>Sessions</TabTitleText>}>
+          <Tab ref={selectedTabRef('sessions')} eventKey="sessions" title={<TabTitleText>Sessions</TabTitleText>}>
             <Sessions hub={name} />
           </Tab>
-          <Tab eventKey="tables" title={<TabTitleText>Tables</TabTitleText>}>
+          <Tab ref={selectedTabRef('tables')} eventKey="tables" title={<TabTitleText>Tables</TabTitleText>}>
             <HubTables hub={name} />
           </Tab>
-          <Tab eventKey="cascade" title={<TabTitleText>Cascade</TabTitleText>}>
+          <Tab ref={selectedTabRef('cascade')} eventKey="cascade" title={<TabTitleText>Cascade</TabTitleText>}>
             <Cascade hub={name} />
           </Tab>
-          <Tab eventKey="properties" title={<TabTitleText>Properties</TabTitleText>}>
+          <Tab ref={selectedTabRef('properties')} eventKey="properties" title={<TabTitleText>Properties</TabTitleText>}>
             <Properties hub={name} />
           </Tab>
-          <Tab eventKey="users" title={<TabTitleText>Users</TabTitleText>}>
+          <Tab ref={selectedTabRef('users')} eventKey="users" title={<TabTitleText>Users</TabTitleText>}>
             <Users hub={name} />
           </Tab>
-          <Tab eventKey="groups" title={<TabTitleText>Groups</TabTitleText>}>
+          <Tab ref={selectedTabRef('groups')} eventKey="groups" title={<TabTitleText>Groups</TabTitleText>}>
             <Groups hub={name} />
           </Tab>
-          <Tab eventKey="accesslist" title={<TabTitleText>Access List</TabTitleText>}>
+          <Tab ref={selectedTabRef('accesslist')} eventKey="accesslist" title={<TabTitleText>Access List</TabTitleText>}>
             <AccessList hub={name} />
           </Tab>
-          <Tab eventKey="securenat" title={<TabTitleText>Secure NAT</TabTitleText>}>
+          <Tab ref={selectedTabRef('securenat')} eventKey="securenat" title={<TabTitleText>Secure NAT</TabTitleText>}>
             <SecureNAT hub={name} />
           </Tab>
-          <Tab eventKey="certificates" title={<TabTitleText>Trusted CA</TabTitleText>}>
+          <Tab ref={selectedTabRef('certificates')} eventKey="certificates" title={<TabTitleText>Trusted CA</TabTitleText>}>
             <HubCertificates hub={name} />
           </Tab>
-          <Tab eventKey="logs" title={<TabTitleText>Logs</TabTitleText>}>
+          <Tab ref={selectedTabRef('logs')} eventKey="logs" title={<TabTitleText>Logs</TabTitleText>}>
             <HubLogs hub={name} />
           </Tab>
-          <Tab eventKey="radius" title={<TabTitleText>RADIUS</TabTitleText>}>
+          <Tab ref={selectedTabRef('radius')} eventKey="radius" title={<TabTitleText>RADIUS</TabTitleText>}>
             <Radius hub={name} />
           </Tab>
         </Tabs>
