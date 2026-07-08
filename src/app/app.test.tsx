@@ -173,14 +173,15 @@ describe('App tests', () => {
     ).toBeVisible();
   });
 
-  it('shows cluster-mode route-denial reason on direct server URLs', async () => {
-    getFarmSetting.mockResolvedValueOnce({ ServerType_u32: 1 });
+  it('keeps clustering configuration reachable in cluster mode', async () => {
+    // Cluster members must still reach the page to change or leave clustering.
+    getFarmSetting.mockResolvedValue({ ServerType_u32: 1 });
 
     window.history.pushState({}, '', '/#/settings/clusterconfig');
 
     render(<App />);
 
-    expect(await screen.findByText('Permission required')).toBeVisible();
-    expect(await screen.findByText(/This page is unavailable in cluster mode/i)).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Clustering Configuration', level: 1 })).toBeVisible();
+    expect(screen.queryByText('Permission required')).not.toBeInTheDocument();
   });
 });

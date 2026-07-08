@@ -77,12 +77,14 @@ describe('routes', () => {
       hideNonBridge: false,
       hiddenLabels: new Set(['Local Bridge']),
     })).toBe("Local Bridge is not available with this server's capabilities");
+    // Clustering Configuration stays reachable in cluster mode so members
+    // can change or leave clustering (no isCluster: false on the route).
     expect(routePermissionReason(clusterConfig as IAppRoute, {
       hideAdminOnly: false,
       hideNonCluster: true,
       hideNonBridge: false,
       hiddenLabels: new Set<string>(),
-    })).toBeUndefined();
+    })).toBeNull();
     expect(routePermissionReason(layer3 as IAppRoute, {
       hideAdminOnly: false,
       hideNonCluster: false,
