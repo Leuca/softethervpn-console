@@ -20,7 +20,6 @@ import {
   Spinner,
   TextInput,
 } from '@patternfly/react-core';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
@@ -118,7 +117,7 @@ const ClusterConfig: React.FunctionComponent = () => {
           attempts += 1;
           if (attempts >= MAX_RETRIES) {
             setRestarting(false);
-            setError('The VPN server did not come back online in time. Use Refresh to reconnect.');
+            setError('The VPN server did not come back online in time. Reload the page to reconnect.');
           } else {
             timerRef.current = window.setTimeout(attempt, RETRY_INTERVAL_MS);
           }
@@ -193,20 +192,9 @@ const ClusterConfig: React.FunctionComponent = () => {
   const busy = isLoading || saving || restarting;
 
   const actions = (
-    <>
-      <Button
-        variant="secondary"
-        icon={<SyncAltIcon />}
-        onClick={load}
-        isDisabled={busy}
-        style={{ marginInlineEnd: 'var(--pf-t--global--spacer--sm)' }}
-      >
-        Refresh
-      </Button>
-      <Button variant="primary" onClick={() => setConfirmOpen(true)} isDisabled={busy || !formValid} isLoading={saving}>
-        Save Changes
-      </Button>
-    </>
+    <Button variant="primary" onClick={() => setConfirmOpen(true)} isDisabled={busy || !formValid} isLoading={saving}>
+      Save Changes
+    </Button>
   );
 
   const description =

@@ -28,7 +28,7 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { binToBytes } from '@app/utils/blob_utils';
@@ -709,11 +709,6 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
     >
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
-        <FlexItem>
-          <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading || busy}>
-            Refresh
-          </Button>
-        </FlexItem>
         <FlexItem>
           <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => openCreate(false)} isDisabled={isLoading || busy || !canAddRule}>
             New IPv4 rule

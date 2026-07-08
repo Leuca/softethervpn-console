@@ -84,7 +84,6 @@ describe('EditConfig', () => {
 
     expect(await screen.findByText('Configuration operation failed')).toBeInTheDocument();
     expect(screen.queryByLabelText('VPN server configuration')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
 

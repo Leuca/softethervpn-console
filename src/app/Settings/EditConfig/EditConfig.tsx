@@ -12,7 +12,7 @@ import {
   Spinner,
   TextArea,
 } from '@patternfly/react-core';
-import { DownloadIcon, SyncAltIcon } from '@patternfly/react-icons';
+import { DownloadIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
@@ -84,7 +84,7 @@ const EditConfig: React.FunctionComponent = () => {
           attempts += 1;
           if (attempts >= MAX_RETRIES) {
             setRestarting(false);
-            setError('The VPN server did not come back online in time. Use Refresh to reconnect.');
+            setError('The VPN server did not come back online in time. Reload the page to reconnect.');
           } else {
             timerRef.current = window.setTimeout(attempt, RETRY_INTERVAL_MS);
           }
@@ -130,15 +130,6 @@ const EditConfig: React.FunctionComponent = () => {
 
   const actions = (
     <>
-      <Button
-        variant="secondary"
-        icon={<SyncAltIcon />}
-        onClick={load}
-        isDisabled={busy}
-        style={{ marginInlineEnd: 'var(--pf-t--global--spacer--sm)' }}
-      >
-        Refresh
-      </Button>
       <Button
         variant="secondary"
         icon={<DownloadIcon />}

@@ -16,7 +16,7 @@ import {
   StackItem,
   Switch,
 } from '@patternfly/react-core';
-import { ExternalLinkAltIcon, SyncAltIcon } from '@patternfly/react-icons';
+import { ExternalLinkAltIcon } from '@patternfly/react-icons';
 import { useNavigate } from 'react-router-dom';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -71,17 +71,10 @@ const VpnAzure: React.FunctionComponent = () => {
 
   const isLoading = enabled === null && error === null;
 
-  const refresh = (
-    <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading || busy}>
-      Refresh
-    </Button>
-  );
-
   return (
     <AppPage
       title="VPN Azure"
       description="A free cloud relay by the SoftEther VPN Project that lets clients reach this server without a global IP address."
-      actions={refresh}
     >
       <Stack hasGutter>
         {error && (

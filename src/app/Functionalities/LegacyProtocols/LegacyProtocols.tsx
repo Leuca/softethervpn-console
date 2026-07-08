@@ -19,7 +19,6 @@ import {
   Switch,
   TextInput,
 } from '@patternfly/react-core';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import { useNavigate } from 'react-router-dom';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -91,20 +90,9 @@ const LegacyProtocols: React.FunctionComponent = () => {
   const isLoading = (ipsec === null || ovpn === null) && error === null;
 
   const actions = (
-    <>
-      <Button
-        variant="secondary"
-        icon={<SyncAltIcon />}
-        onClick={load}
-        isDisabled={isLoading || saving}
-        style={{ marginInlineEnd: 'var(--pf-t--global--spacer--sm)' }}
-      >
-        Refresh
-      </Button>
-      <Button variant="primary" onClick={save} isDisabled={isLoading || saving} isLoading={saving}>
-        Save
-      </Button>
-    </>
+    <Button variant="primary" onClick={save} isDisabled={isLoading || saving} isLoading={saving}>
+      Save
+    </Button>
   );
 
   return (

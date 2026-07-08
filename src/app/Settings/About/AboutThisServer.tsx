@@ -2,7 +2,6 @@ import * as React from 'react';
 import {
   Alert,
   Bullseye,
-  Button,
   Card,
   CardBody,
   CardTitle,
@@ -10,7 +9,6 @@ import {
   Stack,
   StackItem,
 } from '@patternfly/react-core';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -69,22 +67,12 @@ const About: React.FunctionComponent = () => {
   // Show the server mode as text instead of the raw ServerType_u32 enum.
   const infoRows = info && { ...info, ServerType_u32: mode_to_string(info.ServerType_u32 as number) };
 
-  const refresh = (
-    <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading}>
-      Refresh
-    </Button>
-  );
-
   return (
-    <AppPage
-      title="About This VPN Server"
-      description="Product identity and the feature set this server supports."
-      actions={refresh}
-    >
+    <AppPage title="About This VPN Server" description="Product identity and the feature set this server supports.">
       {error ? (
-        <Alert variant="danger" title="Could not load server information" isInline>
-          {error}
-        </Alert>
+          <Alert variant="danger" title="Could not load server information" isInline>
+            {error}
+          </Alert>
       ) : isLoading || infoRows === null || caps === null ? (
         <Bullseye>
           <Spinner size="xl" aria-label="Loading server information" />

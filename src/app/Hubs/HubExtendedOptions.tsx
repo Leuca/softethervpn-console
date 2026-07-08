@@ -11,7 +11,6 @@ import {
   ModalVariant,
   Spinner,
 } from '@patternfly/react-core';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { AdminOptionEditor } from '@app/Hubs/AdminOptionEditor';
 import { useServer } from '@app/ServerContext';
@@ -106,12 +105,6 @@ const HubExtendedOptions: React.FunctionComponent<{ hub: string }> = ({ hub }) =
         <ModalHeader title="Virtual Hub Extended Options" />
         <ModalBody>
           <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
-            <Flex justifyContent={{ default: 'justifyContentFlexEnd' }}>
-              <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading || saving}>
-                Refresh options
-              </Button>
-            </Flex>
-
             {error && (
               <Alert variant="danger" title="Could not load or save hub extended options" isInline>
                 {error}

@@ -213,11 +213,6 @@ const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean 
     <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
         <FlexItem>
-          <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading || saving}>
-            Refresh
-          </Button>
-        </FlexItem>
-        <FlexItem>
           <Button variant="primary" onClick={save} isDisabled={config === null || saving} isLoading={saving}>
             Save
           </Button>

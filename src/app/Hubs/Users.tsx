@@ -27,7 +27,7 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { BanIcon, PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
+import { BanIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
@@ -667,11 +667,6 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
     >
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
-        <FlexItem>
-          <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading}>
-            Refresh
-          </Button>
-        </FlexItem>
         <FlexItem>
           <Button variant="primary" icon={<PlusCircleIcon />} onClick={openCreate} isDisabled={isLoading}>
             New user

@@ -20,7 +20,7 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { PlusCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
+import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { useServer } from '@app/ServerContext';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -327,9 +327,6 @@ const HubSourceAccessControl: React.FunctionComponent<{ hub: string }> = ({ hub 
                 isDisabled={rules === null || saving || !canChange}
               >
                 Add rule
-              </Button>
-              <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading || saving}>
-                Refresh rules
               </Button>
             </Flex>
 

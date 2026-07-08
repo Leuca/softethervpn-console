@@ -21,7 +21,6 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -433,11 +432,6 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               )}
             </FormGroup>
           </Form>
-        </FlexItem>
-        <FlexItem>
-          <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading}>
-            Refresh
-          </Button>
         </FlexItem>
       </Flex>
 

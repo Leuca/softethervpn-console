@@ -26,7 +26,6 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { useServer } from '@app/ServerContext';
@@ -312,11 +311,6 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
     >
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
-        <FlexItem>
-          <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading || saving}>
-            Refresh
-          </Button>
-        </FlexItem>
         <FlexItem>
           {enabled ? (
             <Button

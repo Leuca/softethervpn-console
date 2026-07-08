@@ -32,7 +32,7 @@ import {
   TextInput,
   Tooltip,
 } from '@patternfly/react-core';
-import { OutlinedQuestionCircleIcon, SyncAltIcon } from '@patternfly/react-icons';
+import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { useServer } from '@app/ServerContext';
@@ -478,29 +478,20 @@ const ProxySection: React.FunctionComponent = () => {
 
 const DynDNS: React.FunctionComponent = () => {
   const { ddnsProxy } = useServer();
-  const [nonce, setNonce] = React.useState(0);
-
-  // Remount the status section to re-run its loaders.
-  const refresh = (
-    <Button variant="secondary" icon={<SyncAltIcon />} onClick={() => setNonce((n) => n + 1)}>
-      Refresh
-    </Button>
-  );
 
   return (
     <AppPage
       title="Dynamic DNS"
       description="A free, permanent DNS hostname for this server, updated automatically when its global IP address changes."
-      actions={refresh}
     >
       <Content component="p" style={{ marginBlockEnd: 'var(--pf-t--global--spacer--lg)' }}>
         The Dynamic DNS service assigns this server a unique hostname you can use in VPN Client and VPN Bridge settings,
         even behind a NAT or with a dynamic IP address.
       </Content>
-      <DdnsSection key={`status-${nonce}`} />
+      <DdnsSection />
       {ddnsProxy && (
         <div style={{ marginBlockStart: 'var(--pf-t--global--spacer--lg)' }}>
-          <ProxySection key={`proxy-${nonce}`} />
+          <ProxySection />
         </div>
       )}
     </AppPage>

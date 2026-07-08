@@ -13,7 +13,6 @@ import {
   Spinner,
   TextInput,
 } from '@patternfly/react-core';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 
@@ -100,11 +99,6 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
     >
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
-        <FlexItem>
-          <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading || saving}>
-            Refresh
-          </Button>
-        </FlexItem>
         <FlexItem>
           <Button
             variant="primary"
