@@ -82,13 +82,12 @@ export function sha0(data: Uint8Array): Uint8Array {
 
 // The cascade/user password hash SoftEther expects. Per HashPassword() in the
 // server source (Cedar/Account.c) the order is SHA0(password + UpperCase(user))
-// - password FIRST, then the uppercased ASCII username. (The vpnrpc TypeScript
+// - password FIRST, then the uppercased username. (The vpnrpc TypeScript
 // comment states the reverse order and is wrong; the C source is authoritative.)
+// The material is the raw UTF-8 bytes of both strings, and StrUpper
+// (Mayaqua/Str.c) only uppercases ASCII a-z, so non-ASCII characters pass
+// through unchanged; JS toUpperCase() would diverge from native clients.
 export function hashSoftEtherPassword(username: string, password: string): Uint8Array {
-  const material = password + username.toUpperCase();
-  const bytes = new Uint8Array(material.length);
-  for (let i = 0; i < material.length; i++) {
-    bytes[i] = material.charCodeAt(i) & 0xff;
-  }
-  return sha0(bytes);
+  const usernameUpper = username.replace(/[a-z]/g, (c) => c.toUpperCase());
+  return sha0(new TextEncoder().encode(password + usernameUpper));
 }

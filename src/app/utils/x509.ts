@@ -54,12 +54,19 @@ const name = (cert: X509Certificate, which: 'subjectName' | 'issuerName'): Certi
 // The API returns some certs as raw DER (cluster server cert) and some as the
 // UTF-8 bytes of a PEM block (user certs). Detect PEM so one entry point covers
 // both: X509Certificate parses a PEM string but treats a Uint8Array as DER.
+// The block is located anywhere in the bytes, not just at byte 0, because PEM
+// files commonly carry leading text (openssl -text output, comments).
 const PEM_HEADER = '-----BEGIN CERTIFICATE-----';
+const PEM_FOOTER = '-----END CERTIFICATE-----';
 
 const asCertificate = (bytes: Uint8Array): X509Certificate => {
-  const text = new TextDecoder().decode(bytes.subarray(0, PEM_HEADER.length));
-  if (text === PEM_HEADER) {
-    return new X509Certificate(new TextDecoder().decode(bytes));
+  const text = new TextDecoder().decode(bytes);
+  const start = text.indexOf(PEM_HEADER);
+  if (start !== -1) {
+    const end = text.indexOf(PEM_FOOTER, start);
+    if (end !== -1) {
+      return new X509Certificate(text.slice(start, end + PEM_FOOTER.length));
+    }
   }
   return new X509Certificate(bytes);
 };

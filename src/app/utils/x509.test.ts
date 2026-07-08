@@ -43,6 +43,16 @@ describe('parseCertificate', () => {
     expect(Array.from(certificateBytesToDer(pemBytes))).toEqual(Array.from(SELF_SIGNED_CERT_DER()));
   });
 
+  it('parses PEM with leading text before the certificate block', () => {
+    // openssl -text output and hand-edited files carry text above the block.
+    const decorated = `Subject: CN=test.example.com\n\n${SELF_SIGNED_CERT_PEM()}\ntrailing note\n`;
+    const cert = parseCertificate(new TextEncoder().encode(decorated));
+    expect(cert.subject.commonName).toBe('test.example.com');
+    expect(Array.from(certificateBytesToDer(new TextEncoder().encode(decorated)))).toEqual(
+      Array.from(SELF_SIGNED_CERT_DER()),
+    );
+  });
+
   it('throws on invalid certificate bytes', () => {
     expect(() => parseCertificate(new Uint8Array([1, 2, 3, 4]))).toThrow();
   });

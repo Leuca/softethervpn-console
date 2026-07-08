@@ -86,4 +86,14 @@ describe('ServerProvider', () => {
     expect(logSpy).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith('Server probe GetCaps failed', error);
   });
+
+  it('settles when a probe rejects with a non-object reason', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    enumConnection.mockRejectedValue(undefined);
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('ready'));
+    expect(warnSpy).toHaveBeenCalledWith('Server probe EnumConnection failed', undefined);
+  });
 });

@@ -4,7 +4,7 @@ import { api } from '@app/utils/vpnrpc_settings';
 const notEnoughPrivilegesCode = 52;
 
 const probeErrorCode = (error: unknown): number | null => {
-  const rpcCode = (error as { Error?: { code?: unknown } }).Error?.code;
+  const rpcCode = (error as { Error?: { code?: unknown } } | null | undefined)?.Error?.code;
   if (typeof rpcCode === 'number') {
     return rpcCode;
   }

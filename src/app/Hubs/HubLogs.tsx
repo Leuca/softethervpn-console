@@ -106,6 +106,12 @@ const readLogFile = async (
       onChunk(bytes);
       totalBytes += bytes.length;
       offset += bytes.length;
+      // Offset_u32 cannot address past 4 GiB; stop instead of wrapping and
+      // re-reading the file from the start.
+      if (offset > 0xffffffff) {
+        truncated = true;
+        done = true;
+      }
     }
   }
 

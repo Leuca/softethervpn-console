@@ -34,4 +34,19 @@ describe('sha0', () => {
     // Cedar/Account.c HashPassword: SHA0(password + UpperCase(username))
     expect(toHex(hashSoftEtherPassword('Alice', 'secret'))).toBe(toHex(sha0(ascii('secretALICE'))));
   });
+
+  it('hashes non-ASCII credentials as UTF-8 bytes', () => {
+    // Native HashPassword consumes the raw char* bytes, UTF-8 on the wire.
+    expect(toHex(hashSoftEtherPassword('user', 'p\u00e4ssw\u00f6rd'))).toBe(
+      toHex(sha0(new TextEncoder().encode('p\u00e4ssw\u00f6rdUSER'))),
+    );
+  });
+
+  it('uppercases only ASCII letters in the username, like native StrUpper', () => {
+    // Mayaqua/Str.c ToUpper only maps a-z; e-acute must pass through as-is,
+    // where JS toUpperCase() would map it to E-acute and diverge.
+    expect(toHex(hashSoftEtherPassword('caf\u00e9', 'secret'))).toBe(
+      toHex(sha0(new TextEncoder().encode('secretCAF\u00e9'))),
+    );
+  });
 });
