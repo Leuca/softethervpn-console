@@ -61,13 +61,12 @@ describe('VpnAzure', () => {
   });
 
   it('enables VPN Azure via the toggle and reloads status', async () => {
-    vi.useFakeTimers();
     getAzureStatus
       .mockResolvedValueOnce({ IsEnabled_bool: false, IsConnected_bool: false })
       .mockResolvedValueOnce({ IsEnabled_bool: true, IsConnected_bool: true });
     getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: 'vpn123456' });
     setAzureStatus.mockResolvedValue({ IsEnabled_bool: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
 
     renderPage();
     await screen.findByText('Not connected');
@@ -80,9 +79,7 @@ describe('VpnAzure', () => {
     expect(screen.getByText('Connecting')).toBeInTheDocument();
     expect(await screen.findByText('vpn123456.vpnazure.net')).toBeInTheDocument();
 
-    await vi.advanceTimersByTimeAsync(1000);
-
-    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    expect(await screen.findByText('Connected', {}, { timeout: 2000 })).toBeInTheDocument();
     expect(getAzureStatus).toHaveBeenCalledTimes(2);
   });
 
