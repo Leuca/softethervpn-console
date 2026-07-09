@@ -169,7 +169,7 @@ describe('HubLogs', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'View' }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText(/Preview truncated due to size/i)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/Preview: showing the first/i)).toBeInTheDocument();
     expect(readLogFile).toHaveBeenCalledTimes(1);
   });
 

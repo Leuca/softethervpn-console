@@ -16,6 +16,8 @@ import {
   ModalFooter,
   ModalHeader,
   ModalVariant,
+  Pagination,
+  PaginationVariant,
   Spinner,
   Switch,
   Tab,
@@ -57,7 +59,12 @@ const packetTypes = [
   'Ethernet packet log',
 ];
 
-const PREVIEW_MAX_BYTES = 1_000_000;
+const PREVIEW_MAX_BYTES = 128 * 1024;
+const logFilePageSizes = [
+  { title: '10', value: 10 },
+  { title: '25', value: 25 },
+  { title: '50', value: 50 },
+];
 
 const normalizeLogSettings = (response: VPN.VpnRpcHubLog): VPN.VpnRpcHubLog => {
   const config = new VPN.VpnRpcHubLog(response);
@@ -73,17 +80,33 @@ const safeLogFileName = (file: VPN.VpnRpcEnumLogFileItem): string =>
 
 type LogReadChunkHandler = (chunk: Uint8Array) => void;
 
+interface LogReadOptions {
+  maxBytes?: number;
+  startOffset?: number;
+  endOffset?: number;
+}
+
+const logFileSize = (file: VPN.VpnRpcEnumLogFileItem): number | null => {
+  const size = Number(file.FileSize_u32);
+  return Number.isFinite(size) && size > 0 ? size : null;
+};
+
 const readLogFile = async (
   file: VPN.VpnRpcEnumLogFileItem,
   onChunk: LogReadChunkHandler,
-  maxBytes?: number,
+  options: LogReadOptions = {},
 ): Promise<{ truncated: boolean; totalBytes: number }> => {
-  let offset = 0;
+  let offset = Math.max(0, Math.floor(options.startOffset ?? 0));
   let totalBytes = 0;
   let truncated = false;
   let done = false;
+  const { maxBytes, endOffset } = options;
 
   while (!done) {
+    if (endOffset !== undefined && offset >= endOffset) {
+      done = true;
+      break;
+    }
     const response = await api.ReadLogFile(
       new VPN.VpnRpcReadLogFile({
         ServerName_str: file.ServerName_str,
@@ -94,23 +117,38 @@ const readLogFile = async (
     const bytes = binToBytes(response.Buffer_bin);
     if (!bytes || bytes.length === 0) {
       done = true;
-    } else if (maxBytes !== undefined && totalBytes + bytes.length > maxBytes) {
+    } else {
+      const remainingToEnd = endOffset === undefined ? bytes.length : Math.max(0, endOffset - offset);
+      const chunk = bytes.slice(0, remainingToEnd);
+      if (chunk.length === 0) {
+        done = true;
+        break;
+      }
+      if (maxBytes !== undefined && totalBytes + chunk.length > maxBytes) {
       const remaining = maxBytes - totalBytes;
       if (remaining > 0) {
-        onChunk(bytes.slice(0, remaining));
+          onChunk(chunk.slice(0, remaining));
         totalBytes += remaining;
       }
       truncated = true;
       done = true;
     } else {
-      onChunk(bytes);
-      totalBytes += bytes.length;
-      offset += bytes.length;
+        onChunk(chunk);
+        totalBytes += chunk.length;
+        offset += chunk.length;
+        if (maxBytes !== undefined && totalBytes >= maxBytes && (endOffset === undefined || offset < endOffset)) {
+          truncated = true;
+          done = true;
+        }
+        if (endOffset !== undefined && offset >= endOffset) {
+          done = true;
+        }
       // Offset_u32 cannot address past 4 GiB; stop instead of wrapping and
       // re-reading the file from the start.
       if (offset > 0xffffffff) {
         truncated = true;
         done = true;
+      }
       }
     }
   }
@@ -120,19 +158,20 @@ const readLogFile = async (
 
 const readLogFileText = async (
   file: VPN.VpnRpcEnumLogFileItem,
-): Promise<{ text: string; truncated: boolean; totalBytes: number }> => {
+): Promise<{ text: string; truncated: boolean; totalBytes: number; startOffset: number; fileSize: number | null }> => {
   const decoder = new TextDecoder('utf-8');
   let chunks = '';
-  let truncated = false;
+  const fileSize = logFileSize(file);
+  const isTailPreview = fileSize !== null && fileSize > PREVIEW_MAX_BYTES;
+  const startOffset = isTailPreview ? fileSize - PREVIEW_MAX_BYTES : 0;
 
   const result = await readLogFile(file, (chunk) => {
     chunks += decoder.decode(chunk, { stream: true });
-  }, PREVIEW_MAX_BYTES);
+  }, { maxBytes: PREVIEW_MAX_BYTES, startOffset, endOffset: isTailPreview ? fileSize : undefined });
 
   chunks += decoder.decode();
-  truncated = result.truncated;
 
-  return { text: chunks, truncated, totalBytes: result.totalBytes };
+  return { text: chunks, truncated: result.truncated || startOffset > 0, totalBytes: result.totalBytes, startOffset, fileSize };
 };
 
 const readLogFileBlob = async (file: VPN.VpnRpcEnumLogFileItem): Promise<Blob> => {
@@ -300,7 +339,15 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
   const [error, setError] = React.useState<string | null>(null);
   const [activeFile, setActiveFile] = React.useState<VPN.VpnRpcEnumLogFileItem | null>(null);
   const [downloading, setDownloading] = React.useState<string | null>(null);
-  const [preview, setPreview] = React.useState<{ file: VPN.VpnRpcEnumLogFileItem; text: string } | null>(null);
+  const [page, setPage] = React.useState(1);
+  const [perPage, setPerPage] = React.useState(25);
+  const [preview, setPreview] = React.useState<{
+    file: VPN.VpnRpcEnumLogFileItem;
+    isLoading: boolean;
+    scrollToBottom: boolean;
+    text: string;
+  } | null>(null);
+  const previewTextRef = React.useRef<HTMLPreElement | null>(null);
   const previewRequestRef = React.useRef(0);
   const downloadRequestRef = React.useRef(0);
 
@@ -313,7 +360,10 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
     setError(null);
     api
       .EnumLogFile()
-      .then((response) => setFiles([...(response.LogFiles ?? [])].reverse()))
+      .then((response) => {
+        setFiles([...(response.LogFiles ?? [])].reverse());
+        setPage(1);
+      })
       .catch((e) => setError(String(e)));
   }, [supported]);
 
@@ -321,32 +371,73 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
     load();
   }, [load]);
 
+  const visibleFiles = React.useMemo(() => {
+    if (files === null) {
+      return null;
+    }
+    const start = (page - 1) * perPage;
+    return files.slice(start, start + perPage);
+  }, [files, page, perPage]);
+  const pageCount = files === null ? 1 : Math.max(1, Math.ceil(files.length / perPage));
+
+  React.useEffect(() => {
+    if (!preview?.isLoading && preview?.scrollToBottom && previewTextRef.current) {
+      window.requestAnimationFrame(() => {
+        if (previewTextRef.current) {
+          previewTextRef.current.scrollTop = previewTextRef.current.scrollHeight;
+        }
+      });
+    }
+  }, [preview]);
+
   const openPreview = (file: VPN.VpnRpcEnumLogFileItem) => {
     setActiveFile(file);
     setDownloading(file.FilePath_str);
-    setPreview(null);
     setError(null);
     const requestId = ++previewRequestRef.current;
-    readLogFileText(file)
-      .then((result) => {
-        if (requestId === previewRequestRef.current) {
-          setPreview({
-            file,
-            text: result.text + (result.truncated ? '\n\n[Preview truncated due to size.]' : ''),
-          });
-        }
-      })
-      .catch((e) => {
-        if (requestId === previewRequestRef.current) {
-          setError(String(e));
-        }
-      })
-      .finally(() => {
-        if (requestId === previewRequestRef.current) {
-          setDownloading(null);
-          setActiveFile(null);
-        }
-      });
+    window.setTimeout(() => {
+      if (requestId !== previewRequestRef.current) {
+        return;
+      }
+      setPreview({ file, isLoading: true, scrollToBottom: false, text: '' });
+      readLogFileText(file)
+        .then((result) => {
+          if (requestId === previewRequestRef.current) {
+          let notice = '';
+          if (result.fileSize !== null) {
+            if (result.startOffset > 0) {
+              notice = `\n\n[Preview: showing the last ${result.totalBytes} of ${result.fileSize} bytes.]`;
+            } else if (result.truncated) {
+              notice = `\n\n[Preview: showing the first ${result.totalBytes} bytes.]`;
+            } else {
+              notice = `\n\n[Preview: showing ${result.totalBytes} of ${result.fileSize} bytes.]`;
+            }
+          } else if (result.truncated) {
+            notice = `\n\n[Preview: showing the first ${result.totalBytes} bytes.]`;
+          } else {
+            notice = `\n\n[Preview: showing ${result.totalBytes} bytes.]`;
+          }
+            setPreview({
+              file,
+              isLoading: false,
+              scrollToBottom: true,
+              text: result.text + notice,
+            });
+          }
+        })
+        .catch((e) => {
+          if (requestId === previewRequestRef.current) {
+            setPreview(null);
+            setError(String(e));
+          }
+        })
+        .finally(() => {
+          if (requestId === previewRequestRef.current) {
+            setDownloading(null);
+            setActiveFile(null);
+          }
+        });
+    }, 0);
   };
 
   const downloadFile = (file: VPN.VpnRpcEnumLogFileItem) => {
@@ -399,60 +490,108 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
         <EmptyState titleText="No log files" headingLevel="h2">
           <EmptyStateBody>No readable log files were returned by the server.</EmptyStateBody>
         </EmptyState>
-      ) : files !== null ? (
-        <Table aria-label="Log files" variant="compact" gridBreakPoint="grid-md">
-          <Thead>
-            <Tr>
-              <Th modifier="truncate" width={50}>
-                File path
-              </Th>
-              <Th>Size</Th>
-              <Th>Updated</Th>
-              <Th>Server</Th>
-              <Th screenReaderText="Actions" />
-            </Tr>
-          </Thead>
-          <Tbody>
-            {files.map((file) => (
-              <Tr key={`${file.ServerName_str}:${file.FilePath_str}`}>
-                <Td dataLabel="File path" modifier="truncate" tooltip={file.FilePath_str}>
-                  {file.FilePath_str}
-                </Td>
-                <Td dataLabel="Size">{formatRpcValue('FileSize_u32', file.FileSize_u32)} bytes</Td>
-                <Td dataLabel="Updated">{formatRpcValue('UpdatedTime_dt', file.UpdatedTime_dt)}</Td>
-                <Td dataLabel="Server">{file.ServerName_str || '-'}</Td>
-                <Td isActionCell>
-                  <ActionsColumn
-                    isDisabled={downloading !== null}
-                    items={[
-                      {
-                        title: activeFile?.FilePath_str === file.FilePath_str ? 'Loading preview' : 'View',
-                        onClick: () => openPreview(file),
-                        isDisabled: downloading !== null,
-                      },
-                      {
-                        title: downloading === file.FilePath_str && activeFile === null ? 'Downloading' : 'Download',
-                        onClick: () => downloadFile(file),
-                        isDisabled: downloading !== null,
-                      },
-                    ]}
-                  />
-                </Td>
+      ) : files !== null && visibleFiles !== null ? (
+        <>
+          <Flex
+            alignItems={{ default: 'alignItemsCenter' }}
+            gap={{ default: 'gapSm' }}
+            justifyContent={{ default: 'justifyContentSpaceBetween' }}
+          >
+            <FlexItem>
+              <Pagination
+                itemCount={files.length}
+                page={page}
+                perPage={perPage}
+                perPageOptions={logFilePageSizes}
+                variant={PaginationVariant.top}
+                onSetPage={(_event, nextPage) => setPage(nextPage)}
+                onPerPageSelect={(_event, nextPerPage, nextPage) => {
+                  setPerPage(nextPerPage);
+                  setPage(nextPage);
+                }}
+                titles={{ items: 'log files', perPageSuffix: 'log files' }}
+              />
+            </FlexItem>
+            <FlexItem>
+              <FormSelect
+                id="log-files-page"
+                value={page}
+                onChange={(_event, value) => setPage(Number(value))}
+                aria-label="Log files page"
+              >
+                {Array.from({ length: pageCount }, (_value, index) => (
+                  <FormSelectOption key={index + 1} value={index + 1} label={`Page ${index + 1}`} />
+                ))}
+              </FormSelect>
+            </FlexItem>
+          </Flex>
+          <Table aria-label="Log files" variant="compact" gridBreakPoint="grid-md">
+            <Thead>
+              <Tr>
+                <Th modifier="truncate" width={50}>
+                  File path
+                </Th>
+                <Th>Size</Th>
+                <Th>Updated</Th>
+                <Th>Server</Th>
+                <Th screenReaderText="Actions" />
               </Tr>
-            ))}
-          </Tbody>
-        </Table>
+            </Thead>
+            <Tbody>
+              {visibleFiles.map((file) => (
+                <Tr key={`${file.ServerName_str}:${file.FilePath_str}`}>
+                  <Td dataLabel="File path" modifier="truncate" tooltip={file.FilePath_str}>
+                    {file.FilePath_str}
+                  </Td>
+                  <Td dataLabel="Size">{formatRpcValue('FileSize_u32', file.FileSize_u32)} bytes</Td>
+                  <Td dataLabel="Updated">{formatRpcValue('UpdatedTime_dt', file.UpdatedTime_dt)}</Td>
+                  <Td dataLabel="Server">{file.ServerName_str || '-'}</Td>
+                  <Td isActionCell>
+                    <ActionsColumn
+                      isDisabled={downloading !== null}
+                      items={[
+                        {
+                          title: 'View',
+                          onClick: () => openPreview(file),
+                          isDisabled: downloading !== null,
+                        },
+                        {
+                          title: downloading === file.FilePath_str && activeFile === null ? 'Downloading' : 'Download',
+                          onClick: () => downloadFile(file),
+                          isDisabled: downloading !== null,
+                        },
+                      ]}
+                    />
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </>
       ) : null}
 
       <Modal variant={ModalVariant.large} isOpen={preview !== null} onClose={() => setPreview(null)}>
         <ModalHeader title={preview ? `Log file: ${preview.file.FilePath_str}` : 'Log file'} />
         <ModalBody>
-          <pre style={{ margin: 0, maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-            {preview?.text ?? ''}
-          </pre>
+          {preview?.isLoading ? (
+            <Bullseye>
+              <Spinner size="xl" aria-label="Loading log preview" />
+            </Bullseye>
+          ) : (
+            <pre
+              ref={previewTextRef}
+              style={{ margin: 0, maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap' }}
+            >
+              {preview?.text ?? ''}
+            </pre>
+          )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={() => preview && downloadFile(preview.file)}>
+          <Button
+            variant="primary"
+            onClick={() => preview && downloadFile(preview.file)}
+            isDisabled={preview?.isLoading || downloading !== null}
+          >
             Download
           </Button>
           <Button variant="link" onClick={() => setPreview(null)}>
