@@ -57,8 +57,3 @@ npm run format
 # Launch a tool to inspect the bundle size
 npm run bundle-profile:analyze
 ```
-
-## Packaging
-
-RPM packaging (SoftEtherVPN server/client/bridge with the console optionally embedded in
-`hamcore`) lives in a dedicated repository so the VPN software can be packaged without the UI.
