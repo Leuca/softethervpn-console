@@ -118,6 +118,20 @@ body,
   border-start-end-radius: 0;
 }
 
+/* PatternFly FormGroup renders two non-breaking spaces after each label before
+   optional label help. Hide that orphan text node, then restore the real label
+   and help text sizes. */
+.pf-v6-c-form__group-label {
+  font-size: 0;
+}
+.pf-v6-c-form__label {
+  font-size: var(--pf-v6-c-form__label--FontSize);
+}
+.pf-v6-c-form__group-label-help {
+  margin-inline-start: var(--pf-t--global--spacer--xs);
+  font-size: var(--pf-v6-c-form__group-label-help--FontSize);
+}
+
 /* PatternFly's floating content panel (inset margins, border radius) only
    applies at the xl breakpoint (75rem); below it the panel is flush edge to
    edge. PatternFly insets the panel left and right there but leaves the top
