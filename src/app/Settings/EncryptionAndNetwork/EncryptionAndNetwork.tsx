@@ -173,12 +173,14 @@ const ServerCertCard: React.FunctionComponent = () => {
         ) : (
           <Stack hasGutter>
             <StackItem>
-              <Button variant="secondary" onClick={() => setViewOpen(true)} isDisabled={cert === null}>
-                View current certificate
-              </Button>{' '}
-              <Button variant="secondary" onClick={() => { setCn(''); setRegenOpen(true); }}>
-                Regenerate self-signed certificate
-              </Button>
+              <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 'var(--pf-t--global--spacer--sm)' }}>
+                <Button variant="secondary" onClick={() => setViewOpen(true)} isDisabled={cert === null}>
+                  View current certificate
+                </Button>
+                <Button variant="secondary" onClick={() => { setCn(''); setRegenOpen(true); }}>
+                  Regenerate self-signed certificate
+                </Button>
+              </span>
             </StackItem>
             <StackItem>
               <Content component="h3">Import a certificate and private key</Content>
