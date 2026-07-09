@@ -3,6 +3,10 @@ import {
   Alert,
   Bullseye,
   Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
   Checkbox,
   Content,
   EmptyState,
@@ -203,44 +207,25 @@ const fetchRuntime = (hub: string): Promise<RuntimeState> =>
   }));
 
 const runtimeTrigger = (open: () => void) => (
-  <Button
-    variant="plain"
-    aria-label="View runtime tables"
-    onClick={open}
-    style={{
-      alignItems: 'stretch',
-      background: 'var(--pf-t--global--background--color--primary--default)',
-      border: 'var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default)',
-      borderRadius: 'var(--pf-t--global--border--radius--medium)',
-      display: 'block',
-      marginBlockStart: 'var(--pf-t--global--spacer--md)',
-      padding: 'var(--pf-t--global--spacer--md)',
-      textAlign: 'start',
-      whiteSpace: 'normal',
-      width: '100%',
-    }}
-  >
-    <span style={{ display: 'grid', gap: 'var(--pf-t--global--spacer--xs)', minWidth: 0, whiteSpace: 'normal' }}>
-      <Button
-        component="span"
-        variant="link"
-        isInline
-        style={{ justifySelf: 'start', overflowWrap: 'anywhere', whiteSpace: 'normal' }}
-      >
-        View runtime tables
-      </Button>
-      <span
-        style={{
-          color: 'var(--pf-t--global--text--color--subtle)',
-          fontSize: 'var(--pf-t--global--font--size--sm)',
-          overflowWrap: 'anywhere',
-          whiteSpace: 'normal',
-        }}
-      >
-        Inspect operating status, NAT sessions, and DHCP leases while Secure NAT is running.
-      </span>
-    </span>
-  </Button>
+  <Card isClickable style={{ marginBlockStart: 'var(--pf-t--global--spacer--md)' }}>
+    <CardHeader
+      selectableActions={{
+        selectableActionAriaLabel: 'View runtime tables',
+        onClickAction: open,
+      }}
+    >
+      <CardTitle>View runtime tables</CardTitle>
+    </CardHeader>
+    <CardBody
+      style={{
+        color: 'var(--pf-t--global--text--color--subtle)',
+        fontSize: 'var(--pf-t--global--font--size--sm)',
+        overflowWrap: 'anywhere',
+      }}
+    >
+      Inspect operating status, NAT sessions, and DHCP leases while Secure NAT is running.
+    </CardBody>
+  </Card>
 );
 
 const SecureNatRuntimeModal: React.FunctionComponent<{ hub: string; isOpen: boolean; onClose: () => void }> = ({

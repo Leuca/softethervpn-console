@@ -3,6 +3,10 @@ import {
   Alert,
   Bullseye,
   Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
   Checkbox,
   Content,
   Flex,
@@ -23,44 +27,25 @@ import { HubMessage } from '@app/Hubs/HubMessage';
 import { HubSourceAccessControl } from '@app/Hubs/HubSourceAccessControl';
 
 const settingsTrigger = (title: string, description: string) => (open: () => void) => (
-  <Button
-    variant="plain"
-    aria-label={title}
-    onClick={open}
-    style={{
-      alignItems: 'stretch',
-      background: 'var(--pf-t--global--background--color--primary--default)',
-      border: 'var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default)',
-      borderRadius: 'var(--pf-t--global--border--radius--medium)',
-      display: 'block',
-      minHeight: '100%',
-      padding: 'var(--pf-t--global--spacer--md)',
-      textAlign: 'start',
-      whiteSpace: 'normal',
-      width: '100%',
-    }}
-  >
-    <span style={{ display: 'grid', gap: 'var(--pf-t--global--spacer--xs)', minWidth: 0, whiteSpace: 'normal' }}>
-      <Button
-        component="span"
-        variant="link"
-        isInline
-        style={{ justifySelf: 'start', overflowWrap: 'anywhere', whiteSpace: 'normal' }}
-      >
-        {title}
-      </Button>
-      <span
-        style={{
-          color: 'var(--pf-t--global--text--color--subtle)',
-          fontSize: 'var(--pf-t--global--font--size--sm)',
-          overflowWrap: 'anywhere',
-          whiteSpace: 'normal',
-        }}
-      >
-        {description}
-      </span>
-    </span>
-  </Button>
+  <Card isClickable isFullHeight>
+    <CardHeader
+      selectableActions={{
+        selectableActionAriaLabel: title,
+        onClickAction: open,
+      }}
+    >
+      <CardTitle>{title}</CardTitle>
+    </CardHeader>
+    <CardBody
+      style={{
+        color: 'var(--pf-t--global--text--color--subtle)',
+        fontSize: 'var(--pf-t--global--font--size--sm)',
+        overflowWrap: 'anywhere',
+      }}
+    >
+      {description}
+    </CardBody>
+  </Card>
 );
 
 const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
