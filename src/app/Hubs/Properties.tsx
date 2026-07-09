@@ -26,27 +26,31 @@ import { HubExtendedOptions } from '@app/Hubs/HubExtendedOptions';
 import { HubMessage } from '@app/Hubs/HubMessage';
 import { HubSourceAccessControl } from '@app/Hubs/HubSourceAccessControl';
 
-const settingsTrigger = (title: string, description: string) => (open: () => void) => (
-  <Card isClickable isFullHeight>
-    <CardHeader
-      selectableActions={{
-        selectableActionAriaLabel: title,
-        onClickAction: open,
-      }}
-    >
-      <CardTitle>{title}</CardTitle>
-    </CardHeader>
-    <CardBody
-      style={{
-        color: 'var(--pf-t--global--text--color--subtle)',
-        fontSize: 'var(--pf-t--global--font--size--sm)',
-        overflowWrap: 'anywhere',
-      }}
-    >
-      {description}
-    </CardBody>
-  </Card>
-);
+const settingsTrigger = (title: string, description: string) => {
+  const SettingsTrigger = (open: () => void) => (
+    <Card isClickable isFullHeight>
+      <CardHeader
+        selectableActions={{
+          selectableActionAriaLabel: title,
+          onClickAction: open,
+        }}
+      >
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardBody
+        style={{
+          color: 'var(--pf-t--global--text--color--subtle)',
+          fontSize: 'var(--pf-t--global--font--size--sm)',
+          overflowWrap: 'anywhere',
+        }}
+      >
+        {description}
+      </CardBody>
+    </Card>
+  );
+
+  return SettingsTrigger;
+};
 
 const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the full GetHub response, plus an optional new admin password.
