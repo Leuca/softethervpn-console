@@ -20,11 +20,15 @@ import { AppPage } from '@app/components/AppPage';
 import { StatCard } from '@app/components/StatCard';
 
 const Dashboard: React.FunctionComponent = () => {
-  const { user, ddnsHostname, azure, isBridgeMode, info, hideAdminOnly, hideNonBridge, hiddenLabels } = useServer();
+  const { loading, user, ddnsHostname, azure, isBridgeMode, info, hideAdminOnly, hideNonBridge, hiddenLabels } =
+    useServer();
   const navigate = useNavigate();
 
   const str = (key: string): string => String(info[key] ?? '-');
-  const commonTasks = [
+  const showVpnAzure = !loading && !hideAdminOnly && !hideNonBridge && !hiddenLabels.has('VPN Azure');
+  const commonTasks = loading
+    ? []
+    : [
     {
       title: 'Virtual Hubs',
       description: 'Manage hubs, users, sessions, access lists, Secure NAT, and logs.',
@@ -69,12 +73,14 @@ const Dashboard: React.FunctionComponent = () => {
               value={isBridgeMode ? 'Bridge' : 'Server'}
               tone="info"
             />
-            <StatCard
-              icon={<NetworkIcon />}
-              label="VPN Azure"
-              value={azure ? 'Enabled' : 'Disabled'}
-              tone={azure ? 'success' : 'default'}
-            />
+            {showVpnAzure && (
+              <StatCard
+                icon={<NetworkIcon />}
+                label="VPN Azure"
+                value={azure ? 'Enabled' : 'Disabled'}
+                tone={azure ? 'success' : 'default'}
+              />
+            )}
             <StatCard
               icon={<OutlinedClockIcon />}
               label="Version"
@@ -105,14 +111,16 @@ const Dashboard: React.FunctionComponent = () => {
                   <DescriptionListTerm>Dynamic DNS</DescriptionListTerm>
                   <DescriptionListDescription>{ddnsHostname || '-'}</DescriptionListDescription>
                 </DescriptionListGroup>
-                <DescriptionListGroup>
-                  <DescriptionListTerm>VPN Azure</DescriptionListTerm>
-                  <DescriptionListDescription>
-                    <Label color={azure ? 'green' : 'grey'} isCompact>
-                      {azure ? 'Enabled' : 'Disabled'}
-                    </Label>
-                  </DescriptionListDescription>
-                </DescriptionListGroup>
+                {showVpnAzure && (
+                  <DescriptionListGroup>
+                    <DescriptionListTerm>VPN Azure</DescriptionListTerm>
+                    <DescriptionListDescription>
+                      <Label color={azure ? 'green' : 'grey'} isCompact>
+                        {azure ? 'Enabled' : 'Disabled'}
+                      </Label>
+                    </DescriptionListDescription>
+                  </DescriptionListGroup>
+                )}
                 <DescriptionListGroup>
                   <DescriptionListTerm>Mode</DescriptionListTerm>
                   <DescriptionListDescription>{isBridgeMode ? 'Bridge' : 'Server'}</DescriptionListDescription>
