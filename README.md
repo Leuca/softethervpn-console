@@ -7,7 +7,7 @@ built with [PatternFly 6](https://www.patternfly.org/) and the SoftEther VPN Ser
 This is the successor of [softethervpn-web-console](https://github.com/Leuca/softethervpn-web-console)
 (PatternFly 4 / React 16), rebased onto the current
 [PatternFly seed](https://github.com/patternfly/patternfly-react-seed) (PatternFly 6 / React 18 /
-TypeScript 5 / react-router 7). The original pages are being ported incrementally.
+TypeScript 5 / react-router 7).
 
 ## Quick-start
 
