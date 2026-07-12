@@ -20,23 +20,61 @@ import {
 import { ManagedLoginPayload, ManagedSession, login as submitManagedLogin } from './sessionApi';
 
 type AuthenticatedManagedSession = Extract<ManagedSession, { authenticated: true }>;
+type ManagedLoginHints = Omit<ManagedLoginPayload, 'password'>;
 
 interface ManagedLoginFormProps {
   onLogin: (session: AuthenticatedManagedSession) => void;
 }
 
 const DEFAULT_PORT = 443;
+export const MANAGED_LOGIN_HINTS_KEY = 'softether-vpn-console.managed-login-hints';
 
 const parsePort = (port: string): number => Number(port);
 
 const validPort = (port: number): boolean => Number.isInteger(port) && port >= 1 && port <= 65535;
 
+const loadLoginHints = (): ManagedLoginHints | null => {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY) ?? 'null') as Partial<ManagedLoginHints> | null;
+    if (
+      !value ||
+      typeof value.host !== 'string' ||
+      !validPort(value.port ?? 0) ||
+      typeof value.hub !== 'string' ||
+      typeof value.allowSelfSigned !== 'boolean'
+    ) {
+      return null;
+    }
+    return value as ManagedLoginHints;
+  } catch {
+    return null;
+  }
+};
+
+const saveLoginHints = ({ host, port, hub, allowSelfSigned }: ManagedLoginPayload): void => {
+  try {
+    window.localStorage.setItem(MANAGED_LOGIN_HINTS_KEY, JSON.stringify({ host, port, hub, allowSelfSigned }));
+  } catch {
+    // Browser storage can be unavailable without preventing login.
+  }
+};
+
+const clearLoginHints = (): void => {
+  try {
+    window.localStorage.removeItem(MANAGED_LOGIN_HINTS_KEY);
+  } catch {
+    // Browser storage can be unavailable without preventing login.
+  }
+};
+
 const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLogin }) => {
-  const [host, setHost] = React.useState('');
-  const [port, setPort] = React.useState(String(DEFAULT_PORT));
-  const [hub, setHub] = React.useState('');
+  const [initialHints] = React.useState(loadLoginHints);
+  const [host, setHost] = React.useState(initialHints?.host ?? '');
+  const [port, setPort] = React.useState(String(initialHints?.port ?? DEFAULT_PORT));
+  const [hub, setHub] = React.useState(initialHints?.hub ?? '');
   const [password, setPassword] = React.useState('');
-  const [allowSelfSigned, setAllowSelfSigned] = React.useState(false);
+  const [allowSelfSigned, setAllowSelfSigned] = React.useState(initialHints?.allowSelfSigned ?? false);
+  const [rememberServer, setRememberServer] = React.useState(initialHints !== null);
   const [submitted, setSubmitted] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -70,6 +108,11 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
     submitManagedLogin(payload)
       .then((session) => {
         if (session.authenticated) {
+          if (rememberServer) {
+            saveLoginHints(payload);
+          } else {
+            clearLoginHints();
+          }
           onLogin(session);
         } else {
           setError('Login did not create an authenticated session.');
@@ -169,6 +212,20 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   label="Allow a self-signed SoftEther server certificate"
                   isChecked={allowSelfSigned}
                   onChange={(_event, checked) => setAllowSelfSigned(checked)}
+                  isDisabled={submitting}
+                />
+              </FormGroup>
+              <FormGroup fieldId="managed-login-remember-server" label="Browser preferences">
+                <Checkbox
+                  id="managed-login-remember-server"
+                  label="Remember server details on this browser"
+                  isChecked={rememberServer}
+                  onChange={(_event, checked) => {
+                    setRememberServer(checked);
+                    if (!checked) {
+                      clearLoginHints();
+                    }
+                  }}
                   isDisabled={submitting}
                 />
               </FormGroup>

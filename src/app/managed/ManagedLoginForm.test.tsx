@@ -2,7 +2,7 @@ import * as React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Mock, afterEach, describe, expect, it, vi } from 'vitest';
-import { ManagedLoginForm } from './ManagedLoginForm';
+import { MANAGED_LOGIN_HINTS_KEY, ManagedLoginForm } from './ManagedLoginForm';
 import { login } from './sessionApi';
 
 vi.mock('./sessionApi', () => ({
@@ -14,6 +14,7 @@ const loginMock = login as unknown as Mock;
 describe('ManagedLoginForm', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   it('submits the selected server and reports the authenticated session', async () => {
@@ -78,5 +79,39 @@ describe('ManagedLoginForm', () => {
 
     expect(await screen.findByText('Login failed')).toBeInTheDocument();
     expect(screen.getByText('Authentication failed')).toBeInTheDocument();
+  });
+
+  it('remembers and prefills only non-secret server details', async () => {
+    const session = { authenticated: true, host: 'vpn.example.com', port: 5555, hub: 'DEFAULT' };
+    loginMock.mockResolvedValue(session);
+    const user = userEvent.setup();
+    const rendered = render(<ManagedLoginForm onLogin={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('Server host'), 'vpn.example.com');
+    await user.clear(screen.getByLabelText('Port'));
+    await user.type(screen.getByLabelText('Port'), '5555');
+    await user.type(screen.getByLabelText('Virtual Hub'), 'DEFAULT');
+    await user.type(screen.getByLabelText('Password'), 'secret');
+    await user.click(screen.getByLabelText('Allow a self-signed SoftEther server certificate'));
+    await user.click(screen.getByLabelText('Remember server details on this browser'));
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() => expect(window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY)).not.toBeNull());
+    expect(JSON.parse(window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY) ?? '{}')).toEqual({
+      host: 'vpn.example.com',
+      port: 5555,
+      hub: 'DEFAULT',
+      allowSelfSigned: true,
+    });
+
+    rendered.unmount();
+    render(<ManagedLoginForm onLogin={vi.fn()} />);
+
+    expect(screen.getByLabelText('Server host')).toHaveValue('vpn.example.com');
+    expect(screen.getByLabelText('Port')).toHaveValue(5555);
+    expect(screen.getByLabelText('Virtual Hub')).toHaveValue('DEFAULT');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
+    expect(screen.getByLabelText('Allow a self-signed SoftEther server certificate')).toBeChecked();
+    expect(screen.getByLabelText('Remember server details on this browser')).toBeChecked();
   });
 });
