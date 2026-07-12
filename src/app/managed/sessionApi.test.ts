@@ -49,10 +49,6 @@ describe('managed session API', () => {
     expect(fetchMock).toHaveBeenCalledWith('/logout', {
       credentials: 'same-origin',
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: undefined,
     });
   });
 

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Button,
   Masthead,
   MastheadBrand,
   MastheadContent,
@@ -20,6 +21,7 @@ import {
 import { BarsIcon, UserIcon } from '@patternfly/react-icons';
 import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from '@app/routes';
 import { useServer } from '@app/ServerContext';
+import { useManagedSession } from '@app/managed/ManagedSessionGate';
 import logo from '@app/bgimages/icons8-softether-vpn.svg';
 
 interface IAppLayout {
@@ -32,6 +34,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels } = useServer();
+  const managedSession = useManagedSession();
 
   // Control the sidebar ourselves so its collapse behaviour is uniform across
   // viewports: any click anywhere in the viewport closes it, except clicks on
@@ -105,6 +108,18 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
           <UserIcon />
           <span className="se-user__role">{user}</span>
         </span>
+        {managedSession && (
+          <Button
+            className="se-managed-logout"
+            variant="secondary"
+            size="sm"
+            isLoading={managedSession.isLoggingOut}
+            isDisabled={managedSession.isLoggingOut}
+            onClick={managedSession.logout}
+          >
+            Log out
+          </Button>
+        )}
       </MastheadContent>
     </Masthead>
   );

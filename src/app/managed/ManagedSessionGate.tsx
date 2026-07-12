@@ -1,7 +1,16 @@
 import * as React from 'react';
-import { Alert, Bullseye, Content, Spinner, Stack, StackItem } from '@patternfly/react-core';
+import {
+  Alert,
+  AlertActionCloseButton,
+  AlertGroup,
+  Bullseye,
+  Content,
+  Spinner,
+  Stack,
+  StackItem,
+} from '@patternfly/react-core';
 import { ManagedLoginForm } from './ManagedLoginForm';
-import { ManagedSession, getSession } from './sessionApi';
+import { ManagedSession, getSession, logout } from './sessionApi';
 import './ManagedSessionGate.css';
 
 type AuthenticatedManagedSession = Extract<ManagedSession, { authenticated: true }>;
@@ -10,9 +19,20 @@ interface ManagedSessionGateProps {
   children: React.ReactNode;
 }
 
+interface ManagedSessionControls {
+  isLoggingOut: boolean;
+  logout: () => void;
+}
+
+const ManagedSessionContext = React.createContext<ManagedSessionControls | null>(null);
+
+export const useManagedSession = (): ManagedSessionControls | null => React.useContext(ManagedSessionContext);
+
 const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ children }) => {
   const [session, setSession] = React.useState<ManagedSession | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+  const [logoutError, setLogoutError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let active = true;
@@ -39,6 +59,15 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
   const handleLogin = (nextSession: AuthenticatedManagedSession) => {
     setSession(nextSession);
     setError(null);
+  };
+
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    setLogoutError(null);
+    logout()
+      .then(() => setSession({ authenticated: false }))
+      .catch((e) => setLogoutError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setIsLoggingOut(false));
   };
 
   if (session === null) {
@@ -76,7 +105,24 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
     );
   }
 
-  return <>{children}</>;
+  return (
+    <ManagedSessionContext.Provider value={{ isLoggingOut, logout: handleLogout }}>
+      {logoutError && (
+        <AlertGroup isToast isLiveRegion>
+          <Alert
+            variant="danger"
+            title="Could not log out"
+            actionClose={
+              <AlertActionCloseButton aria-label="Dismiss logout error" onClose={() => setLogoutError(null)} />
+            }
+          >
+            {logoutError}
+          </Alert>
+        </AlertGroup>
+      )}
+      {children}
+    </ManagedSessionContext.Provider>
+  );
 };
 
 export { ManagedSessionGate };

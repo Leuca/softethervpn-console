@@ -50,13 +50,18 @@ const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 const postJson = <T>(path: string, body?: unknown): Promise<T> =>
-  requestJson<T>(path, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  requestJson<T>(
+    path,
+    body === undefined
+      ? { method: 'POST' }
+      : {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        },
+  );
 
 export const getSession = (): Promise<ManagedSession> => requestJson<ManagedSession>('/session');
 

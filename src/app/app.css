@@ -68,6 +68,10 @@ body,
   font-weight: var(--pf-t--global--font--weight--body--bold);
 }
 
+.se-managed-logout {
+  margin-inline-start: var(--pf-t--global--spacer--sm);
+}
+
 /* PatternFly paints the desktop sidebar with a "glass"/floating surface token
    that the dark palette does not redefine, so it falls back to light. Pin the
    sidebar background (all breakpoints) to the dark secondary surface - resolved
