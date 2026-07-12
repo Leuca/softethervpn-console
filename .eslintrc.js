@@ -40,6 +40,19 @@ module.exports = {
         "@typescript-eslint/no-unused-vars": "error"
       },
     },
+    {
+      "files": ["gateway/src/**/*.ts"],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": {
+        "project": "./gateway/tsconfig.json",
+        "tsconfigRootDir": __dirname
+      },
+      "plugins": ["@typescript-eslint"],
+      "extends": ["plugin:@typescript-eslint/recommended"],
+      "rules": {
+        "@typescript-eslint/no-unused-vars": "error"
+      }
+    },
   ],
   "settings": {
     "react": {

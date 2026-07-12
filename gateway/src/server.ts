@@ -2,8 +2,8 @@ import cookie from '@fastify/cookie';
 import Fastify, { FastifyInstance } from 'fastify';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerFrontend } from './frontend.js';
-import { createLoginProbe, LoginProbe } from './loginProbe.js';
-import { forwardRpcRequest, registerRpcProxy, RpcForwarder } from './rpcProxy.js';
+import { LoginProbe, createLoginProbe } from './loginProbe.js';
+import { RpcForwarder, forwardRpcRequest, registerRpcProxy } from './rpcProxy.js';
 import { registerSessionRoutes } from './sessionRoutes.js';
 import { SessionStore } from './sessions.js';
 

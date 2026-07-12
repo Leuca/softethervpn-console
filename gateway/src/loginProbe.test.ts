@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createLoginProbe, LoginProbeError } from './loginProbe.js';
+import { LoginProbeError, createLoginProbe } from './loginProbe.js';
 
 const credentials = {
   host: 'vpn.example.com',

@@ -19,7 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "eslint": "eslint --ext .tsx,.js ./src/",
+    "eslint": "eslint --ext .tsx,.js ./src/ \"gateway/src/**/*.ts\"",
     "lint:ascii": "node scripts/check-ascii.mjs",
     "lint": "npm run eslint && npm run lint:ascii",
     "format": "prettier --check --write ./src/**/*.{tsx,ts}",

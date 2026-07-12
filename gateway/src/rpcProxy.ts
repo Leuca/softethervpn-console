@@ -1,4 +1,4 @@
-import { request as httpsRequest, RequestOptions } from 'node:https';
+import { RequestOptions, request as httpsRequest } from 'node:https';
 import { FastifyPluginAsync } from 'fastify';
 import { SESSION_COOKIE } from './sessionCookie.js';
 import { SessionCredentials, SessionStore } from './sessions.js';

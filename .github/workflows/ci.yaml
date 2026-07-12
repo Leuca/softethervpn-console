@@ -54,3 +54,24 @@ jobs:
         run: npm install
       - name: Build frontend
         run: npm run build:${{ matrix.mode }}
+  gateway:
+    name: Gateway
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: lts/*
+      - name: Install dependencies
+        run: npm install
+      - name: Run type-check
+        run: npm run type-check
+      - name: Run tests
+        run: npm test
+      - name: Build gateway
+        run: npm run build

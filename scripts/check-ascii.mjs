@@ -4,7 +4,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
-const ROOTS = ['src', 'scripts'];
+const ROOTS = ['src', 'scripts', 'gateway/src'];
 const ROOT_FILES = ['webpack.common.js', 'webpack.dev.js', 'webpack.prod.js', 'vitest.config.ts'];
 const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.css', '.html']);
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'coverage', '.git']);
