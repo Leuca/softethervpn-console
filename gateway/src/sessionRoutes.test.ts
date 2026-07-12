@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildGatewayServer } from './server.js';
 
 const loginPayload = {
@@ -11,7 +11,7 @@ const loginPayload = {
 
 describe('gateway session routes', () => {
   it('creates a private session and returns only public server details', async () => {
-    const server = buildGatewayServer();
+    const server = buildGatewayServer({ loginProbe: vi.fn().mockResolvedValue(undefined) });
 
     try {
       const login = await server.inject({
@@ -46,7 +46,7 @@ describe('gateway session routes', () => {
   });
 
   it('deletes the session during logout', async () => {
-    const server = buildGatewayServer();
+    const server = buildGatewayServer({ loginProbe: vi.fn().mockResolvedValue(undefined) });
 
     try {
       const login = await server.inject({

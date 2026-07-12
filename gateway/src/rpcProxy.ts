@@ -1,24 +1,24 @@
 import { request as httpsRequest, RequestOptions } from 'node:https';
 import { FastifyPluginAsync } from 'fastify';
-import { SESSION_COOKIE } from './sessionRoutes.js';
-import { GatewaySession, SessionStore } from './sessions.js';
+import { SESSION_COOKIE } from './sessionCookie.js';
+import { SessionCredentials, SessionStore } from './sessions.js';
 
 const RPC_TIMEOUT_MS = 5 * 60 * 1000;
 
-interface RpcResponse {
+export interface RpcResponse {
   statusCode: number;
   contentType?: string;
   body: string;
 }
 
-export type RpcForwarder = (session: GatewaySession, body: string) => Promise<RpcResponse>;
+export type RpcForwarder = (session: SessionCredentials, body: string) => Promise<RpcResponse>;
 
 interface RpcProxyOptions {
   sessions: SessionStore;
   forward?: RpcForwarder;
 }
 
-export const buildRpcRequestOptions = (session: GatewaySession, body: string): RequestOptions => ({
+export const buildRpcRequestOptions = (session: SessionCredentials, body: string): RequestOptions => ({
   hostname: session.host,
   port: session.port,
   path: '/api/',

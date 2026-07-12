@@ -19,7 +19,10 @@ const storedSession: GatewaySession = {
 describe('gateway RPC proxy', () => {
   it('requires an authenticated session', async () => {
     const forward = vi.fn();
-    const server = buildGatewayServer({ rpcForwarder: forward });
+    const server = buildGatewayServer({
+      loginProbe: vi.fn().mockResolvedValue(undefined),
+      rpcForwarder: forward,
+    });
 
     try {
       const response = await server.inject({
@@ -41,7 +44,10 @@ describe('gateway RPC proxy', () => {
       contentType: 'application/json',
       body: '{"jsonrpc":"2.0","result":{"value":1},"id":1}',
     });
-    const server = buildGatewayServer({ rpcForwarder: forward });
+    const server = buildGatewayServer({
+      loginProbe: vi.fn().mockResolvedValue(undefined),
+      rpcForwarder: forward,
+    });
 
     try {
       const login = await server.inject({ method: 'POST', url: '/login', payload: loginPayload });

@@ -1,7 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
+import { LoginProbe, LoginProbeError } from './loginProbe.js';
+import { SESSION_COOKIE } from './sessionCookie.js';
 import { SessionCredentials, SessionStore } from './sessions.js';
 
-export const SESSION_COOKIE = 'softether_console_session';
 const COOKIE_OPTIONS = {
   httpOnly: true,
   path: '/',
@@ -9,6 +10,7 @@ const COOKIE_OPTIONS = {
 };
 
 interface SessionRoutesOptions {
+  probe: LoginProbe;
   sessions: SessionStore;
 }
 
@@ -35,6 +37,15 @@ export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = a
 
     if (!credentials.host) {
       return reply.code(400).send({ error: 'Server host is required.' });
+    }
+
+    try {
+      await options.probe(credentials);
+    } catch (error) {
+      if (error instanceof LoginProbeError) {
+        return reply.code(error.statusCode).send({ error: error.message });
+      }
+      return reply.code(502).send({ error: 'The selected server could not be reached.' });
     }
 
     const id = options.sessions.create(credentials);
