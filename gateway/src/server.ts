@@ -1,8 +1,11 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { pathToFileURL } from 'node:url';
+import { registerSessionRoutes } from './sessionRoutes.js';
+import { SessionStore } from './sessions.js';
 
 interface GatewayServerOptions {
   logger?: boolean;
+  sessions?: SessionStore;
 }
 
 const parsePort = (value: string | undefined): number => {
@@ -17,6 +20,9 @@ export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyI
   const server = Fastify({ logger: options.logger ?? false });
 
   server.get('/healthz', async () => ({ status: 'ok' }));
+  server.register(registerSessionRoutes, {
+    sessions: options.sessions ?? new SessionStore(),
+  });
 
   return server;
 };
