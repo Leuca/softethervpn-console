@@ -1,13 +1,25 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 const Dotenv = require('dotenv-webpack');
 const BG_IMAGES_DIRNAME = 'bgimages';
 const ASSET_PATH = process.env.ASSET_PATH || '/';
+
+const getConsoleMode = () => {
+  const mode = process.env.CONSOLE_MODE || 'integrated';
+  if (mode !== 'integrated' && mode !== 'managed') {
+    throw new Error(`Unsupported CONSOLE_MODE "${mode}". Use "integrated" or "managed".`);
+  }
+  return mode;
+};
+
 module.exports = (env) => {
+  const consoleMode = getConsoleMode();
+
   return {
     module: {
       rules: [
@@ -111,6 +123,9 @@ module.exports = (env) => {
       publicPath: ASSET_PATH,
     },
     plugins: [
+      new webpack.DefinePlugin({
+        __CONSOLE_MODE__: JSON.stringify(consoleMode),
+      }),
       new HtmlWebpackPlugin({
         template: path.resolve(__dirname, 'src', 'index.html'),
       }),
