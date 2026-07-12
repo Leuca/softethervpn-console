@@ -1,11 +1,13 @@
 import cookie from '@fastify/cookie';
 import Fastify, { FastifyInstance } from 'fastify';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { registerFrontend } from './frontend.js';
 import { registerRpcProxy, RpcForwarder } from './rpcProxy.js';
 import { registerSessionRoutes } from './sessionRoutes.js';
 import { SessionStore } from './sessions.js';
 
 interface GatewayServerOptions {
+  frontendRoot?: string;
   logger?: boolean;
   rpcForwarder?: RpcForwarder;
   sessions?: SessionStore;
@@ -30,12 +32,16 @@ export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyI
     sessions,
     forward: options.rpcForwarder,
   });
+  if (options.frontendRoot) {
+    registerFrontend(server, options.frontendRoot);
+  }
 
   return server;
 };
 
 export const startGatewayServer = async (): Promise<void> => {
-  const server = buildGatewayServer({ logger: true });
+  const frontendRoot = process.env.FRONTEND_ROOT || fileURLToPath(new URL('../../dist', import.meta.url));
+  const server = buildGatewayServer({ frontendRoot, logger: true });
   const host = process.env.HOST || '127.0.0.1';
   const port = parsePort(process.env.PORT);
 
