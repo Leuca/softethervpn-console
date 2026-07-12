@@ -93,6 +93,13 @@
   box-shadow: var(--pf-t--global--box-shadow--md);
 }
 
+.se-managed-login__target-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem;
+  gap: var(--pf-t--global--spacer--md);
+  align-items: start;
+}
+
 @media (min-width: 901px) and (max-height: 760px) {
   .se-managed-login {
     align-items: start;
@@ -142,5 +149,9 @@
 
   .se-managed-login__intro h1 {
     font-size: 1.75rem;
+  }
+
+  .se-managed-login__target-fields {
+    grid-template-columns: 1fr;
   }
 }

@@ -7,7 +7,6 @@ import {
   CardBody,
   CardTitle,
   Checkbox,
-  Content,
   Form,
   FormGroup,
   FormHelperText,
@@ -127,12 +126,6 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
       <CardTitle>Server connection</CardTitle>
       <CardBody>
         <Stack hasGutter>
-          <StackItem>
-            <Content component="p">
-              Choose the SoftEther VPN Server this managed console should control. The password is sent only to the
-              managed server login endpoint.
-            </Content>
-          </StackItem>
           {error && (
             <StackItem>
               <Alert variant="danger" title="Login failed" isInline>
@@ -142,44 +135,49 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
           )}
           <StackItem>
             <Form onSubmit={handleSubmit}>
-              <FormGroup label="Server host" fieldId="managed-login-host" isRequired>
-                <TextInput
-                  id="managed-login-host"
-                  value={host}
-                  onChange={(_event, value) => setHost(value)}
-                  validated={submitted && !hostValid ? 'error' : 'default'}
-                  aria-label="Server host"
-                  isDisabled={submitting}
-                />
-                {submitted && !hostValid && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem variant="error">Enter the SoftEther server host name or IP address.</HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </FormGroup>
-              <FormGroup label="Port" fieldId="managed-login-port" isRequired>
-                <TextInput
-                  type="number"
-                  id="managed-login-port"
-                  min={1}
-                  max={65535}
-                  value={port}
-                  onChange={(_event, value) => setPort(value)}
-                  validated={submitted && !portIsValid ? 'error' : 'default'}
-                  aria-label="Port"
-                  isDisabled={submitting}
-                />
-                {submitted && !portIsValid && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem variant="error">Enter a TCP port between 1 and 65535.</HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </FormGroup>
-              <FormGroup label="Virtual Hub" fieldId="managed-login-hub">
+              <div className="se-managed-login__target-fields">
+                <FormGroup label="Server host" fieldId="managed-login-host" isRequired>
+                  <TextInput
+                    id="managed-login-host"
+                    value={host}
+                    placeholder="vpn.example.com"
+                    onChange={(_event, value) => setHost(value)}
+                    validated={submitted && !hostValid ? 'error' : 'default'}
+                    aria-label="Server host"
+                    isDisabled={submitting}
+                  />
+                  {submitted && !hostValid && (
+                    <FormHelperText>
+                      <HelperText>
+                        <HelperTextItem variant="error">
+                          Enter the SoftEther server host name or IP address.
+                        </HelperTextItem>
+                      </HelperText>
+                    </FormHelperText>
+                  )}
+                </FormGroup>
+                <FormGroup label="Port" fieldId="managed-login-port" isRequired>
+                  <TextInput
+                    type="number"
+                    id="managed-login-port"
+                    min={1}
+                    max={65535}
+                    value={port}
+                    onChange={(_event, value) => setPort(value)}
+                    validated={submitted && !portIsValid ? 'error' : 'default'}
+                    aria-label="Port"
+                    isDisabled={submitting}
+                  />
+                  {submitted && !portIsValid && (
+                    <FormHelperText>
+                      <HelperText>
+                        <HelperTextItem variant="error">Enter a TCP port between 1 and 65535.</HelperTextItem>
+                      </HelperText>
+                    </FormHelperText>
+                  )}
+                </FormGroup>
+              </div>
+              <FormGroup label="Virtual Hub" labelInfo="Optional" fieldId="managed-login-hub">
                 <TextInput
                   id="managed-login-hub"
                   value={hub}
