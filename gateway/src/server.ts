@@ -1,10 +1,13 @@
+import cookie from '@fastify/cookie';
 import Fastify, { FastifyInstance } from 'fastify';
 import { pathToFileURL } from 'node:url';
+import { registerRpcProxy, RpcForwarder } from './rpcProxy.js';
 import { registerSessionRoutes } from './sessionRoutes.js';
 import { SessionStore } from './sessions.js';
 
 interface GatewayServerOptions {
   logger?: boolean;
+  rpcForwarder?: RpcForwarder;
   sessions?: SessionStore;
 }
 
@@ -18,10 +21,14 @@ const parsePort = (value: string | undefined): number => {
 
 export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyInstance => {
   const server = Fastify({ logger: options.logger ?? false });
+  const sessions = options.sessions ?? new SessionStore();
 
   server.get('/healthz', async () => ({ status: 'ok' }));
-  server.register(registerSessionRoutes, {
-    sessions: options.sessions ?? new SessionStore(),
+  server.register(cookie);
+  server.register(registerSessionRoutes, { sessions });
+  server.register(registerRpcProxy, {
+    sessions,
+    forward: options.rpcForwarder,
   });
 
   return server;

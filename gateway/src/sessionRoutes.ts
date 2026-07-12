@@ -1,8 +1,7 @@
-import cookie from '@fastify/cookie';
 import { FastifyPluginAsync } from 'fastify';
 import { SessionCredentials, SessionStore } from './sessions.js';
 
-const SESSION_COOKIE = 'softether_console_session';
+export const SESSION_COOKIE = 'softether_console_session';
 const COOKIE_OPTIONS = {
   httpOnly: true,
   path: '/',
@@ -27,8 +26,6 @@ const loginBodySchema = {
 } as const;
 
 export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = async (server, options) => {
-  await server.register(cookie);
-
   server.post<{ Body: SessionCredentials }>('/login', { schema: { body: loginBodySchema } }, async (request, reply) => {
     const credentials = {
       ...request.body,
