@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check release version
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "$package_version" != "$tag_version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version $package_version" >&2
+            exit 1
+          fi
+
+      - name: Run checks
+        run: npm run ci-checks
+
+      - name: Build release bundle
+        run: npm run build
+
+      - name: Package release bundle
+        run: |
+          artifact="softethervpn-console-${GITHUB_REF_NAME}.tar.gz"
+          tar -czf "$artifact" -C dist .
+          sha256sum "$artifact" > "$artifact.sha256"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifact="softethervpn-console-${GITHUB_REF_NAME}.tar.gz"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "SoftEther VPN Console $GITHUB_REF_NAME" \
+            --generate-notes \
+            "$artifact" \
+            "$artifact.sha256"
