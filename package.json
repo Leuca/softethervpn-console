@@ -12,6 +12,8 @@
   "scripts": {
     "prebuild": "npm run type-check && npm run clean",
     "build": "webpack --config webpack.prod.js",
+    "build:integrated": "CONSOLE_MODE=integrated npm run build",
+    "build:managed": "CONSOLE_MODE=managed npm run build",
     "start": "sirv dist --single --host --port 8080",
     "start:dev": "webpack serve --color --progress --config webpack.dev.js",
     "test": "vitest run",
