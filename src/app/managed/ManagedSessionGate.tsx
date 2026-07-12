@@ -11,6 +11,7 @@ import {
 } from '@patternfly/react-core';
 import { ManagedLoginForm } from './ManagedLoginForm';
 import { ManagedSession, getSession, logout } from './sessionApi';
+import logo from '@app/bgimages/icons8-softether-vpn.svg';
 import './ManagedSessionGate.css';
 
 type AuthenticatedManagedSession = Extract<ManagedSession, { authenticated: true }>;
@@ -83,10 +84,19 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
       <div className="se-managed-login">
         <div className="se-managed-login__panel">
           <div className="se-managed-login__intro">
-            <Content component="h1">Connect to SoftEther VPN Server</Content>
-            <Content component="p">
-              Choose the server to manage. Your administrator password is used only to open this secure session.
-            </Content>
+            <div className="se-managed-login__brand">
+              <img src={logo} className="se-managed-login__logo" alt="" />
+              <span className="se-managed-login__brand-text">
+                <strong>SoftEther</strong>
+                <span>VPN Console</span>
+              </span>
+            </div>
+            <div className="se-managed-login__copy">
+              <Content component="h1">Connect to SoftEther VPN Server</Content>
+              <Content component="p">
+                Choose the server to manage. Your administrator password is used only to open this secure session.
+              </Content>
+            </div>
           </div>
           <Stack hasGutter>
             {error && (

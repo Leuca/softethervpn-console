@@ -4,49 +4,85 @@
   align-items: center;
   padding: var(--pf-t--global--spacer--2xl);
   background:
-    radial-gradient(circle at 14% 18%, rgba(0, 102, 204, 0.12), transparent 24rem),
-    radial-gradient(circle at 92% 78%, rgba(7, 17, 31, 0.08), transparent 28rem),
-    #f4f7fb;
+    radial-gradient(ellipse 70% 65% at 4% 8%, rgba(21, 21, 21, 0.16), transparent 68%),
+    radial-gradient(ellipse 58% 55% at 96% 94%, rgba(92, 101, 110, 0.13), transparent 72%),
+    linear-gradient(135deg, #fafafa 0%, #e7e9ea 52%, #f5f5f5 100%);
 }
 
 .se-managed-login__panel {
-  width: min(100%, 1080px);
+  width: min(100%, 1040px);
   margin-inline: auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
-  gap: var(--pf-t--global--spacer--2xl);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: start;
 }
 
 .se-managed-login__intro {
-  max-width: 34rem;
-  color: #1f2937;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(2rem, 5vw, 3.5rem);
+  padding-block: 0;
+  color: #151515;
 }
 
-.se-managed-login__intro h1 {
-  margin-block: var(--pf-t--global--spacer--sm) var(--pf-t--global--spacer--md);
-  color: #07111f;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  line-height: 1;
-  letter-spacing: -0.035em;
+.se-managed-login__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm);
 }
 
-.se-managed-login__intro p {
-  color: #4b5563;
-  font-size: var(--pf-t--global--font--size--lg);
-  max-width: 31rem;
+.se-managed-login__logo {
+  display: block;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: brightness(0);
 }
 
-.se-managed-login__eyebrow {
-  color: #0066cc;
-  font-size: var(--pf-t--global--font--size--sm);
-  font-weight: var(--pf-t--global--font--weight--bold);
-  letter-spacing: 0.16em;
+.se-managed-login__brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.se-managed-login__brand-text strong {
+  color: #151515;
+  font-size: var(--pf-t--global--font--size--body--lg);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+
+.se-managed-login__brand-text span {
+  color: #5f6a73;
+  font-size: var(--pf-t--global--font--size--body--sm);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
+.se-managed-login__copy {
+  max-width: 30rem;
+  padding-inline-start: var(--pf-t--global--spacer--xl);
+  border-inline-start: 3px solid #0066cc;
+}
+
+.se-managed-login__intro h1 {
+  margin-block: 0 var(--pf-t--global--spacer--md);
+  color: #101820;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.se-managed-login__intro p {
+  margin: 0;
+  color: #4f5b66;
+  font-size: var(--pf-t--global--font--size--lg);
+  line-height: 1.55;
+}
+
 .se-managed-login-card {
-  box-shadow: 0 1rem 2.5rem rgba(7, 17, 31, 0.12);
+  box-shadow: var(--pf-t--global--box-shadow--md);
 }
 
 @media (max-width: 900px) {
@@ -54,9 +90,6 @@
     min-height: 100dvh;
     align-items: start;
     padding: var(--pf-t--global--spacer--lg);
-    background:
-      radial-gradient(circle at 12% 10%, rgba(0, 102, 204, 0.12), transparent 22rem),
-      #f4f7fb;
   }
 
   .se-managed-login__panel {
@@ -65,6 +98,7 @@
   }
 
   .se-managed-login__intro {
-    padding-block-start: var(--pf-t--global--spacer--xl);
+    gap: var(--pf-t--global--spacer--xl);
+    padding: var(--pf-t--global--spacer--lg) 0 0;
   }
 }
