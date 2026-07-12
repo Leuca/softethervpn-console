@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardBody,
+  CardTitle,
   Checkbox,
   Content,
   Form,
@@ -79,7 +80,8 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
   };
 
   return (
-    <Card>
+    <Card className="se-managed-login-card">
+      <CardTitle>Server connection</CardTitle>
       <CardBody>
         <Stack hasGutter>
           <StackItem>

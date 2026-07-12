@@ -5,6 +5,8 @@ import { Bullseye, Spinner } from '@patternfly/react-core';
 import { AppLayout } from '@app/AppLayout/AppLayout';
 import { AppRoutes } from '@app/routes';
 import { ServerProvider, useServer } from '@app/ServerContext';
+import { consoleMode } from '@app/consoleMode';
+import { ManagedSessionGate } from '@app/managed/ManagedSessionGate';
 import '@app/theme-dark-chrome.css';
 import '@app/app.css';
 
@@ -32,9 +34,17 @@ const AppShell: React.FunctionComponent = () => {
 // embedded web server, which cannot rewrite arbitrary paths to index.html.
 const App: React.FunctionComponent = () => (
   <Router>
-    <ServerProvider>
-      <AppShell />
-    </ServerProvider>
+    {consoleMode === 'managed' ? (
+      <ManagedSessionGate>
+        <ServerProvider>
+          <AppShell />
+        </ServerProvider>
+      </ManagedSessionGate>
+    ) : (
+      <ServerProvider>
+        <AppShell />
+      </ServerProvider>
+    )}
   </Router>
 );
 
