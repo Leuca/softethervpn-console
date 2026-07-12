@@ -36,8 +36,13 @@ jobs:
       - name: Run tests
         run: npm run test
   build:
-    name: Build
+    name: Build (${{ matrix.mode }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mode:
+          - integrated
+          - managed
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -47,5 +52,5 @@ jobs:
           node-version: lts/*
       - name: Install dependencies
         run: npm install
-      - name: Attempt a build
-        run: npm run build
+      - name: Build frontend
+        run: npm run build:${{ matrix.mode }}
