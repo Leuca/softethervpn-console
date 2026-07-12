@@ -7,6 +7,7 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   path: '/',
   sameSite: 'strict' as const,
+  secure: 'auto' as const,
 };
 
 interface SessionRoutesOptions {

@@ -27,8 +27,11 @@ VPN_DEV_HUB=
 VPN_DEV_PASSWORD=your-admin-password
 ```
 
-In production builds no configuration is needed: the console is meant to be served by the
-VPN server's embedded web server, so the browser session already carries host and credentials.
+Production supports two compile-time deployment modes. `npm run build:integrated`
+creates a bundle for the VPN server's embedded web server. `npm run build:managed`
+creates a bundle served by the optional Node gateway, which handles server
+selection and login. See [`gateway/README.md`](gateway/README.md) for the managed
+deployment and TLS boundaries.
 
 ## Development scripts
 

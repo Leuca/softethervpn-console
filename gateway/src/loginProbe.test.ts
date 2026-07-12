@@ -41,4 +41,18 @@ describe('SoftEther login probe', () => {
       new LoginProbeError('The selected server could not be reached.', 502),
     );
   });
+
+  it('reports upstream certificate verification failures clearly', async () => {
+    const certificateError = Object.assign(new Error('certificate rejected'), {
+      code: 'DEPTH_ZERO_SELF_SIGNED_CERT',
+    });
+    const probe = createLoginProbe(vi.fn().mockRejectedValue(certificateError));
+
+    await expect(probe(credentials)).rejects.toEqual(
+      new LoginProbeError(
+        'The server certificate could not be verified. Check the server address and certificate, or allow self-signed certificates for a trusted private server.',
+        502,
+      ),
+    );
+  });
 });

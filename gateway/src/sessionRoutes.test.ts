@@ -11,12 +11,16 @@ const loginPayload = {
 
 describe('gateway session routes', () => {
   it('creates a private session and returns only public server details', async () => {
-    const server = buildGatewayServer({ loginProbe: vi.fn().mockResolvedValue(undefined) });
+    const server = buildGatewayServer({
+      loginProbe: vi.fn().mockResolvedValue(undefined),
+      trustProxy: true,
+    });
 
     try {
       const login = await server.inject({
         method: 'POST',
         url: '/login',
+        headers: { 'x-forwarded-proto': 'https' },
         payload: loginPayload,
       });
       const cookie = login.headers['set-cookie'];
@@ -30,6 +34,7 @@ describe('gateway session routes', () => {
       });
       expect(cookie).toContain('HttpOnly');
       expect(cookie).toContain('SameSite=Strict');
+      expect(cookie).toContain('Secure');
       expect(login.body).not.toContain(loginPayload.password);
 
       const session = await server.inject({

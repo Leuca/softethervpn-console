@@ -13,6 +13,7 @@ interface GatewayServerOptions {
   logger?: boolean;
   rpcForwarder?: RpcForwarder;
   sessions?: SessionStore;
+  trustProxy?: boolean | string;
 }
 
 const parsePort = (value: string | undefined): number => {
@@ -24,7 +25,10 @@ const parsePort = (value: string | undefined): number => {
 };
 
 export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyInstance => {
-  const server = Fastify({ logger: options.logger ?? false });
+  const server = Fastify({
+    logger: options.logger ?? false,
+    trustProxy: options.trustProxy ?? false,
+  });
   const sessions = options.sessions ?? new SessionStore();
   const rpcForwarder = options.rpcForwarder ?? forwardRpcRequest;
 
@@ -47,7 +51,8 @@ export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyI
 
 export const startGatewayServer = async (): Promise<void> => {
   const frontendRoot = process.env.FRONTEND_ROOT || fileURLToPath(new URL('../../dist', import.meta.url));
-  const server = buildGatewayServer({ frontendRoot, logger: true });
+  const trustProxy = process.env.TRUST_PROXY === 'true' ? true : process.env.TRUST_PROXY || '127.0.0.1';
+  const server = buildGatewayServer({ frontendRoot, logger: true, trustProxy });
   const host = process.env.HOST || '127.0.0.1';
   const port = parsePort(process.env.PORT);
 
