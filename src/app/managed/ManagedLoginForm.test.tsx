@@ -28,7 +28,7 @@ describe('ManagedLoginForm', () => {
 
     await user.type(screen.getByLabelText('Server host'), 'vpn.example.com');
     await user.type(screen.getByLabelText('Password'), 'secret');
-    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    await user.keyboard('{Enter}');
 
     await waitFor(() =>
       expect(loginMock).toHaveBeenCalledWith({
@@ -94,11 +94,13 @@ describe('ManagedLoginForm', () => {
     await user.clear(screen.getByLabelText('Port'));
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
-    expect(screen.getByLabelText('Server host')).toHaveAccessibleDescription(
-      /Enter the SoftEther server host name or IP address\./,
-    );
+    const host = screen.getByLabelText('Server host');
+    expect(host).toHaveFocus();
+    expect(host).toHaveAccessibleDescription(/Enter the SoftEther server host name or IP address\./);
     expect(screen.getByLabelText('Port')).toHaveAccessibleDescription(/Enter a TCP port between 1 and 65535\./);
     expect(screen.getByLabelText('Password')).toHaveAccessibleDescription(/Enter the administrator password\./);
+    expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
+    expect(screen.getByRole('form', { name: 'SoftEther server login' })).toBeInTheDocument();
     expect(loginMock).not.toHaveBeenCalled();
   });
 
@@ -130,6 +132,7 @@ describe('ManagedLoginForm', () => {
 
     const liveRegion = (await screen.findByText(message)).closest('[aria-live="polite"]');
     expect(liveRegion).toHaveTextContent(title);
+    expect(document.getElementById('managed-login-error')).toHaveFocus();
     expect(screen.getByLabelText('Server host')).toHaveValue('vpn.example.com');
   });
 

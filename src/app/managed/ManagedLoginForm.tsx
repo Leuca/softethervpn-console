@@ -132,6 +132,16 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
   const [submitted, setSubmitted] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<LoginFailure | null>(null);
+  const hostRef = React.useRef<HTMLInputElement>(null);
+  const portRef = React.useRef<HTMLInputElement>(null);
+  const passwordRef = React.useRef<HTMLInputElement>(null);
+  const errorRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (error) {
+      errorRef.current?.focus();
+    }
+  }, [error]);
 
   const normalizedHost = host.trim();
   const normalizedHub = hub.trim();
@@ -144,8 +154,13 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitted(true);
+    setError(null);
 
     if (!canSubmit) {
+      if (!submitting) {
+        const firstInvalid = !hostValid ? hostRef.current : !portIsValid ? portRef.current : passwordRef.current;
+        firstInvalid?.focus();
+      }
       return;
     }
 
@@ -158,7 +173,6 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
     };
 
     setSubmitting(true);
-    setError(null);
     submitManagedLogin(payload)
       .then((session) => {
         if (session.authenticated) {
@@ -183,17 +197,21 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
         <Stack hasGutter>
           {error && (
             <StackItem>
-              <Alert variant="danger" title={error.title} isInline isLiveRegion>
-                {error.message}
-              </Alert>
+              <div id="managed-login-error" ref={errorRef} tabIndex={-1}>
+                <Alert variant="danger" title={error.title} isInline isLiveRegion>
+                  {error.message}
+                </Alert>
+              </div>
             </StackItem>
           )}
           <StackItem>
-            <Form onSubmit={handleSubmit} aria-busy={submitting}>
+            <Form aria-label="SoftEther server login" onSubmit={handleSubmit} aria-busy={submitting}>
               <div className="se-managed-login__target-fields">
                 <FormGroup label="Server host" fieldId="managed-login-host" isRequired>
                   <TextInput
                     id="managed-login-host"
+                    name="host"
+                    ref={hostRef}
                     value={host}
                     placeholder="vpn.example.com"
                     onChange={(_event, value) => setHost(value)}
@@ -217,6 +235,8 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   <TextInput
                     type="number"
                     id="managed-login-port"
+                    name="port"
+                    ref={portRef}
                     min={1}
                     max={65535}
                     value={port}
@@ -241,6 +261,7 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
               <FormGroup label="Virtual Hub" labelInfo="Optional" fieldId="managed-login-hub">
                 <TextInput
                   id="managed-login-hub"
+                  name="hub"
                   value={hub}
                   onChange={(_event, value) => setHub(value)}
                   aria-label="Virtual Hub"
@@ -251,6 +272,9 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                 <TextInput
                   type="password"
                   id="managed-login-password"
+                  name="password"
+                  ref={passwordRef}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(_event, value) => setPassword(value)}
                   validated={submitted && !passwordValid ? 'error' : 'default'}
