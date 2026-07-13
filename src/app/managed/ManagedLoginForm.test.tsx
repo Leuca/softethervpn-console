@@ -41,6 +41,23 @@ describe('ManagedLoginForm', () => {
     expect(onLogin).toHaveBeenCalledWith(session);
   });
 
+  it('keeps one stable login action while authenticating', async () => {
+    loginMock.mockImplementation(() => new Promise(() => undefined));
+    const user = userEvent.setup();
+
+    render(<ManagedLoginForm onLogin={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('Server host'), 'vpn.example.com');
+    await user.type(screen.getByLabelText('Password'), 'secret');
+    const submit = screen.getByRole('button', { name: 'Log in' });
+    await user.click(submit);
+
+    expect(submit).toBeDisabled();
+    expect(submit.closest('form')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', 'Logging in');
+  });
+
   it('submits optional hub and self-signed certificate settings', async () => {
     const session = { authenticated: true, host: 'vpn.example.com', port: 5555, hub: 'DEFAULT' };
     loginMock.mockResolvedValue(session);

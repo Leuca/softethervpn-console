@@ -136,7 +136,7 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
             </StackItem>
           )}
           <StackItem>
-            <Form onSubmit={handleSubmit}>
+            <Form onSubmit={handleSubmit} aria-busy={submitting}>
               <div className="se-managed-login__target-fields">
                 <FormGroup label="Server host" fieldId="managed-login-host" isRequired>
                   <TextInput
@@ -251,7 +251,13 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                 </FormHelperText>
               </FormGroup>
               <ActionGroup>
-                <Button type="submit" variant="primary" isLoading={submitting} isDisabled={!canSubmit}>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  isLoading={submitting}
+                  isDisabled={!canSubmit}
+                  spinnerAriaValueText="Logging in"
+                >
                   Log in
                 </Button>
               </ActionGroup>
