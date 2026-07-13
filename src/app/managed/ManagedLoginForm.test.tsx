@@ -3,9 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Mock, afterEach, describe, expect, it, vi } from 'vitest';
 import { MANAGED_LOGIN_HINTS_KEY, ManagedLoginForm } from './ManagedLoginForm';
-import { login } from './sessionApi';
+import { ManagedSessionApiError, login } from './sessionApi';
 
-vi.mock('./sessionApi', () => ({
+vi.mock('./sessionApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./sessionApi')>()),
   login: vi.fn(),
 }));
 
@@ -85,8 +86,40 @@ describe('ManagedLoginForm', () => {
     );
   });
 
-  it('shows login errors inline', async () => {
-    loginMock.mockRejectedValue(new Error('Authentication failed'));
+  it('shows accessible field validation before contacting the gateway', async () => {
+    const user = userEvent.setup();
+
+    render(<ManagedLoginForm onLogin={vi.fn()} />);
+
+    await user.clear(screen.getByLabelText('Port'));
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    expect(screen.getByLabelText('Server host')).toHaveAccessibleDescription(
+      /Enter the SoftEther server host name or IP address\./,
+    );
+    expect(screen.getByLabelText('Port')).toHaveAccessibleDescription(/Enter a TCP port between 1 and 65535\./);
+    expect(screen.getByLabelText('Password')).toHaveAccessibleDescription(/Enter the administrator password\./);
+    expect(loginMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new ManagedSessionApiError('The server did not accept these login details.', 401),
+      'Login details rejected',
+      'Check the administrator password and Virtual Hub, then try again.',
+    ],
+    [
+      new ManagedSessionApiError('The server certificate could not be verified.', 502),
+      'Certificate verification failed',
+      'Check the server address and certificate. For a trusted private server, allow self-signed certificates under Advanced connection options.',
+    ],
+    [
+      new ManagedSessionApiError('The selected server could not be reached.', 502),
+      'Server unavailable',
+      'Check the server address and port, confirm that the server is running, then try again.',
+    ],
+  ])('presents a specific login failure', async (failure, title, message) => {
+    loginMock.mockRejectedValue(failure);
     const user = userEvent.setup();
 
     render(<ManagedLoginForm onLogin={vi.fn()} />);
@@ -95,8 +128,9 @@ describe('ManagedLoginForm', () => {
     await user.type(screen.getByLabelText('Password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
-    expect(await screen.findByText('Login failed')).toBeInTheDocument();
-    expect(screen.getByText('Authentication failed')).toBeInTheDocument();
+    const liveRegion = (await screen.findByText(message)).closest('[aria-live="polite"]');
+    expect(liveRegion).toHaveTextContent(title);
+    expect(screen.getByLabelText('Server host')).toHaveValue('vpn.example.com');
   });
 
   it('remembers and prefills only non-secret server details', async () => {

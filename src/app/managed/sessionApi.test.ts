@@ -56,7 +56,10 @@ describe('managed session API', () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: 'Login failed' }, { status: 401 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(getSession()).rejects.toMatchObject({
+    const error = await getSession().catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(ManagedSessionApiError);
+    expect(error).toMatchObject({
       name: 'ManagedSessionApiError',
       message: 'Login failed',
       status: 401,

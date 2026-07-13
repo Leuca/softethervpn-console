@@ -28,6 +28,19 @@ describe('SoftEther login probe', () => {
     );
   });
 
+  it('normalizes a SoftEther JSON-RPC error as rejected login details', async () => {
+    const rejected = createLoginProbe(
+      vi.fn().mockResolvedValue({
+        statusCode: 200,
+        body: '{"jsonrpc":"2.0","error":{"code":-32603,"message":"Authentication failed"},"id":"login-probe"}',
+      }),
+    )(credentials);
+
+    await expect(rejected).rejects.toEqual(
+      new LoginProbeError('The server did not accept these login details.', 401),
+    );
+  });
+
   it('distinguishes rejected credentials from an unreachable server', async () => {
     const rejected = createLoginProbe(
       vi.fn().mockResolvedValue({ statusCode: 403, body: '' }),

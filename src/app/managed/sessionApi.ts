@@ -22,6 +22,7 @@ export class ManagedSessionApiError extends Error {
 
   constructor(message: string, status: number) {
     super(message);
+    Object.setPrototypeOf(this, ManagedSessionApiError.prototype);
     this.name = 'ManagedSessionApiError';
     this.status = status;
   }
