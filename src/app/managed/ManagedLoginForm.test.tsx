@@ -115,5 +115,8 @@ describe('ManagedLoginForm', () => {
     expect(screen.getByLabelText('Password')).toHaveValue('');
     expect(screen.getByLabelText('Allow a self-signed SoftEther server certificate')).toBeChecked();
     expect(screen.getByLabelText('Remember server details on this browser')).toBeChecked();
+
+    await user.click(screen.getByLabelText('Remember server details on this browser'));
+    expect(window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY)).toBeNull();
   });
 });

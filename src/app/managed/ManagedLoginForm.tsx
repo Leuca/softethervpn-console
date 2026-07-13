@@ -228,7 +228,7 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   </FormHelperText>
                 </FormGroup>
               </ExpandableSection>
-              <FormGroup fieldId="managed-login-remember-server" label="Browser preferences">
+              <FormGroup fieldId="managed-login-remember-server">
                 <Checkbox
                   id="managed-login-remember-server"
                   label="Remember server details on this browser"
@@ -241,6 +241,14 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   }}
                   isDisabled={submitting}
                 />
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>
+                      Saves the host, port, Virtual Hub, and certificate preference. The administrator password is
+                      never saved. Clear this checkbox to forget the saved details.
+                    </HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
               </FormGroup>
               <ActionGroup>
                 <Button type="submit" variant="primary" isLoading={submitting} isDisabled={!canSubmit}>
