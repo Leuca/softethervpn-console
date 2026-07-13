@@ -7,6 +7,7 @@ import {
   CardBody,
   CardTitle,
   Checkbox,
+  ExpandableSection,
   Form,
   FormGroup,
   FormHelperText,
@@ -74,6 +75,7 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
   const [password, setPassword] = React.useState('');
   const [allowSelfSigned, setAllowSelfSigned] = React.useState(initialHints?.allowSelfSigned ?? false);
   const [rememberServer, setRememberServer] = React.useState(initialHints !== null);
+  const [advancedOpen, setAdvancedOpen] = React.useState(initialHints?.allowSelfSigned ?? false);
   const [submitted, setSubmitted] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -204,15 +206,28 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   </FormHelperText>
                 )}
               </FormGroup>
-              <FormGroup fieldId="managed-login-allow-self-signed" label="Upstream TLS">
-                <Checkbox
-                  id="managed-login-allow-self-signed"
-                  label="Allow a self-signed SoftEther server certificate"
-                  isChecked={allowSelfSigned}
-                  onChange={(_event, checked) => setAllowSelfSigned(checked)}
-                  isDisabled={submitting}
-                />
-              </FormGroup>
+              <ExpandableSection
+                isExpanded={advancedOpen}
+                toggleText="Advanced connection options"
+                onToggle={(_event, expanded) => setAdvancedOpen(expanded)}
+              >
+                <FormGroup fieldId="managed-login-allow-self-signed">
+                  <Checkbox
+                    id="managed-login-allow-self-signed"
+                    label="Allow a self-signed SoftEther server certificate"
+                    isChecked={allowSelfSigned}
+                    onChange={(_event, checked) => setAllowSelfSigned(checked)}
+                    isDisabled={submitting}
+                  />
+                  <FormHelperText>
+                    <HelperText>
+                      <HelperTextItem>
+                        Certificate verification will be disabled. Use this only for a trusted private server.
+                      </HelperTextItem>
+                    </HelperText>
+                  </FormHelperText>
+                </FormGroup>
+              </ExpandableSection>
               <FormGroup fieldId="managed-login-remember-server" label="Browser preferences">
                 <Checkbox
                   id="managed-login-remember-server"

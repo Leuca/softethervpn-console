@@ -1,13 +1,16 @@
 import * as React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Button,
+  Dropdown,
+  DropdownItem,
+  DropdownList,
   Masthead,
   MastheadBrand,
   MastheadContent,
   MastheadLogo,
   MastheadMain,
   MastheadToggle,
+  MenuToggle,
   Nav,
   NavExpandable,
   NavItem,
@@ -35,6 +38,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const location = useLocation();
   const { user, hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels } = useServer();
   const managedSession = useManagedSession();
+  const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
 
   // Control the sidebar ourselves so its collapse behaviour is uniform across
   // viewports: any click anywhere in the viewport closes it, except clicks on
@@ -104,21 +108,43 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
         </MastheadBrand>
       </MastheadMain>
       <MastheadContent>
-        <span className="se-user">
-          <UserIcon />
-          <span className="se-user__role">{user}</span>
-        </span>
-        {managedSession && (
-          <Button
-            className="se-managed-logout"
-            variant="secondary"
-            size="sm"
-            isLoading={managedSession.isLoggingOut}
-            isDisabled={managedSession.isLoggingOut}
-            onClick={managedSession.logout}
-          >
-            Log out
-          </Button>
+        {managedSession ? (
+          <div className="se-user-menu">
+            <Dropdown
+              isOpen={isUserMenuOpen}
+              onOpenChange={setIsUserMenuOpen}
+              onSelect={() => setIsUserMenuOpen(false)}
+              popperProps={{ position: 'right' }}
+              toggle={(toggleRef) => (
+                <MenuToggle
+                  ref={toggleRef}
+                  aria-label={`User menu for ${user}`}
+                  isExpanded={isUserMenuOpen}
+                  onClick={() => setIsUserMenuOpen((open) => !open)}
+                >
+                  <span className="se-user__content">
+                    <UserIcon />
+                    <span className="se-user__role">{user}</span>
+                  </span>
+                </MenuToggle>
+              )}
+            >
+              <DropdownList>
+                <DropdownItem
+                  key="logout"
+                  isDisabled={managedSession.isLoggingOut}
+                  onClick={managedSession.logout}
+                >
+                  Log out
+                </DropdownItem>
+              </DropdownList>
+            </Dropdown>
+          </div>
+        ) : (
+          <span className="se-user">
+            <UserIcon />
+            <span className="se-user__role">{user}</span>
+          </span>
         )}
       </MastheadContent>
     </Masthead>

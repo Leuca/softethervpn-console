@@ -68,8 +68,16 @@ body,
   font-weight: var(--pf-t--global--font--weight--body--bold);
 }
 
-.se-managed-logout {
-  margin-inline-start: var(--pf-t--global--spacer--sm);
+.se-user-menu {
+  display: flex;
+  justify-content: flex-end;
+  margin-inline-start: auto;
+}
+
+.se-user__content {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm);
 }
 
 /* PatternFly paints the desktop sidebar with a "glass"/floating surface token

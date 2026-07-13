@@ -53,6 +53,7 @@ describe('ManagedLoginForm', () => {
     await user.type(screen.getByLabelText('Port'), '5555');
     await user.type(screen.getByLabelText('Virtual Hub'), 'DEFAULT');
     await user.type(screen.getByLabelText('Password'), 'secret');
+    await user.click(screen.getByRole('button', { name: 'Advanced connection options' }));
     await user.click(screen.getByLabelText('Allow a self-signed SoftEther server certificate'));
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
@@ -92,6 +93,7 @@ describe('ManagedLoginForm', () => {
     await user.type(screen.getByLabelText('Port'), '5555');
     await user.type(screen.getByLabelText('Virtual Hub'), 'DEFAULT');
     await user.type(screen.getByLabelText('Password'), 'secret');
+    await user.click(screen.getByRole('button', { name: 'Advanced connection options' }));
     await user.click(screen.getByLabelText('Allow a self-signed SoftEther server certificate'));
     await user.click(screen.getByLabelText('Remember server details on this browser'));
     await user.click(screen.getByRole('button', { name: 'Log in' }));
