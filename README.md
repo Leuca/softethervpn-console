@@ -4,17 +4,47 @@ A web management application for [SoftEther VPN Server](https://github.com/SoftE
 built with [PatternFly 6](https://www.patternfly.org/) and the SoftEther VPN Server
 [JSON-RPC API Suite](https://github.com/SoftEtherVPN/SoftEtherVPN/tree/master/developer_tools/vpnserver-jsonrpc-clients/).
 
-This is the successor of [softethervpn-web-console](https://github.com/Leuca/softethervpn-web-console)
-(PatternFly 4 / React 16), rebased onto the current
+This is the successor to [softethervpn-web-console](https://github.com/Leuca/softethervpn-web-console)
+(PatternFly 4 / React 16), ported onto the current
 [PatternFly seed](https://github.com/patternfly/patternfly-react-seed) (PatternFly 6 / React 18 /
 TypeScript 5 / react-router 7).
+
+## Releases
+
+[GitHub releases](https://github.com/Leuca/softethervpn-console/releases) provide
+separate archives for the two deployment modes:
+
+- `softethervpn-console-vX.Y.Z.tar.gz` contains the integrated frontend bundle.
+- `softethervpn-console-managed-vX.Y.Z.tar.gz` contains the managed frontend and
+  the compiled Node gateway.
+
+Each archive has a matching `.sha256` file. Download both files into the same
+directory and verify an archive before extracting it:
+
+```sh
+sha256sum -c softethervpn-console-vX.Y.Z.tar.gz.sha256
+```
+
+After extracting a managed archive, install the gateway's production
+dependencies and start it with:
+
+```sh
+npm install --omit=dev --prefix gateway
+npm --prefix gateway start
+```
+
+The gateway listens on plain HTTP and should be placed behind a trusted HTTPS
+reverse proxy. See [`gateway/README.md`](gateway/README.md) for its configuration
+and TLS boundaries.
 
 ## Quick-start
 
 ```bash
 git clone https://github.com/Leuca/softethervpn-console
 cd softethervpn-console
-npm install && npm run start:dev
+npm install
+npm install --prefix gateway
+npm run start:dev
 ```
 
 During development the console connects to the VPN server configured in `.env.defaults`.
@@ -27,23 +57,43 @@ VPN_DEV_HUB=
 VPN_DEV_PASSWORD=your-admin-password
 ```
 
-Production supports two compile-time deployment modes. `npm run build:integrated`
-creates a bundle for the VPN server's embedded web server. `npm run build:managed`
-creates a bundle served by the optional Node gateway, which handles server
-selection and login. See [`gateway/README.md`](gateway/README.md) for the managed
-deployment and TLS boundaries.
+Leave `VPN_DEV_HUB` empty for server administration. Set it to a Virtual Hub name
+when connecting with that hub's administrator credentials.
+
+Production supports two compile-time deployment modes. Build an integrated
+frontend for the VPN server's embedded web server with:
+
+```sh
+npm run build:integrated
+```
+
+Build and start the managed frontend and Node gateway with:
+
+```sh
+npm run build:managed
+npm --prefix gateway run build
+npm --prefix gateway start
+```
+
+The managed gateway handles server selection and login. See
+[`gateway/README.md`](gateway/README.md) for its deployment and TLS boundaries.
 
 ## Development scripts
 
 ```sh
 # Install development/build dependencies
 npm install
+npm install --prefix gateway
 
 # Start the development server
 npm run start:dev
 
-# Run a production build (outputs to "dist" dir)
-npm run build
+# Build the integrated frontend (outputs to the "dist" directory)
+npm run build:integrated
+
+# Build the managed frontend and gateway
+npm run build:managed
+npm --prefix gateway run build
 
 # Run the test suite
 npm run test
@@ -59,4 +109,21 @@ npm run format
 
 # Launch a tool to inspect the bundle size
 npm run bundle-profile:analyze
+```
+
+## Integrating the console with SoftEther VPN Server
+
+The embedded web server exposes the console below a URL prefix rather than at the
+site root. For example, when the console is available at `/admin/default`, its
+asset and base paths must use that prefix:
+
+```sh
+# Serve generated assets from the console's URL prefix.
+sed -i \
+    -e 's|href="/images/favicon.png"|href="/admin/default/images/favicon.png"|' \
+    -e 's|<base href="/">|<base href="/admin/default/">|' \
+    src/index.html
+
+# Build with the correct path
+ASSET_PATH=/admin/default/ npm run build:integrated
 ```
