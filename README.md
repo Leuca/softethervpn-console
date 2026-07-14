@@ -123,3 +123,9 @@ ASSET_PATH=/admin/default/ npm run build:integrated
 
 Keep the trailing slash so generated asset and base URLs resolve below the
 configured prefix.
+
+## Development note
+
+This project is developed with assistance from AI coding tools. All changes
+remain subject to maintainer review and the project's testing and CI
+requirements.
