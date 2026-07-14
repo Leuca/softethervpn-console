@@ -73,6 +73,7 @@ describe('ManagedLoginForm', () => {
     await user.type(screen.getByLabelText('Password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Advanced connection options' }));
     await user.click(screen.getByLabelText('Allow a self-signed SoftEther server certificate'));
+    expect(screen.getByRole('button', { name: 'Advanced connection options' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
     await waitFor(() =>
