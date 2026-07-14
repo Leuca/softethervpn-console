@@ -23,7 +23,9 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm ci --prefix gateway
 
       - name: Check release version
         run: |
@@ -37,13 +39,24 @@ jobs:
       - name: Run checks
         run: npm run ci-checks
 
-      - name: Build release bundle
-        run: npm run build
-
-      - name: Package release bundle
+      - name: Build and package integrated release bundle
         run: |
+          npm run build:integrated
           artifact="softethervpn-console-${GITHUB_REF_NAME}.tar.gz"
           tar -czf "$artifact" -C dist .
+          sha256sum "$artifact" > "$artifact.sha256"
+
+      - name: Build and package managed release bundle
+        run: |
+          npm run build:managed
+          npm --prefix gateway run build
+          artifact="softethervpn-console-managed-${GITHUB_REF_NAME}.tar.gz"
+          tar -czf "$artifact" \
+            dist \
+            gateway/dist \
+            gateway/package.json \
+            gateway/package-lock.json \
+            gateway/README.md
           sha256sum "$artifact" > "$artifact.sha256"
 
       - name: Publish GitHub release
@@ -51,8 +64,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           artifact="softethervpn-console-${GITHUB_REF_NAME}.tar.gz"
+          managed_artifact="softethervpn-console-managed-${GITHUB_REF_NAME}.tar.gz"
           gh release create "$GITHUB_REF_NAME" \
             --title "SoftEther VPN Console $GITHUB_REF_NAME" \
             --generate-notes \
             "$artifact" \
-            "$artifact.sha256"
+            "$artifact.sha256" \
+            "$managed_artifact" \
+            "$managed_artifact.sha256"
