@@ -114,16 +114,12 @@ npm run bundle-profile:analyze
 ## Integrating the console with SoftEther VPN Server
 
 The embedded web server exposes the console below a URL prefix rather than at the
-site root. For example, when the console is available at `/admin/default`, its
-asset and base paths must use that prefix:
+site root. Set `ASSET_PATH` to that prefix when building the integrated bundle.
+For example:
 
 ```sh
-# Serve generated assets from the console's URL prefix.
-sed -i \
-    -e 's|href="/images/favicon.png"|href="/admin/default/images/favicon.png"|' \
-    -e 's|<base href="/">|<base href="/admin/default/">|' \
-    src/index.html
-
-# Build with the correct path
 ASSET_PATH=/admin/default/ npm run build:integrated
 ```
+
+Keep the trailing slash so generated asset and base URLs resolve below the
+configured prefix.
