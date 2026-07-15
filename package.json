@@ -1,6 +1,6 @@
 {
   "name": "softethervpn-console",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A SoftEther VPN Server web management application built with PatternFly 6",
   "repository": {
     "type": "git",
