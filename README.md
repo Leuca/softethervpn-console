@@ -43,7 +43,6 @@ and TLS boundaries.
 git clone https://github.com/Leuca/softethervpn-console
 cd softethervpn-console
 npm install
-npm install --prefix gateway
 npm run start:dev
 ```
 
@@ -70,6 +69,7 @@ npm run build:integrated
 Build and start the managed frontend and Node gateway with:
 
 ```sh
+npm install --prefix gateway
 npm run build:managed
 npm --prefix gateway run build
 npm --prefix gateway start
@@ -81,8 +81,10 @@ The managed gateway handles server selection and login. See
 ## Development scripts
 
 ```sh
-# Install development/build dependencies
+# Install frontend development/build dependencies
 npm install
+
+# Install gateway dependencies when working on managed deployments
 npm install --prefix gateway
 
 # Start the development server
@@ -103,6 +105,11 @@ npm run test:coverage
 
 # Run the linter
 npm run lint
+
+# Type-check the frontend, gateway, or complete repository
+npm run type-check
+npm run type-check:gateway
+npm run type-check:all
 
 # Run the code formatter
 npm run format

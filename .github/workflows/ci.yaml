@@ -32,9 +32,7 @@ jobs:
         with:
           node-version: lts/*
       - name: Install dependencies
-        run: |
-          npm install
-          npm install --prefix gateway
+        run: npm install
       - name: Run tests
         run: npm run test
   build:
@@ -53,9 +51,7 @@ jobs:
         with:
           node-version: lts/*
       - name: Install dependencies
-        run: |
-          npm install
-          npm install --prefix gateway
+        run: npm install
       - name: Build frontend
         run: npm run build:${{ matrix.mode }}
   gateway:
