@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Properties } from './Properties';
@@ -203,6 +203,9 @@ describe('Properties', () => {
         expect.objectContaining({ Name_str: 'no_change_users', Value_u32: 0 }),
       ]),
     );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Virtual Hub Administration Options' })).not.toBeInTheDocument(),
+    );
   });
 
   it('loads hub extended options', async () => {
@@ -256,6 +259,9 @@ describe('Properties', () => {
         expect.objectContaining({ Name_str: 'NoIpTable', Value_u32: 1 }),
         expect.objectContaining({ Name_str: 'BroadcastStormDetectionThreshold', Value_u32: 64 }),
       ]),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Virtual Hub Extended Options' })).not.toBeInTheDocument(),
     );
   });
 

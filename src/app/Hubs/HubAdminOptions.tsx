@@ -72,7 +72,7 @@ const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, t
       .SetHubAdminOptions(new VPN.VpnRpcAdminOption({ HubName_str: hub, AdminOptionList: options }))
       .then(() => {
         setSaving(false);
-        load();
+        setOpen(false);
       })
       .catch((e) => {
         setError(String(e));
