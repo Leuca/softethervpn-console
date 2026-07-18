@@ -18,11 +18,12 @@ interface AppPageProps {
  */
 const AppPage: React.FunctionComponent<AppPageProps> = ({ title, description, actions, children }) => (
   <>
-    <PageSection className="se-app-page__header">
+    <PageSection className={`se-app-page__header${actions ? ' se-app-page__header--sticky' : ''}`}>
       <Flex
         justifyContent={{ default: 'justifyContentSpaceBetween' }}
         alignItems={{ default: 'alignItemsCenter' }}
         flexWrap={{ default: 'wrap' }}
+        gap={{ default: 'gapMd' }}
       >
         <FlexItem>
           <Title headingLevel="h1" size="2xl">

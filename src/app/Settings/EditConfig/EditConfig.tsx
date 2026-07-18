@@ -157,7 +157,7 @@ const EditConfig: React.FunctionComponent = () => {
   return (
     <AppPage
       title="Edit Configuration"
-      description="View and edit the raw VPN server configuration file. Applying it restarts the server."
+      description="View and edit the raw VPN server configuration file."
       actions={actions}
     >
       <Alert

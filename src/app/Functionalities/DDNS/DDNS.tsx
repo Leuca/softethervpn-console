@@ -482,10 +482,6 @@ const DynDNS: React.FunctionComponent = () => {
       title="Dynamic DNS"
       description="A free, permanent DNS hostname for this server, updated automatically when its global IP address changes."
     >
-      <Content component="p" style={{ marginBlockEnd: 'var(--pf-t--global--spacer--lg)' }}>
-        The Dynamic DNS service assigns this server a unique hostname you can use in VPN Client and VPN Bridge settings,
-        even behind a NAT or with a dynamic IP address.
-      </Content>
       <DdnsSection />
       {ddnsProxy && (
         <div style={{ marginBlockStart: 'var(--pf-t--global--spacer--lg)' }}>

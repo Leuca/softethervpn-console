@@ -61,29 +61,25 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
     const reveal = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        const activeTabButton = activeTabRef.current;
-        const activeTabItem = activeTabButton?.closest<HTMLElement>('li');
-        const tabList = activeTabButton?.closest<HTMLElement>('.pf-v6-c-tabs__list');
+        const tabList = document.querySelector<HTMLElement>('#hub-detail-tabs > .pf-v6-c-tabs__list');
+        const activeTabItem = tabList
+          ?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+          ?.closest<HTMLElement>('li');
 
         if (!activeTabItem || !tabList) {
           return;
         }
 
-        const activeTabRect = activeTabItem.getBoundingClientRect();
-        const tabListRect = tabList.getBoundingClientRect();
-
-        if (activeTabRect.left < tabListRect.left) {
-          tabList.scrollLeft += activeTabRect.left - tabListRect.left;
-        } else if (activeTabRect.right > tabListRect.right) {
-          tabList.scrollLeft += activeTabRect.right - tabListRect.right;
-        }
+        const centeredPosition = activeTabItem.offsetLeft - (tabList.clientWidth - activeTabItem.offsetWidth) / 2;
+        const maximumPosition = tabList.scrollWidth - tabList.clientWidth;
+        tabList.scrollLeft = Math.max(0, Math.min(centeredPosition, maximumPosition));
       });
     };
 
     reveal();
     timers.push(window.setTimeout(reveal, 100), window.setTimeout(reveal, 250));
 
-    const tabList = activeTabRef.current?.closest<HTMLElement>('.pf-v6-c-tabs__list');
+    const tabList = document.querySelector<HTMLElement>('#hub-detail-tabs > .pf-v6-c-tabs__list');
     if (tabList && window.ResizeObserver) {
       observer = new ResizeObserver(reveal);
       observer.observe(tabList);
@@ -116,7 +112,15 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
         <BreadcrumbItem isActive>{name}</BreadcrumbItem>
       </Breadcrumb>
       <AppPage title={name} description="Virtual Hub management.">
-        <Tabs key={name} activeKey={activeTab} onSelect={selectTab} mountOnEnter unmountOnExit>
+        <Tabs
+          id="hub-detail-tabs"
+          key={name}
+          aria-label="Virtual Hub sections"
+          activeKey={activeTab}
+          onSelect={selectTab}
+          mountOnEnter
+          unmountOnExit
+        >
           <Tab ref={selectedTabRef('status')} eventKey="status" title={<TabTitleText>Status</TabTitleText>}>
             <HubStatus hub={name} />
           </Tab>

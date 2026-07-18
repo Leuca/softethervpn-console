@@ -611,6 +611,7 @@ const HubLogs: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <Tabs
+      aria-label="Hub log views"
       activeKey={activeTab}
       onSelect={(_event, key) => setActiveTab(String(key))}
       mountOnEnter

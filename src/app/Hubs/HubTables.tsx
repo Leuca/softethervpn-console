@@ -253,7 +253,11 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
       ) : singleKind === 'ip' ? (
         ipTable
       ) : (
-        <Tabs activeKey={activeTab} onSelect={(_event, key) => setActiveTab(String(key) as TableKind)}>
+        <Tabs
+          aria-label="Hub address tables"
+          activeKey={activeTab}
+          onSelect={(_event, key) => setActiveTab(String(key) as TableKind)}
+        >
           <Tab eventKey="mac" title={<TabTitleText>MAC address table</TabTitleText>}>
             {macTable}
           </Tab>

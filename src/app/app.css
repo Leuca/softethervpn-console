@@ -115,14 +115,17 @@ body,
   z-index: var(--pf-t--global--z-index--md);
 }
 
-/* Keep page-level actions, such as Refresh and Create buttons, available while
-   long pages scroll. */
 .se-app-page__header {
+  background-color: var(--pf-t--global--background--color--primary--default);
+  box-shadow: var(--pf-t--global--box-shadow--sm--bottom);
+}
+
+/* Keep page-level actions, such as Refresh and Create buttons, available while
+   long pages scroll without making descriptive-only headers sticky. */
+.se-app-page__header--sticky {
   position: sticky;
   inset-block-start: 0;
   z-index: var(--pf-t--global--z-index--sm);
-  background-color: var(--pf-t--global--background--color--primary--default);
-  box-shadow: var(--pf-t--global--box-shadow--sm--bottom);
 }
 
 .pf-v6-c-page {
