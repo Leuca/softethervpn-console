@@ -29,7 +29,7 @@ After extracting a managed archive, install the gateway's production
 dependencies and start it with:
 
 ```sh
-npm install --omit=dev --prefix gateway
+npm ci --omit=dev --prefix gateway
 npm --prefix gateway start
 ```
 
