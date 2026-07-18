@@ -3,10 +3,6 @@ import {
   Alert,
   Bullseye,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
-  CardTitle,
   Checkbox,
   Content,
   Flex,
@@ -20,6 +16,7 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
+import { ActionCard } from '@app/components/ActionCard';
 import { api } from '@app/utils/vpnrpc_settings';
 import { HubAdminOptions } from '@app/Hubs/HubAdminOptions';
 import { HubExtendedOptions } from '@app/Hubs/HubExtendedOptions';
@@ -28,25 +25,7 @@ import { HubSourceAccessControl } from '@app/Hubs/HubSourceAccessControl';
 
 const settingsTrigger = (title: string, description: string) => {
   const SettingsTrigger = (open: () => void) => (
-    <Card isClickable isFullHeight>
-      <CardHeader
-        selectableActions={{
-          selectableActionAriaLabel: title,
-          onClickAction: open,
-        }}
-      >
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardBody
-        style={{
-          color: 'var(--pf-t--global--text--color--subtle)',
-          fontSize: 'var(--pf-t--global--font--size--sm)',
-          overflowWrap: 'anywhere',
-        }}
-      >
-        {description}
-      </CardBody>
-    </Card>
+    <ActionCard title={title} description={description} onClick={open} />
   );
 
   return SettingsTrigger;

@@ -3,10 +3,6 @@ import {
   Alert,
   Bullseye,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
-  CardTitle,
   Checkbox,
   Content,
   EmptyState,
@@ -32,6 +28,7 @@ import {
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { ScrollableTable } from '@app/components/ScrollableTable';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
+import { ActionCard } from '@app/components/ActionCard';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { useServer } from '@app/ServerContext';
 import { capBool, capValue } from '@app/utils/caps';
@@ -208,25 +205,12 @@ const fetchRuntime = (hub: string): Promise<RuntimeState> =>
   }));
 
 const runtimeTrigger = (open: () => void) => (
-  <Card isClickable style={{ marginBlockStart: 'var(--pf-t--global--spacer--md)' }}>
-    <CardHeader
-      selectableActions={{
-        selectableActionAriaLabel: 'View runtime tables',
-        onClickAction: open,
-      }}
-    >
-      <CardTitle>View runtime tables</CardTitle>
-    </CardHeader>
-    <CardBody
-      style={{
-        color: 'var(--pf-t--global--text--color--subtle)',
-        fontSize: 'var(--pf-t--global--font--size--sm)',
-        overflowWrap: 'anywhere',
-      }}
-    >
-      Inspect operating status, NAT sessions, and DHCP leases while Secure NAT is running.
-    </CardBody>
-  </Card>
+  <ActionCard
+    title="View runtime tables"
+    description="Inspect operating status, NAT sessions, and DHCP leases while Secure NAT is running."
+    onClick={open}
+    style={{ marginBlockStart: 'var(--pf-t--global--spacer--md)' }}
+  />
 );
 
 const SecureNatRuntimeModal: React.FunctionComponent<{ hub: string; isOpen: boolean; onClose: () => void }> = ({

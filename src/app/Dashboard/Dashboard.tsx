@@ -2,7 +2,6 @@ import * as React from 'react';
 import {
   Card,
   CardBody,
-  CardHeader,
   CardTitle,
   DescriptionList,
   DescriptionListDescription,
@@ -16,6 +15,7 @@ import {
 import { NetworkIcon, OutlinedClockIcon, ServerIcon, UserIcon } from '@patternfly/react-icons';
 import { useNavigate } from 'react-router-dom';
 import { useServer } from '@app/ServerContext';
+import { ActionCard } from '@app/components/ActionCard';
 import { AppPage } from '@app/components/AppPage';
 import { StatCard } from '@app/components/StatCard';
 
@@ -94,7 +94,11 @@ const Dashboard: React.FunctionComponent = () => {
           <Card>
             <CardTitle>Server overview</CardTitle>
             <CardBody>
-              <DescriptionList isHorizontal columnModifier={{ default: '1Col', lg: '2Col' }}>
+              <DescriptionList
+                isHorizontal
+                columnModifier={{ default: '1Col', lg: '2Col' }}
+                style={{ overflowWrap: 'anywhere' }}
+              >
                 <DescriptionListGroup>
                   <DescriptionListTerm>Product</DescriptionListTerm>
                   <DescriptionListDescription>{str('ServerProductName_str')}</DescriptionListDescription>
@@ -137,24 +141,12 @@ const Dashboard: React.FunctionComponent = () => {
               <CardBody>
                 <Gallery hasGutter minWidths={{ default: '220px' }}>
                   {commonTasks.map((task) => (
-                    <Card key={task.path} isClickable isFullHeight>
-                      <CardHeader
-                        selectableActions={{
-                          selectableActionAriaLabel: task.title,
-                          onClickAction: () => navigate(task.path),
-                        }}
-                      >
-                        <CardTitle>{task.title}</CardTitle>
-                      </CardHeader>
-                      <CardBody
-                        style={{
-                          color: 'var(--pf-t--global--text--color--subtle)',
-                          fontSize: 'var(--pf-t--global--font--size--sm)',
-                        }}
-                      >
-                        {task.description}
-                      </CardBody>
-                    </Card>
+                    <ActionCard
+                      key={task.path}
+                      title={task.title}
+                      description={task.description}
+                      onClick={() => navigate(task.path)}
+                    />
                   ))}
                 </Gallery>
               </CardBody>

@@ -43,12 +43,13 @@ const StatCard: React.FunctionComponent<StatCardProps> = ({ icon, label, value, 
             {icon}
           </span>
         </FlexItem>
-        <FlexItem>
+        <FlexItem style={{ minWidth: 0 }}>
           <div
             style={{
               fontSize: 'var(--pf-t--global--font--size--heading--h3)',
               fontWeight: 'var(--pf-t--global--font--weight--body--bold)',
               lineHeight: 1.1,
+              overflowWrap: 'anywhere',
             }}
           >
             {value}
@@ -57,6 +58,7 @@ const StatCard: React.FunctionComponent<StatCardProps> = ({ icon, label, value, 
             style={{
               fontSize: 'var(--pf-t--global--font--size--body--sm)',
               color: 'var(--pf-t--global--text--color--subtle)',
+              overflowWrap: 'anywhere',
             }}
           >
             {label}
