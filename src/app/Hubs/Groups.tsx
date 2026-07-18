@@ -20,7 +20,8 @@ import {
   Spinner,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { BanIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -158,7 +159,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </EmptyStateFooter>
         </EmptyState>
       ) : groups !== null ? (
-        <Table aria-label="Groups" variant="compact">
+        <ScrollableTable aria-label="Groups" variant="compact">
           <Thead>
             <Tr>
               <Th>Group name</Th>
@@ -198,7 +199,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       {/* Create group */}

@@ -12,7 +12,8 @@ import {
   ModalVariant,
   Spinner,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -107,7 +108,7 @@ const ConnectionsList: React.FunctionComponent = () => {
           <EmptyStateBody>There are currently no TCP/IP connections to this server.</EmptyStateBody>
         </EmptyState>
       ) : (
-        <Table aria-label="TCP/IP connections" variant="compact">
+        <ScrollableTable aria-label="TCP/IP connections" variant="compact">
           <Thead>
             <Tr>
               <Th>Connection name</Th>
@@ -136,7 +137,7 @@ const ConnectionsList: React.FunctionComponent = () => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       )}
 
       <Modal variant={ModalVariant.medium} isOpen={detail !== null} onClose={() => setDetail(null)}>

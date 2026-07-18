@@ -27,7 +27,8 @@ import {
   Switch,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -756,7 +757,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </EmptyStateFooter>
         </EmptyState>
       ) : rules !== null ? (
-        <Table aria-label="Access list" variant="compact">
+        <ScrollableTable aria-label="Access list" variant="compact">
           <Thead>
             <Tr>
               <Th>ID</Th>
@@ -809,7 +810,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       <Modal variant={ModalVariant.large} isOpen={editor !== null} onClose={() => setEditor(null)}>

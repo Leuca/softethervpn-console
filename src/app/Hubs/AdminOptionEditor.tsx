@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Alert, Switch, TextInput } from '@patternfly/react-core';
-import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 
 interface AdminOptionEditorProps {
@@ -55,7 +56,7 @@ const AdminOptionEditor: React.FunctionComponent<AdminOptionEditorProps> = ({
           This connection cannot modify Virtual Hub Administration Options.
         </Alert>
       )}
-      <Table aria-label={ariaLabel} variant="compact" gridBreakPoint="grid-md">
+      <ScrollableTable aria-label={ariaLabel} variant="compact" gridBreakPoint="grid-md">
         <Thead>
           <Tr>
             <Th width={30}>Option</Th>
@@ -99,7 +100,7 @@ const AdminOptionEditor: React.FunctionComponent<AdminOptionEditorProps> = ({
             );
           })}
         </Tbody>
-      </Table>
+      </ScrollableTable>
     </>
   );
 };

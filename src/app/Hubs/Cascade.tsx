@@ -27,7 +27,8 @@ import {
   Spinner,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -894,7 +895,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </EmptyStateFooter>
         </EmptyState>
       ) : links !== null ? (
-        <Table aria-label="Cascade connections" variant="compact">
+        <ScrollableTable aria-label="Cascade connections" variant="compact">
           <Thead>
             <Tr>
               <Th>Setting name</Th>
@@ -938,7 +939,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               );
             })}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       {/* Create cascade (step aside while a sub-modal is open) */}

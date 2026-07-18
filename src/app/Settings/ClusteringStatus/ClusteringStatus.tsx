@@ -20,7 +20,8 @@ import {
   StackItem,
 } from '@patternfly/react-core';
 import { SyncAltIcon } from '@patternfly/react-icons';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
@@ -106,7 +107,7 @@ const ControllerView: React.FunctionComponent = () => {
           <EmptyStateBody>No servers have joined this cluster yet.</EmptyStateBody>
         </EmptyState>
       ) : (
-        <Table aria-label="Cluster members" variant="compact">
+        <ScrollableTable aria-label="Cluster members" variant="compact">
           <Thead>
             <Tr>
               <Th>Type</Th>
@@ -139,7 +140,7 @@ const ControllerView: React.FunctionComponent = () => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       )}
 
       <Modal variant={ModalVariant.medium} isOpen={detail !== null} onClose={() => setDetail(null)}>

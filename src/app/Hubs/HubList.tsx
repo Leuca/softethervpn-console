@@ -21,7 +21,8 @@ import {
   Switch,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -172,7 +173,7 @@ const HubList: React.FunctionComponent = () => {
           )}
         </EmptyState>
       ) : hubs !== null ? (
-        <Table aria-label="Virtual Hubs" variant="compact">
+        <ScrollableTable aria-label="Virtual Hubs" variant="compact">
           <Thead>
             <Tr>
               <Th>Virtual Hub</Th>
@@ -229,7 +230,7 @@ const HubList: React.FunctionComponent = () => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       {/* Create hub */}

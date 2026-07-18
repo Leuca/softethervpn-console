@@ -29,7 +29,8 @@ import {
   TextArea,
   TextInput,
 } from '@patternfly/react-core';
-import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { useServer } from '@app/ServerContext';
@@ -271,7 +272,7 @@ const SecureNatRuntimeModal: React.FunctionComponent<{ hub: string; isOpen: bool
                   <EmptyStateBody>No Virtual NAT sessions are currently active.</EmptyStateBody>
                 </EmptyState>
               ) : (
-                <Table aria-label="NAT table" variant="compact">
+                <ScrollableTable aria-label="NAT table" variant="compact">
                   <Thead>
                     <Tr>
                       <Th>ID</Th>
@@ -296,7 +297,7 @@ const SecureNatRuntimeModal: React.FunctionComponent<{ hub: string; isOpen: bool
                       </Tr>
                     ))}
                   </Tbody>
-                </Table>
+                </ScrollableTable>
               )}
 
               <Content component="h2">DHCP leases</Content>
@@ -305,7 +306,7 @@ const SecureNatRuntimeModal: React.FunctionComponent<{ hub: string; isOpen: bool
                   <EmptyStateBody>No DHCP clients currently have leases from Secure NAT.</EmptyStateBody>
                 </EmptyState>
               ) : (
-                <Table aria-label="DHCP leases" variant="compact">
+                <ScrollableTable aria-label="DHCP leases" variant="compact">
                   <Thead>
                     <Tr>
                       <Th>ID</Th>
@@ -328,7 +329,7 @@ const SecureNatRuntimeModal: React.FunctionComponent<{ hub: string; isOpen: bool
                       </Tr>
                     ))}
                   </Tbody>
-                </Table>
+                </ScrollableTable>
               )}
             </>
           ) : null}

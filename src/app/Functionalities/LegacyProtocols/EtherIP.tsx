@@ -23,7 +23,8 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { PlusCircleIcon } from '@patternfly/react-icons';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { useNavigate } from 'react-router-dom';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -146,7 +147,7 @@ const EtherIPDetailed: React.FunctionComponent = () => {
                 <EmptyStateBody>Add a client setting for each EtherIP / L2TPv3 router that connects.</EmptyStateBody>
               </EmptyState>
             ) : settings !== null ? (
-              <Table aria-label="EtherIP client settings" variant="compact">
+              <ScrollableTable aria-label="EtherIP client settings" variant="compact">
                 <Thead>
                   <Tr>
                     <Th>ISAKMP Phase 1 ID</Th>
@@ -170,7 +171,7 @@ const EtherIPDetailed: React.FunctionComponent = () => {
                     </Tr>
                   ))}
                 </Tbody>
-              </Table>
+              </ScrollableTable>
             ) : null}
           </StackItem>
         </Stack>

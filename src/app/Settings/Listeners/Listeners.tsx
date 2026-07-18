@@ -19,7 +19,8 @@ import {
   NumberInput,
   Spinner,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -152,7 +153,7 @@ const Listeners: React.FunctionComponent = () => {
           </EmptyStateFooter>
         </EmptyState>
       ) : listeners !== null ? (
-        <Table aria-label="Listeners" variant="compact">
+        <ScrollableTable aria-label="Listeners" variant="compact">
           <Thead>
             <Tr>
               <Th>Port</Th>
@@ -187,7 +188,7 @@ const Listeners: React.FunctionComponent = () => {
               );
             })}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       {/* Create listener */}

@@ -14,7 +14,8 @@ import {
   ModalVariant,
   Spinner,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { KeyValueTable } from '@app/components/KeyValueTable';
@@ -151,7 +152,7 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <EmptyStateBody>No VPN sessions are currently connected to this hub.</EmptyStateBody>
         </EmptyState>
       ) : sessions !== null ? (
-        <Table aria-label="Sessions" variant="compact">
+        <ScrollableTable aria-label="Sessions" variant="compact">
           <Thead>
             <Tr>
               <Th>Session name</Th>
@@ -190,7 +191,7 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       {/* Session details: status summary only. Session MAC/IP tables open separately. */}

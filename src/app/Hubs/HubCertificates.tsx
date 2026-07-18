@@ -20,7 +20,8 @@ import {
   Spinner,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -448,7 +449,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <EmptyStateBody>No hub-specific CA certificates are configured for this Virtual Hub.</EmptyStateBody>
         </EmptyState>
       ) : certs !== null ? (
-        <Table aria-label="Trusted CA certificates" variant="compact">
+        <ScrollableTable aria-label="Trusted CA certificates" variant="compact">
           <Thead>
             <Tr>
               <Th>Subject</Th>
@@ -474,7 +475,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
@@ -499,7 +500,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <EmptyStateBody>No revoked certificate definitions are configured for this Virtual Hub.</EmptyStateBody>
         </EmptyState>
       ) : crls !== null ? (
-        <Table aria-label="Certificate revocation list" variant="compact">
+        <ScrollableTable aria-label="Certificate revocation list" variant="compact">
           <Thead>
             <Tr>
               <Th>Entry</Th>
@@ -521,7 +522,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>

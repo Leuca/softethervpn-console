@@ -22,7 +22,8 @@ import {
   StackItem,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -180,7 +181,7 @@ const LocalBridge: React.FunctionComponent = () => {
               </EmptyStateBody>
             </EmptyState>
           ) : bridges !== null ? (
-            <Table aria-label="Local bridges" variant="compact">
+            <ScrollableTable aria-label="Local bridges" variant="compact">
               <Thead>
                 <Tr>
                   <Th>#</Th>
@@ -215,7 +216,7 @@ const LocalBridge: React.FunctionComponent = () => {
                   );
                 })}
               </Tbody>
-            </Table>
+            </ScrollableTable>
           ) : null}
         </StackItem>
       </Stack>

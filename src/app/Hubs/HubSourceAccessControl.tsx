@@ -19,7 +19,8 @@ import {
   Spinner,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { useServer } from '@app/ServerContext';
@@ -353,7 +354,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
                 <EmptyStateBody>With no rules, connections are allowed unless another server setting rejects them.</EmptyStateBody>
               </EmptyState>
             ) : rules !== null ? (
-              <Table aria-label="Source IP Access Control" variant="compact" gridBreakPoint="grid-md">
+              <ScrollableTable aria-label="Source IP Access Control" variant="compact" gridBreakPoint="grid-md">
                 <Thead>
                   <Tr>
                     <Th width={10}>ID</Th>
@@ -383,7 +384,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
                     </Tr>
                   ))}
                 </Tbody>
-              </Table>
+              </ScrollableTable>
             ) : null}
           </Flex>
         </ModalBody>

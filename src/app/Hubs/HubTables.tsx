@@ -17,7 +17,8 @@ import {
   TabTitleText,
   Tabs,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { formatMacAddress, formatRpcValue } from '@app/utils/format';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -110,7 +111,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
           <EmptyStateBody>No MAC addresses are currently registered{scopedText}.</EmptyStateBody>
         </EmptyState>
       ) : mac !== null ? (
-        <Table aria-label={sessionName ? `Session MAC address table for ${sessionName}` : 'Hub MAC address table'} variant="compact">
+        <ScrollableTable aria-label={sessionName ? `Session MAC address table for ${sessionName}` : 'Hub MAC address table'} variant="compact">
           <Thead>
             <Tr>
               <Th>Session name</Th>
@@ -147,7 +148,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
               );
             })}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
     </Flex>
   );
@@ -159,7 +160,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
           <EmptyStateBody>No IP addresses are currently registered{scopedText}.</EmptyStateBody>
         </EmptyState>
       ) : ip !== null ? (
-        <Table aria-label={sessionName ? `Session IP address table for ${sessionName}` : 'Hub IP address table'} variant="compact">
+        <ScrollableTable aria-label={sessionName ? `Session IP address table for ${sessionName}` : 'Hub IP address table'} variant="compact">
           <Thead>
             <Tr>
               <Th>Session name</Th>
@@ -198,7 +199,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
     </Flex>
   );

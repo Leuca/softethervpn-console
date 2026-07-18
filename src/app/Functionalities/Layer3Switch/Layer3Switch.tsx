@@ -26,7 +26,8 @@ import {
   StackItem,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -408,7 +409,7 @@ const Layer3Switch: React.FunctionComponent = () => {
               <EmptyStateBody>Create a switch, add interfaces and routes, then start it.</EmptyStateBody>
             </EmptyState>
           ) : switches !== null ? (
-            <Table aria-label="Layer 3 switches" variant="compact">
+            <ScrollableTable aria-label="Layer 3 switches" variant="compact">
               <Thead>
                 <Tr>
                   <Th>Name</Th>
@@ -454,7 +455,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                   );
                 })}
               </Tbody>
-            </Table>
+            </ScrollableTable>
           ) : null}
         </StackItem>
 
@@ -504,7 +505,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                 ) : ifs.length === 0 ? (
                   <Content component="small">No interfaces defined.</Content>
                 ) : (
-                  <Table aria-label="Virtual interfaces" variant="compact">
+                  <ScrollableTable aria-label="Virtual interfaces" variant="compact">
                     <Thead>
                       <Tr>
                         <Th>Virtual Hub</Th>
@@ -528,7 +529,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                         </Tr>
                       ))}
                     </Tbody>
-                  </Table>
+                  </ScrollableTable>
                 )}
               </StackItem>
 
@@ -557,7 +558,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                 ) : routes.length === 0 ? (
                   <Content component="small">No routes defined.</Content>
                 ) : (
-                  <Table aria-label="Routing table" variant="compact">
+                  <ScrollableTable aria-label="Routing table" variant="compact">
                     <Thead>
                       <Tr>
                         <Th>Network address</Th>
@@ -583,7 +584,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                         </Tr>
                       ))}
                     </Tbody>
-                  </Table>
+                  </ScrollableTable>
                 )}
               </StackItem>
             </Stack>

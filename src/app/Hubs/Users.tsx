@@ -26,7 +26,8 @@ import {
   Spinner,
   TextInput,
 } from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { ScrollableTable } from '@app/components/ScrollableTable';
 import { BanIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -695,7 +696,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </EmptyStateFooter>
         </EmptyState>
       ) : users !== null ? (
-        <Table aria-label="Users" variant="compact">
+        <ScrollableTable aria-label="Users" variant="compact">
           <Thead>
             <Tr>
               <Th>User name</Th>
@@ -741,7 +742,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               </Tr>
             ))}
           </Tbody>
-        </Table>
+        </ScrollableTable>
       ) : null}
 
       {create && (
