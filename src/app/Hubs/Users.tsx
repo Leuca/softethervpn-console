@@ -32,6 +32,7 @@ import { BanIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
+import { FormErrorAlert } from '@app/components/FormErrorAlert';
 import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 import { binToBytes } from '@app/utils/blob_utils';
 import { recordChanged } from '@app/utils/dirty';
@@ -128,8 +129,10 @@ interface UserSettingsModalProps {
   rootCommonNameEnabled: boolean;
   rootSerialEnabled: boolean;
   rootSerial: string;
+  error: string | null;
   isOpen: boolean;
   isSubmitDisabled: boolean;
+  isSubmitting: boolean;
   onClose: () => void;
   onSubmit: () => void;
   onField: (key: string, value: unknown) => void;
@@ -152,8 +155,10 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
   rootCommonNameEnabled,
   rootSerialEnabled,
   rootSerial,
+  error,
   isOpen,
   isSubmitDisabled,
+  isSubmitting,
   onClose,
   onSubmit,
   onField,
@@ -179,9 +184,10 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
         : null;
 
   return (
-    <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={onClose}>
+    <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={() => !isSubmitting && onClose()}>
       <ModalHeader title={isCreate ? 'New user' : `Edit ${String(user.Name_str)}`} />
       <ModalBody>
+        <FormErrorAlert error={error} title="User operation failed" />
         <Form>
           {isCreate && (
             <FormGroup label="User name" isRequired fieldId={`${idPrefix}-name`}>
@@ -379,10 +385,15 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" onClick={onSubmit} isDisabled={isSubmitDisabled}>
+        <Button
+          variant="primary"
+          onClick={onSubmit}
+          isDisabled={isSubmitDisabled || isSubmitting}
+          isLoading={isSubmitting}
+        >
           {isCreate ? 'Create' : 'Save'}
         </Button>
-        <Button variant="link" onClick={onClose}>
+        <Button variant="link" onClick={onClose} isDisabled={isSubmitting}>
           Cancel
         </Button>
       </ModalFooter>
@@ -393,6 +404,7 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
 const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [users, setUsers] = React.useState<VPN.VpnRpcEnumUserItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
 
   const [create, setCreate] = React.useState<Record<string, unknown> | null>(null);
   const [createPassword, setCreatePassword] = React.useState('');
@@ -430,6 +442,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   }, [load]);
 
   const openCreate = () => {
+    setError(null);
     setCreate(emptyUserDraft());
     setCreatePassword('');
     setCreateCertFilename('');
@@ -463,19 +476,23 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       NtUsername_utf: authType === VPN.VpnRpcUserAuthType.NTDomain ? String(create.NtUsername_utf ?? '') : '',
       ExpireTime_dt: new Date(String(create.ExpireTime_dt ?? NEVER)),
     });
+    setSubmitting(true);
+    setError(null);
     api
       .CreateUser(obj)
       .then(() => {
+        setSubmitting(false);
         setCreate(null);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setCreate(null);
+        setSubmitting(false);
       });
   };
 
   const openEdit = (userName: string) => {
+    setError(null);
     setNewPassword('');
     setEditCertFilename('');
     setEditCertError(null);
@@ -631,15 +648,18 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       delete (obj as { CommonName_utf?: string }).CommonName_utf;
       delete (obj as { Serial_bin?: Uint8Array }).Serial_bin;
     }
+    setSubmitting(true);
+    setError(null);
     api
       .SetUser(obj)
       .then(() => {
+        setSubmitting(false);
         setEdit(null);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setEdit(null);
+        setSubmitting(false);
       });
   };
 
@@ -674,7 +694,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </FlexItem>
       </Flex>
 
-      {error && (
+      {error && create === null && edit === null && (
         <Alert variant="danger" title="User operation failed" isInline>
           {error}
         </Alert>
@@ -755,8 +775,10 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           rootCommonNameEnabled={createRootCommonNameEnabled}
           rootSerialEnabled={createRootSerialEnabled}
           rootSerial={createRootSerial}
+          error={error}
           isOpen={certOpen === null && policyOpen === null}
           isSubmitDisabled={!canCreate}
+          isSubmitting={submitting}
           onClose={() => setCreate(null)}
           onSubmit={createUser}
           onField={(key, value) => (key === 'AuthType_u32' ? setCreateAuthType(value) : setCreateField(key, value))}
@@ -781,8 +803,10 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           rootCommonNameEnabled={editRootCommonNameEnabled}
           rootSerialEnabled={editRootSerialEnabled}
           rootSerial={editRootSerial}
+          error={error}
           isOpen={certOpen === null && policyOpen === null}
           isSubmitDisabled={!editDirty || !editValid}
+          isSubmitting={submitting}
           onClose={() => setEdit(null)}
           onSubmit={saveEdit}
           onField={(key, value) => (key === 'AuthType_u32' ? setEditAuthType(value) : setEditField(key, value))}

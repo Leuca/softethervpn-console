@@ -25,6 +25,7 @@ import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
+import { FormErrorAlert } from '@app/components/FormErrorAlert';
 
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
@@ -82,21 +83,25 @@ const Listeners: React.FunctionComponent = () => {
     // Default to the next free port after the highest one in use.
     const highest = (listeners ?? []).reduce((max, l) => Math.max(max, l.Ports_u32), 0);
     setNewPort(Math.min(Math.max(highest + 1, MIN_PORT), MAX_PORT));
+    setError(null);
     setCreateOpen(true);
   };
 
   const clampPort = (value: number) => Math.min(Math.max(value, MIN_PORT), MAX_PORT);
 
   const create = () => {
+    setBusy(true);
+    setError(null);
     api
       .CreateListener(new VPN.VpnRpcListener({ Port_u32: newPort, Enable_bool: true }))
       .then(() => {
+        setBusy(false);
         setCreateOpen(false);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setCreateOpen(false);
+        setBusy(false);
       });
   };
 
@@ -126,7 +131,7 @@ const Listeners: React.FunctionComponent = () => {
       description="TCP ports the VPN server accepts client connections on. You can create, delete, start and stop listeners."
       actions={createButton}
     >
-      {error && (
+      {error && !createOpen && (
         <Alert
           variant="danger"
           title="Listener operation failed"
@@ -192,9 +197,14 @@ const Listeners: React.FunctionComponent = () => {
       ) : null}
 
       {/* Create listener */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={createOpen}
+        onClose={() => !busy && setCreateOpen(false)}
+      >
         <ModalHeader title="Create listener" />
         <ModalBody>
+          <FormErrorAlert error={error} title="Listener operation failed" />
           <Content component="p">Add a TCP/IP port number for the VPN server to accept client connections on.</Content>
           <Form>
             <FormGroup label="Port number" fieldId="listener-port">
@@ -237,10 +247,15 @@ const Listeners: React.FunctionComponent = () => {
           </Alert>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={create} isDisabled={usedPorts.has(newPort)}>
+          <Button
+            variant="primary"
+            onClick={create}
+            isDisabled={usedPorts.has(newPort) || busy}
+            isLoading={busy}
+          >
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)}>
+          <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={busy}>
             Cancel
           </Button>
         </ModalFooter>

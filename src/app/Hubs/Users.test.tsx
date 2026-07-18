@@ -254,6 +254,27 @@ describe('Users', () => {
     expect(Object.prototype.hasOwnProperty.call(sent, 'Auth_Password_str')).toBe(false);
   });
 
+  it('keeps edited values open when the server rejects the save', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({ Name_str: 'alice', Realname_utf: 'Alice A', AuthType_u32: 1 });
+    setUser.mockRejectedValue(new Error('Update rejected'));
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    const dialog = await screen.findByRole('dialog');
+    const realname = within(dialog).getByLabelText('Real name');
+    await user.clear(realname);
+    await user.type(realname, 'Alice B');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(await within(dialog).findByText('User operation failed')).toBeInTheDocument();
+    expect(realname).toHaveValue('Alice B');
+  });
+
   it('disables edit save again when user fields return to their original values', async () => {
     enumUser.mockResolvedValue({ UserList: [alice] });
     getUser.mockResolvedValue({ Name_str: 'alice', Realname_utf: 'Alice A', Note_utf: '', AuthType_u32: 1 });

@@ -25,12 +25,14 @@ import { ScrollableTable } from '@app/components/ScrollableTable';
 import { BanIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
+import { FormErrorAlert } from '@app/components/FormErrorAlert';
 import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 import { recordChanged } from '@app/utils/dirty';
 
 const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [groups, setGroups] = React.useState<VPN.VpnRpcEnumGroupItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
 
   const [createOpen, setCreateOpen] = React.useState(false);
   const [name, setName] = React.useState('');
@@ -59,25 +61,30 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setName('');
     setRealname('');
     setNote('');
+    setError(null);
     setCreateOpen(true);
   };
 
   const create = () => {
+    setSubmitting(true);
+    setError(null);
     api
       .CreateGroup(
         new VPN.VpnRpcSetGroup({ HubName_str: hub, Name_str: name.trim(), Realname_utf: realname, Note_utf: note }),
       )
       .then(() => {
+        setSubmitting(false);
         setCreateOpen(false);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setCreateOpen(false);
+        setSubmitting(false);
       });
   };
 
   const openEdit = (groupName: string) => {
+    setError(null);
     api
       .GetGroup(new VPN.VpnRpcSetGroup({ HubName_str: hub, Name_str: groupName }))
       .then((response) => {
@@ -96,15 +103,18 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     }
     const obj = new VPN.VpnRpcSetGroup(edit as Partial<VPN.VpnRpcSetGroup>);
     obj.HubName_str = hub; // ensure the save targets this hub even if GetGroup omits it
+    setSubmitting(true);
+    setError(null);
     api
       .SetGroup(obj)
       .then(() => {
+        setSubmitting(false);
         setEdit(null);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setEdit(null);
+        setSubmitting(false);
       });
   };
 
@@ -137,7 +147,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </FlexItem>
       </Flex>
 
-      {error && (
+      {error && !createOpen && edit === null && (
         <Alert variant="danger" title="Group operation failed" isInline>
           {error}
         </Alert>
@@ -203,9 +213,14 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       ) : null}
 
       {/* Create group */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={createOpen}
+        onClose={() => !submitting && setCreateOpen(false)}
+      >
         <ModalHeader title="New group" />
         <ModalBody>
+          <FormErrorAlert error={error} title="Group operation failed" />
           <Form>
             <FormGroup label="Group name" isRequired fieldId="group-name">
               <TextInput
@@ -230,10 +245,15 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </Form>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={create} isDisabled={name.trim().length === 0}>
+          <Button
+            variant="primary"
+            onClick={create}
+            isDisabled={name.trim().length === 0 || submitting}
+            isLoading={submitting}
+          >
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)}>
+          <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>
@@ -242,9 +262,14 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       {/* Edit group */}
       {/* Step aside while the policy sub-modal is open (stacked modals hide each
           other from screen readers); the edit state is preserved on return. */}
-      <Modal variant={ModalVariant.small} isOpen={edit !== null && !policyOpen} onClose={() => setEdit(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={edit !== null && !policyOpen}
+        onClose={() => !submitting && setEdit(null)}
+      >
         <ModalHeader title={edit ? `Edit ${String(edit.Name_str)}` : ''} />
         <ModalBody>
+          <FormErrorAlert error={error} title="Group operation failed" />
           {edit && (
             <Form>
               <FormGroup label="Real name" fieldId="edit-group-realname">
@@ -272,10 +297,10 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={saveEdit} isDisabled={!editDirty}>
+          <Button variant="primary" onClick={saveEdit} isDisabled={!editDirty || submitting} isLoading={submitting}>
             Save
           </Button>
-          <Button variant="link" onClick={() => setEdit(null)}>
+          <Button variant="link" onClick={() => setEdit(null)} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>

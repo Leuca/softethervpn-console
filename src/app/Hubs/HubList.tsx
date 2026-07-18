@@ -28,6 +28,7 @@ import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { useServer } from '@app/ServerContext';
 import { AppPage } from '@app/components/AppPage';
+import { FormErrorAlert } from '@app/components/FormErrorAlert';
 import { formatRpcValue, hubTypeLabel } from '@app/utils/format';
 
 const HubList: React.FunctionComponent = () => {
@@ -80,6 +81,7 @@ const HubList: React.FunctionComponent = () => {
     setName('');
     setPassword('');
     setConfirm('');
+    setError(null);
     setCreateOpen(true);
   };
 
@@ -93,6 +95,8 @@ const HubList: React.FunctionComponent = () => {
     // A standalone server (ServerType 0) only has standalone hubs; on a cluster
     // controller new hubs default to static.
     const isCluster = Number(info['ServerType_u32'] ?? 0) !== 0;
+    setBusy(true);
+    setError(null);
     api
       .CreateHub(
         new VPN.VpnRpcCreateHub({
@@ -104,12 +108,13 @@ const HubList: React.FunctionComponent = () => {
         }),
       )
       .then(() => {
+        setBusy(false);
         setCreateOpen(false);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setCreateOpen(false);
+        setBusy(false);
       });
   };
 
@@ -140,7 +145,7 @@ const HubList: React.FunctionComponent = () => {
       description="Each Virtual Hub is an isolated virtual Ethernet switch with its own users, groups and security policy."
       actions={createButton}
     >
-      {error && (
+      {error && !createOpen && (
         <Alert
           variant="danger"
           title="Hub operation failed"
@@ -234,9 +239,14 @@ const HubList: React.FunctionComponent = () => {
       ) : null}
 
       {/* Create hub */}
-      <Modal variant={ModalVariant.small} isOpen={!hideAdminOnly && createOpen} onClose={() => setCreateOpen(false)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={!hideAdminOnly && createOpen}
+        onClose={() => !busy && setCreateOpen(false)}
+      >
         <ModalHeader title="Create Virtual Hub" />
         <ModalBody>
+          <FormErrorAlert error={error} title="Hub operation failed" />
           <Form>
             <FormGroup label="Virtual Hub name" isRequired fieldId="hub-name">
               <TextInput
@@ -274,10 +284,10 @@ const HubList: React.FunctionComponent = () => {
           </Form>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={create} isDisabled={!canCreate}>
+          <Button variant="primary" onClick={create} isDisabled={!canCreate || busy} isLoading={busy}>
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)}>
+          <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={busy}>
             Cancel
           </Button>
         </ModalFooter>

@@ -68,6 +68,25 @@ describe('Groups', () => {
     });
   });
 
+  it('keeps the create draft open when the server rejects it', async () => {
+    enumGroup.mockResolvedValue({ GroupList: [sales] });
+    createGroup.mockRejectedValue(new Error('Group already exists'));
+    const user = userEvent.setup();
+
+    render(<Groups hub="DEFAULT" />);
+    await screen.findByText('sales');
+    await user.click(screen.getByRole('button', { name: /new group/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Group name'), 'sales');
+    await user.type(within(dialog).getByLabelText('Note'), 'Keep this draft');
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+
+    expect(await within(dialog).findByText('Group operation failed')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Group name')).toHaveValue('sales');
+    expect(within(dialog).getByLabelText('Note')).toHaveValue('Keep this draft');
+  });
+
   it('edits a group name-less (real name / note) and saves', async () => {
     enumGroup.mockResolvedValue({ GroupList: [sales] });
     // GetGroup may not echo HubName_str; the save must still target the hub.

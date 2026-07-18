@@ -32,6 +32,7 @@ import { ScrollableTable } from '@app/components/ScrollableTable';
 import { PlusCircleIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
+import { FormErrorAlert } from '@app/components/FormErrorAlert';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 import { KeyValueTable } from '@app/components/KeyValueTable';
@@ -644,6 +645,7 @@ const AuthFields: React.FunctionComponent<{
 const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [links, setLinks] = React.useState<VPN.VpnRpcEnumLinkItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
 
   const [createOpen, setCreateOpen] = React.useState(false);
   const [name, setName] = React.useState('');
@@ -694,6 +696,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   }, [load]);
 
   const openCreate = () => {
+    setError(null);
     setName('');
     setHost('');
     setPort('443');
@@ -742,15 +745,18 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       delete (link as unknown as Record<string, unknown>).ServerCert_bin;
     }
     applyAuth(link as unknown as Record<string, unknown>, (key) => auth[key], password);
+    setSubmitting(true);
+    setError(null);
     api
       .CreateLink(link)
       .then(() => {
+        setSubmitting(false);
         setCreateOpen(false);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setCreateOpen(false);
+        setSubmitting(false);
       });
   };
 
@@ -781,6 +787,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Load the full cascade config for inspection / editing. GetLink is keyed by
   // the local hub (HubName_Ex_str) and the account name.
   const openEdit = (accountName: string) => {
+    setError(null);
     setEditPassword('');
     setEditTouched(new Set());
     api
@@ -823,15 +830,18 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     if (AUTH_KEYS.some((key) => editTouched.has(key)) || editPassword.length > 0) {
       applyAuth(obj as unknown as Record<string, unknown>, (key) => edit[key], editPassword);
     }
+    setSubmitting(true);
+    setError(null);
     api
       .SetLink(obj)
       .then(() => {
+        setSubmitting(false);
         setEdit(null);
         load();
       })
       .catch((e) => {
         setError(String(e));
-        setEdit(null);
+        setSubmitting(false);
       });
   };
 
@@ -870,7 +880,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </FlexItem>
       </Flex>
 
-      {error && (
+      {error && !createOpen && edit === null && (
         <Alert variant="danger" title="Cascade operation failed" isInline>
           {error}
         </Alert>
@@ -943,9 +953,14 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       ) : null}
 
       {/* Create cascade (step aside while a sub-modal is open) */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen && !subModalOpen} onClose={() => setCreateOpen(false)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={createOpen && !subModalOpen}
+        onClose={() => !submitting && setCreateOpen(false)}
+      >
         <ModalHeader title="New cascade connection" />
         <ModalBody>
+          <FormErrorAlert error={error} title="Cascade operation failed" />
           <Form>
             <FormGroup label="Setting name" isRequired fieldId="link-name">
               <TextInput
@@ -1016,19 +1031,24 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           </Form>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={create} isDisabled={!canCreate}>
+          <Button variant="primary" onClick={create} isDisabled={!canCreate || submitting} isLoading={submitting}>
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)}>
+          <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>
       </Modal>
 
       {/* Edit / inspect cascade (step aside while a sub-modal is open) */}
-      <Modal variant={ModalVariant.medium} isOpen={edit !== null && !subModalOpen} onClose={() => setEdit(null)}>
+      <Modal
+        variant={ModalVariant.medium}
+        isOpen={edit !== null && !subModalOpen}
+        onClose={() => !submitting && setEdit(null)}
+      >
         <ModalHeader title={edit ? `Cascade settings: ${String(edit.AccountName_utf ?? '')}` : ''} />
         <ModalBody>
+          <FormErrorAlert error={error} title="Cascade operation failed" />
           {edit && (
             <Form>
               <FormGroup label="Destination server host" isRequired fieldId="edit-host">
@@ -1094,6 +1114,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             isDisabled={
               !edit ||
               !editDirty ||
+              submitting ||
               String(edit.Hostname_str ?? '').trim().length === 0 ||
               String(edit.HubName_str ?? '').trim().length === 0 ||
               !(Number(edit.Port_u32) >= 1 && Number(edit.Port_u32) <= 65535) ||
@@ -1102,10 +1123,11 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               (proxyTouched && !proxyComplete((key) => edit[key])) ||
               (authTouched && !editAuthComplete((key) => edit[key], editOriginal, editPassword, editTouched))
             }
+            isLoading={submitting}
           >
             Save
           </Button>
-          <Button variant="link" onClick={() => setEdit(null)}>
+          <Button variant="link" onClick={() => setEdit(null)} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>
