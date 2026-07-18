@@ -23,6 +23,7 @@ import { useDocumentTitle } from '@app/utils/useDocumentTitle';
 
 export interface IAppRoute {
   label?: string; // Excluding the label will exclude the route from the nav sidebar in AppLayout
+  capabilityLabel?: string;
   element: React.ReactElement;
   path: string;
   title: string;
@@ -50,18 +51,25 @@ export interface IRoutePermissionState {
 export const isRouteAccessible = (
   route: IAppRoute,
   { hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels }: IRoutePermissionState,
-): boolean =>
-  !(route.label && hiddenLabels.has(route.label)) &&
-  !(hideAdminOnly && route.isAdmin) &&
-  !(hideNonCluster && route.isCluster === false) &&
-  !(hideNonBridge && route.isBridge === false);
+): boolean => {
+  const capabilityLabel = route.capabilityLabel ?? route.label;
+
+  return (
+    !(capabilityLabel && hiddenLabels.has(capabilityLabel)) &&
+    !(hideAdminOnly && route.isAdmin) &&
+    !(hideNonCluster && route.isCluster === false) &&
+    !(hideNonBridge && route.isBridge === false)
+  );
+};
 
 export const routePermissionReason = (
   route: IAppRoute,
   { hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels }: IRoutePermissionState,
 ): string | null => {
-  if (route.label && hiddenLabels.has(route.label)) {
-    return `${route.label} is not available with this server's capabilities`;
+  const capabilityLabel = route.capabilityLabel ?? route.label;
+
+  if (capabilityLabel && hiddenLabels.has(capabilityLabel)) {
+    return `${capabilityLabel} is not available with this server's capabilities`;
   }
   if (hideAdminOnly && route.isAdmin) {
     return 'This page requires server administrator privileges';
@@ -122,6 +130,7 @@ const routes: AppRouteConfig[] = [
   // The Hubs component is mounted a second time for hub subpaths, so a
   // selected hub resolves without a dedicated route per subsection.
   {
+    capabilityLabel: 'Hubs',
     element: <Hubs />,
     path: '/hubs/:hub',
     title: 'SoftEther VPN Console | Hubs',
@@ -151,6 +160,7 @@ const routes: AppRouteConfig[] = [
         isBridge: false,
       },
       {
+        capabilityLabel: 'Legacy Protocols',
         element: <EtherIPDetailed />,
         path: '/functionalities/legacyprotocols/etherip',
         title: 'SoftEther VPN Console | EtherIP / L2TPv3 detailed settings',

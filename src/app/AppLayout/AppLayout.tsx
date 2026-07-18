@@ -70,6 +70,9 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
       hideNonBridge,
       hiddenLabels,
     });
+  const isRouteActive = (route: IAppRoute): boolean =>
+    route.path === location.pathname ||
+    (route.path !== '/' && location.pathname.startsWith(`${route.path}/`));
 
   const isGroupVisible = (group: IAppRouteGroup): boolean =>
     !hiddenLabels.has(group.label) && !(hideAdminOnly && group.isAdmin) && group.routes.some(isRouteVisible);
@@ -156,7 +159,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   );
 
   const renderNavItem = (route: IAppRoute, index: number) => (
-    <NavItem key={`${route.label}-${index}`} id={`${route.label}-${index}`} isActive={route.path === location.pathname}>
+    <NavItem key={`${route.label}-${index}`} id={`${route.label}-${index}`} isActive={isRouteActive(route)}>
       <NavLink to={route.path}>{route.label}</NavLink>
     </NavItem>
   );
@@ -166,7 +169,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
       key={`${group.label}-${groupIndex}`}
       id={`${group.label}-${groupIndex}`}
       title={group.label}
-      isActive={group.routes.some((route) => route.path === location.pathname)}
+      isActive={group.routes.some(isRouteActive)}
     >
       {group.routes.map((route, idx) => isRouteVisible(route) && renderNavItem(route, idx))}
     </NavExpandable>

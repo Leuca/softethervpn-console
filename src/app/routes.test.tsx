@@ -7,6 +7,7 @@ const flattenedRoutes = routes.reduce(
 );
 
 const findRoute = (label: string): IAppRoute | undefined => flattenedRoutes.find((route) => route.label === label);
+const findRouteByPath = (path: string): IAppRoute | undefined => flattenedRoutes.find((route) => route.path === path);
 const findGroup = (label: string): IAppRouteGroup | undefined =>
   routes.find((route): route is IAppRouteGroup => 'routes' in route && route.label === label);
 
@@ -97,5 +98,24 @@ describe('routes', () => {
       hideNonBridge: false,
       hiddenLabels: new Set<string>(),
     })).toBeNull();
+  });
+
+  it('applies parent capabilities to unlabeled detail routes', () => {
+    const selectedHub = findRouteByPath('/hubs/:hub');
+    const etherIp = findRouteByPath('/functionalities/legacyprotocols/etherip');
+    const state = {
+      hideAdminOnly: false,
+      hideNonCluster: false,
+      hideNonBridge: false,
+      hiddenLabels: new Set(['Hubs', 'Legacy Protocols']),
+    };
+
+    expect(selectedHub).toBeDefined();
+    expect(etherIp).toBeDefined();
+    expect(isRouteAccessible(selectedHub as IAppRoute, state)).toBe(false);
+    expect(isRouteAccessible(etherIp as IAppRoute, state)).toBe(false);
+    expect(routePermissionReason(selectedHub as IAppRoute, state)).toBe(
+      "Hubs is not available with this server's capabilities",
+    );
   });
 });

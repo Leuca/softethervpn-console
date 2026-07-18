@@ -1,6 +1,6 @@
 import * as React from 'react';
 import App from '@app/index';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Mock, afterEach, describe, expect, it, test, vi } from 'vitest';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -15,6 +15,7 @@ vi.mock('@app/utils/vpnrpc_settings', () => {
       GetFarmSetting: vi.fn(() => Promise.resolve({ ServerType_u32: 0 })),
       GetDDnsClientStatus: vi.fn(() => Promise.resolve({ CurrentHostName_str: 'vpn.example.test' })),
       GetAzureStatus: vi.fn(() => Promise.resolve({ IsEnabled_bool: false })),
+      EnumHub: vi.fn(() => Promise.resolve({ HubList: [] })),
       GetCaps: vi.fn(() =>
         Promise.resolve({
         CapsList: [],
@@ -196,6 +197,25 @@ describe('App tests', () => {
         vi.useRealTimers();
         window.ResizeObserver = originalResizeObserver;
       }
+    });
+  });
+
+  it('updates the active navigation state across browser history', async () => {
+    await withDesktopWidth(async () => {
+      const user = userEvent.setup();
+
+      render(<App />);
+
+      await user.click(await screen.findByRole('link', { name: 'Hubs' }));
+      expect(screen.getByRole('link', { name: 'Hubs' })).toHaveAttribute('aria-current', 'page');
+
+      act(() => window.history.back());
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Hubs' })).not.toHaveAttribute('aria-current'));
+
+      act(() => window.history.forward());
+      await waitFor(() =>
+        expect(screen.getByRole('link', { name: 'Hubs' })).toHaveAttribute('aria-current', 'page'),
+      );
     });
   });
 
