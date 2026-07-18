@@ -40,23 +40,20 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const managedSession = useManagedSession();
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
 
-  // Control the sidebar ourselves so its collapse behaviour is uniform across
-  // viewports: any click anywhere in the viewport closes it, except clicks on
-  // the sidebar itself (and the toggle button, which opens/closes it on its
-  // own). We still pass onPageResize so PatternFly keeps its resize observer
-  // running - that's what feeds the responsive breakpoint and mobile-overlay
-  // behaviour; dropping it (as an earlier attempt did) breaks both the desktop
-  // collapse and the mobile toggle.
-  // Start open only where the sidebar docks (the PatternFly xl breakpoint,
-  // 1200px); on narrower viewports it overlays the content, so start closed.
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(
-    () => typeof window !== 'undefined' && window.innerWidth >= 1200,
-  );
+  // Keep the desktop sidebar user-controlled and stable while treating the
+  // narrow sidebar as a dismissible overlay. PatternFly docks the sidebar at
+  // its xl breakpoint (1200px).
+  const isMobileView = React.useRef(typeof window !== 'undefined' && window.innerWidth < 1200);
+  const desktopSidebarOpen = React.useRef(true);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => !isMobileView.current);
 
   React.useEffect(() => {
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Element | null;
-      if (target?.closest('#page-sidebar') || target?.closest('#nav-toggle')) {
+      if (!isMobileView.current || target?.closest('#nav-toggle')) {
+        return;
+      }
+      if (target?.closest('#page-sidebar') && !target.closest('a')) {
         return;
       }
       setIsSidebarOpen(false);
@@ -85,7 +82,15 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             variant="plain"
             aria-label="Global navigation"
             isSidebarOpen={isSidebarOpen}
-            onSidebarToggle={() => setIsSidebarOpen((open) => !open)}
+            onSidebarToggle={() =>
+              setIsSidebarOpen((open) => {
+                const nextIsOpen = !open;
+                if (!isMobileView.current) {
+                  desktopSidebarOpen.current = nextIsOpen;
+                }
+                return nextIsOpen;
+              })
+            }
           >
             <BarsIcon />
           </PageToggleButton>
@@ -203,7 +208,12 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
       masthead={masthead}
       sidebar={Sidebar}
       skipToContent={PageSkipToContent}
-      onPageResize={() => undefined}
+      onPageResize={(_event, { mobileView }) => {
+        if (mobileView !== isMobileView.current) {
+          isMobileView.current = mobileView;
+          setIsSidebarOpen(mobileView ? false : desktopSidebarOpen.current);
+        }
+      }}
     >
       {children}
     </Page>

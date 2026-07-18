@@ -125,9 +125,16 @@ body,
   box-shadow: var(--pf-t--global--box-shadow--sm--bottom);
 }
 
+.pf-v6-c-page {
+  --pf-v6-c-page--BackgroundColor: var(--pf-t--global--background--color--primary--default);
+}
+
 .pf-v6-c-page__main-container {
-  border-start-start-radius: 0;
-  border-start-end-radius: 0;
+  align-self: stretch;
+  max-height: 100%;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* PatternFly FormGroup renders two non-breaking spaces after each label before
@@ -142,17 +149,4 @@ body,
 .pf-v6-c-form__group-label-help {
   margin-inline-start: var(--pf-t--global--spacer--xs);
   font-size: var(--pf-v6-c-form__group-label-help--FontSize);
-}
-
-/* PatternFly's floating content panel (inset margins, border radius) only
-   applies at the xl breakpoint (75rem); below it the panel is flush edge to
-   edge. PatternFly insets the panel left and right there but leaves the top
-   margin at 0, so match the top margin to the same inset for an equal gap on
-   top, left and right. Gate it to the same breakpoint: on narrower viewports
-   the horizontal insets collapse to 0, so a top inset would leave an orphaned
-   grey strip under the masthead. The bottom stays flush on purpose. */
-@media screen and (min-width: 75rem) {
-  .pf-v6-c-page__main-container {
-    --pf-v6-c-page__main-container--MarginBlockStart: var(--pf-v6-c-page--inset);
-  }
 }

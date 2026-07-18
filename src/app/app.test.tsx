@@ -1,6 +1,6 @@
 import * as React from 'react';
 import App from '@app/index';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Mock, afterEach, describe, expect, it, test, vi } from 'vitest';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -114,7 +114,7 @@ describe('App tests', () => {
     expect(button.getAttribute('aria-expanded')).not.toBe(initialExpanded);
   });
 
-  it('should close the sidebar when clicking anywhere outside it', async () => {
+  it('should keep the sidebar open when clicking desktop content', async () => {
     await withDesktopWidth(async () => {
       const user = userEvent.setup();
 
@@ -126,8 +126,23 @@ describe('App tests', () => {
       const main = document.getElementById('primary-app-container');
       await user.click(main as HTMLElement);
 
-      expect(button.getAttribute('aria-expanded')).toBe('false');
+      expect(button.getAttribute('aria-expanded')).toBe('true');
     });
+  });
+
+  it('should close the mobile sidebar when clicking outside it', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    const button = await screen.findByRole('button', { name: 'Global navigation' });
+    await user.click(button);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+
+    const main = document.getElementById('primary-app-container');
+    await user.click(main as HTMLElement);
+
+    expect(button.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('should not close the sidebar when clicking inside it', async () => {
@@ -143,6 +158,44 @@ describe('App tests', () => {
       await user.click(sidebar as HTMLElement);
 
       expect(button.getAttribute('aria-expanded')).toBe('true');
+    });
+  });
+
+  it('should close the sidebar when the page enters mobile view', async () => {
+    await withDesktopWidth(async () => {
+      const resizeCallbacks: ResizeObserverCallback[] = [];
+      const originalResizeObserver = window.ResizeObserver;
+
+      window.ResizeObserver = class ResizeObserver {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+
+        constructor(callback: ResizeObserverCallback) {
+          resizeCallbacks.push(callback);
+        }
+      };
+
+      try {
+        render(<App />);
+
+        const button = await screen.findByRole('button', { name: 'Global navigation' });
+        expect(button.getAttribute('aria-expanded')).toBe('true');
+
+        vi.useFakeTimers();
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 600 });
+        act(() => {
+          resizeCallbacks.forEach((callback) =>
+            callback([{} as ResizeObserverEntry], undefined as unknown as ResizeObserver),
+          );
+        });
+        act(() => vi.advanceTimersByTime(250));
+
+        expect(button.getAttribute('aria-expanded')).toBe('false');
+      } finally {
+        vi.useRealTimers();
+        window.ResizeObserver = originalResizeObserver;
+      }
     });
   });
 
