@@ -25,6 +25,7 @@ import { BarsIcon, UserIcon } from '@patternfly/react-icons';
 import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from '@app/routes';
 import { useServer } from '@app/ServerContext';
 import { useManagedSession } from '@app/managed/ManagedSessionGate';
+import { accessibleRouteChangeHandler } from '@app/utils/utils';
 import logo from '@app/bgimages/icons8-softether-vpn.svg';
 
 interface IAppLayout {
@@ -46,6 +47,11 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const isMobileView = React.useRef(typeof window !== 'undefined' && window.innerWidth < 1200);
   const desktopSidebarOpen = React.useRef(true);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => !isMobileView.current);
+
+  React.useEffect(() => {
+    const timer = accessibleRouteChangeHandler();
+    return () => window.clearTimeout(timer);
+  }, [location.pathname]);
 
   React.useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -208,6 +214,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   return (
     <Page
       mainContainerId={pageId}
+      mainTabIndex={-1}
       masthead={masthead}
       sidebar={Sidebar}
       skipToContent={PageSkipToContent}

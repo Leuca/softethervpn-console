@@ -12,6 +12,7 @@ const FormErrorAlert: React.FunctionComponent<FormErrorAlertProps> = ({ error, t
       variant="danger"
       title={title}
       isInline
+      isLiveRegion
       style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
     >
       {error}
