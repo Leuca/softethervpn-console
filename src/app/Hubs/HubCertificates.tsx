@@ -228,6 +228,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [fileError, setFileError] = React.useState<string | null>(null);
   const [viewCert, setViewCert] = React.useState<Uint8Array | string | null>(null);
   const [pendingDelete, setPendingDelete] = React.useState<PendingDelete | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
   const [crlForm, setCrlForm] = React.useState<CrlFormState | null>(null);
   const [crlOriginal, setCrlOriginal] = React.useState<CrlFormState | null>(null);
   const [crlSaving, setCrlSaving] = React.useState(false);
@@ -294,12 +295,21 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       return;
     }
     const pending = pendingDelete;
-    setPendingDelete(null);
+    setDeleting(true);
     const request =
       pending.kind === 'ca'
         ? api.DeleteCa(new VPN.VpnRpcHubDeleteCA({ HubName_str: hub, Key_u32: pending.item.Key_u32 }))
         : api.DelCrl(new VPN.VpnRpcCrl({ HubName_str: hub, Key_u32: pending.item.Key_u32 }));
-    request.then(() => load()).catch((e) => setError(String(e)));
+    request
+      .then(() => {
+        setPendingDelete(null);
+        load();
+      })
+      .catch((e) => {
+        setPendingDelete(null);
+        setError(String(e));
+      })
+      .finally(() => setDeleting(false));
   };
 
   const editCrl = (key: number) => {
@@ -525,7 +535,11 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ScrollableTable>
       ) : null}
 
-      <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingDelete !== null}
+        onClose={() => !deleting && setPendingDelete(null)}
+      >
         <ModalHeader
           title={pendingDelete?.kind === 'crl' ? 'Delete revoked certificate' : 'Delete trusted CA certificate'}
           titleIconVariant="warning"
@@ -543,10 +557,10 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete}>
+          <Button variant="danger" onClick={confirmDelete} isLoading={deleting} isDisabled={deleting}>
             Delete
           </Button>
-          <Button variant="link" onClick={() => setPendingDelete(null)}>
+          <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={deleting}>
             Cancel
           </Button>
         </ModalFooter>

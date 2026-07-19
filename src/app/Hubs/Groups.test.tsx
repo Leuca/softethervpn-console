@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Groups } from './Groups';
@@ -163,7 +163,12 @@ describe('Groups', () => {
 
   it('deletes a group after confirmation', async () => {
     enumGroup.mockResolvedValue({ GroupList: [sales] });
-    deleteGroup.mockResolvedValue({});
+    let resolveDelete: (value: object) => void = () => undefined;
+    deleteGroup.mockReturnValue(
+      new Promise<object>((resolve) => {
+        resolveDelete = resolve;
+      }),
+    );
     const user = userEvent.setup();
 
     render(<Groups hub="DEFAULT" />);
@@ -172,9 +177,14 @@ describe('Groups', () => {
     await user.click(await screen.findByText('Delete'));
 
     const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    const deleteButton = within(dialog).getByRole('button', { name: 'Delete' });
+    await user.click(deleteButton);
 
+    expect(deleteButton).toBeDisabled();
+    expect(dialog).toBeInTheDocument();
     expect(deleteGroup.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Name_str: 'sales' });
+    resolveDelete({});
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(enumGroup).toHaveBeenCalledTimes(2);
   });
 });

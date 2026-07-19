@@ -850,11 +850,18 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       return;
     }
     const accountName = pendingDelete;
-    setPendingDelete(null);
+    setSubmitting(true);
     api
       .DeleteLink(new VPN.VpnRpcLink({ HubName_str: hub, AccountName_utf: accountName }))
-      .then(() => load())
-      .catch((e) => setError(String(e)));
+      .then(() => {
+        setPendingDelete(null);
+        load();
+      })
+      .catch((e) => {
+        setPendingDelete(null);
+        setError(String(e));
+      })
+      .finally(() => setSubmitting(false));
   };
 
   const isLoading = links === null && error === null;
@@ -1157,17 +1164,21 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Modal>
 
       {/* Delete confirmation */}
-      <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingDelete !== null}
+        onClose={() => !submitting && setPendingDelete(null)}
+      >
         <ModalHeader title="Delete cascade connection" titleIconVariant="warning" />
         <ModalBody>
           Delete the cascade connection <strong>{pendingDelete}</strong>? If it is online it will be disconnected
           first.
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete}>
+          <Button variant="danger" onClick={confirmDelete} isLoading={submitting} isDisabled={submitting}>
             Delete
           </Button>
-          <Button variant="link" onClick={() => setPendingDelete(null)}>
+          <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>

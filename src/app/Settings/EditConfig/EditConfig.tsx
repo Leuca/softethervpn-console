@@ -109,7 +109,6 @@ const EditConfig: React.FunctionComponent = () => {
   };
 
   const apply = () => {
-    setConfirmOpen(false);
     const value = currentText();
     if (value === null) {
       setError('Load the configuration before applying changes.');
@@ -120,6 +119,7 @@ const EditConfig: React.FunctionComponent = () => {
     api
       .SetConfig(new VPN.VpnRpcConfig({ FileName_str: fileName, FileData_bin: toConfigBytes(value) }))
       .then(() => {
+        setConfirmOpen(false);
         // The server restarts on success; wait for it to come back instead of
         // hitting it mid-restart and showing a transient error.
         setApplying(false);
@@ -128,6 +128,7 @@ const EditConfig: React.FunctionComponent = () => {
         waitForRestart();
       })
       .catch((e) => {
+        setConfirmOpen(false);
         setError(String(e));
         setApplying(false);
       });
@@ -199,17 +200,26 @@ const EditConfig: React.FunctionComponent = () => {
         />
       ) : null}
 
-      <Modal variant={ModalVariant.small} isOpen={confirmOpen} onClose={() => setConfirmOpen(false)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={confirmOpen}
+        onClose={() => !applying && !restarting && setConfirmOpen(false)}
+      >
         <ModalHeader title="Apply configuration" titleIconVariant="warning" />
         <ModalBody>
           Applying this configuration overwrites the server settings and <strong>restarts the VPN server</strong>.
           Existing connections are dropped. Continue?
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={apply} isDisabled={!hasConfig || applying || restarting}>
+          <Button
+            variant="danger"
+            onClick={apply}
+            isDisabled={!hasConfig || applying || restarting}
+            isLoading={applying}
+          >
             Apply and restart
           </Button>
-          <Button variant="link" onClick={() => setConfirmOpen(false)}>
+          <Button variant="link" onClick={() => setConfirmOpen(false)} isDisabled={applying || restarting}>
             Cancel
           </Button>
         </ModalFooter>

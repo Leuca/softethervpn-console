@@ -668,11 +668,18 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       return;
     }
     const userName = pendingDelete;
-    setPendingDelete(null);
+    setSubmitting(true);
     api
       .DeleteUser(new VPN.VpnRpcDeleteUser({ HubName_str: hub, Name_str: userName }))
-      .then(() => load())
-      .catch((e) => setError(String(e)));
+      .then(() => {
+        setPendingDelete(null);
+        load();
+      })
+      .catch((e) => {
+        setPendingDelete(null);
+        setError(String(e));
+      })
+      .finally(() => setSubmitting(false));
   };
 
   const isLoading = users === null && error === null;
@@ -822,16 +829,20 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       )}
 
       {/* Delete confirmation */}
-      <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingDelete !== null}
+        onClose={() => !submitting && setPendingDelete(null)}
+      >
         <ModalHeader title="Delete user" titleIconVariant="warning" />
         <ModalBody>
           Delete the user <strong>{pendingDelete}</strong>? Any active sessions for this user will be disconnected.
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete}>
+          <Button variant="danger" onClick={confirmDelete} isLoading={submitting} isDisabled={submitting}>
             Delete
           </Button>
-          <Button variant="link" onClick={() => setPendingDelete(null)}>
+          <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>

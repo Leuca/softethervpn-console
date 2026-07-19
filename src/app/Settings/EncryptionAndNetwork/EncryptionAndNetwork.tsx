@@ -115,6 +115,7 @@ const ServerCertCard: React.FunctionComponent = () => {
   const [viewOpen, setViewOpen] = React.useState(false);
 
   const [regenOpen, setRegenOpen] = React.useState(false);
+  const [regenerating, setRegenerating] = React.useState(false);
   const [cn, setCn] = React.useState('');
 
   const [certFile, setCertFile] = React.useState('');
@@ -138,11 +139,19 @@ const ServerCertCard: React.FunctionComponent = () => {
   }, [load]);
 
   const regenerate = () => {
-    setRegenOpen(false);
+    setRegenerating(true);
+    setError(null);
     api
       .RegenerateServerCert(new VPN.VpnRpcTest({ StrValue_str: cn.trim() }))
-      .then(() => load())
-      .catch((e) => setError(String(e)));
+      .then(() => {
+        setRegenOpen(false);
+        load();
+      })
+      .catch((e) => {
+        setRegenOpen(false);
+        setError(String(e));
+      })
+      .finally(() => setRegenerating(false));
   };
 
   const importCert = () => {
@@ -228,7 +237,11 @@ const ServerCertCard: React.FunctionComponent = () => {
 
       <CertificateModal certBin={cert} isOpen={viewOpen} onClose={() => setViewOpen(false)} />
 
-      <Modal variant={ModalVariant.small} isOpen={regenOpen} onClose={() => setRegenOpen(false)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={regenOpen}
+        onClose={() => !regenerating && setRegenOpen(false)}
+      >
         <ModalHeader title="Regenerate self-signed certificate" />
         <ModalBody>
           <Content component="p">A new self-signed certificate is generated with the common name (CN) you specify. Set the CN to the hostname clients use to reach this server (important for SSTP).</Content>
@@ -239,10 +252,15 @@ const ServerCertCard: React.FunctionComponent = () => {
           </Form>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={regenerate} isDisabled={cn.trim() === ''}>
+          <Button
+            variant="primary"
+            onClick={regenerate}
+            isDisabled={cn.trim() === '' || regenerating}
+            isLoading={regenerating}
+          >
             Regenerate
           </Button>
-          <Button variant="link" onClick={() => setRegenOpen(false)}>
+          <Button variant="link" onClick={() => setRegenOpen(false)} isDisabled={regenerating}>
             Cancel
           </Button>
         </ModalFooter>

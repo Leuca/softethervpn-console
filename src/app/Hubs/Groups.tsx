@@ -123,11 +123,18 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       return;
     }
     const groupName = pendingDelete;
-    setPendingDelete(null);
+    setSubmitting(true);
     api
       .DeleteGroup(new VPN.VpnRpcDeleteUser({ HubName_str: hub, Name_str: groupName }))
-      .then(() => load())
-      .catch((e) => setError(String(e)));
+      .then(() => {
+        setPendingDelete(null);
+        load();
+      })
+      .catch((e) => {
+        setPendingDelete(null);
+        setError(String(e));
+      })
+      .finally(() => setSubmitting(false));
   };
 
   const isLoading = groups === null && error === null;
@@ -307,17 +314,21 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Modal>
 
       {/* Delete confirmation */}
-      <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingDelete !== null}
+        onClose={() => !submitting && setPendingDelete(null)}
+      >
         <ModalHeader title="Delete group" titleIconVariant="warning" />
         <ModalBody>
           Delete the group <strong>{pendingDelete}</strong>? Its members are not deleted, but they stop belonging to the
           group.
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete}>
+          <Button variant="danger" onClick={confirmDelete} isLoading={submitting} isDisabled={submitting}>
             Delete
           </Button>
-          <Button variant="link" onClick={() => setPendingDelete(null)}>
+          <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>

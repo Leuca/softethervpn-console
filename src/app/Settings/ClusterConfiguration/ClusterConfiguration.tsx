@@ -154,7 +154,6 @@ const ClusterConfig: React.FunctionComponent = () => {
     if (!form) {
       return;
     }
-    setConfirmOpen(false);
     setSaving(true);
     setError(null);
 
@@ -175,6 +174,7 @@ const ClusterConfig: React.FunctionComponent = () => {
     api
       .SetFarmSetting(config)
       .then(() => {
+        setConfirmOpen(false);
         // The server restarts on success; wait for it to come back rather than
         // hitting it mid-restart and showing a transient error.
         setSaving(false);
@@ -183,6 +183,7 @@ const ClusterConfig: React.FunctionComponent = () => {
         waitForRestart();
       })
       .catch((e) => {
+        setConfirmOpen(false);
         setError(String(e));
         setSaving(false);
       });
@@ -395,17 +396,21 @@ const ClusterConfig: React.FunctionComponent = () => {
         </Form>
       ) : null}
 
-      <Modal variant={ModalVariant.small} isOpen={confirmOpen} onClose={() => setConfirmOpen(false)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={confirmOpen}
+        onClose={() => !saving && !restarting && setConfirmOpen(false)}
+      >
         <ModalHeader title="Change clustering configuration" titleIconVariant="warning" />
         <ModalBody>
           Applying this change <strong>restarts the VPN server</strong>. All connected sessions and management
           connections (including this one) are disconnected, and you will need to reconnect. Continue?
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={apply}>
+          <Button variant="danger" onClick={apply} isLoading={saving} isDisabled={saving || restarting}>
             Save and restart
           </Button>
-          <Button variant="link" onClick={() => setConfirmOpen(false)}>
+          <Button variant="link" onClick={() => setConfirmOpen(false)} isDisabled={saving || restarting}>
             Cancel
           </Button>
         </ModalFooter>

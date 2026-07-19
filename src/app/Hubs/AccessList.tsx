@@ -695,11 +695,18 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       return;
     }
     const id = pendingDelete;
-    setPendingDelete(null);
+    setBusy(true);
     api
       .DeleteAccess(new VPN.VpnRpcDeleteAccess({ HubName_str: hub, Id_u32: id }))
-      .then(() => load())
-      .catch((e) => setError(String(e)));
+      .then(() => {
+        setPendingDelete(null);
+        load();
+      })
+      .catch((e) => {
+        setPendingDelete(null);
+        setError(String(e));
+      })
+      .finally(() => setBusy(false));
   };
 
   const isLoading = rules === null && error === null;
@@ -1314,14 +1321,18 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ModalFooter>
       </Modal>
 
-      <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingDelete !== null}
+        onClose={() => !busy && setPendingDelete(null)}
+      >
         <ModalHeader title="Delete rule" titleIconVariant="warning" />
         <ModalBody>Delete access list rule #{pendingDelete}?</ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete}>
+          <Button variant="danger" onClick={confirmDelete} isLoading={busy} isDisabled={busy}>
             Delete
           </Button>
-          <Button variant="link" onClick={() => setPendingDelete(null)}>
+          <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={busy}>
             Cancel
           </Button>
         </ModalFooter>
