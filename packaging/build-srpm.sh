@@ -22,7 +22,7 @@ if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/softethervpn-console$ ]]; then
   exit 2
 fi
 
-rpm_version="${upstream_version/-/~}"
+rpm_version="${upstream_version/-/\~}"
 work_dir="$(mktemp -d)"
 top_dir="$work_dir/rpmbuild"
 sources_dir="$top_dir/SOURCES"

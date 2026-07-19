@@ -102,7 +102,6 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           packaging/build-srpm.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/srpm"
 
       - name: Publish source RPM
