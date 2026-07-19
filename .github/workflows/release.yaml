@@ -65,10 +65,47 @@ jobs:
         run: |
           artifact="softethervpn-console-${GITHUB_REF_NAME}.tar.gz"
           managed_artifact="softethervpn-console-managed-${GITHUB_REF_NAME}.tar.gz"
+          prerelease_args=()
+          if [[ "${GITHUB_REF_NAME#v}" == *-* ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+
           gh release create "$GITHUB_REF_NAME" \
             --title "SoftEther VPN Console $GITHUB_REF_NAME" \
             --generate-notes \
+            "${prerelease_args[@]}" \
             "$artifact" \
             "$artifact.sha256" \
             "$managed_artifact" \
             "$managed_artifact.sha256"
+
+  srpm:
+    name: Build and publish source RPM
+    needs: release
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Fedora packaging tools
+        run: >-
+          dnf install -y
+          gh
+          git-core
+          nodejs-packaging-bundler
+          rpm-build
+          rpmlint
+          systemd-rpm-macros
+
+      - name: Build source RPM
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          packaging/build-srpm.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/srpm"
+
+      - name: Publish source RPM
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" --clobber "$RUNNER_TEMP"/srpm/*

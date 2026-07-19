@@ -1,0 +1,42 @@
+[Unit]
+Description=SoftEther VPN Console managed gateway
+Documentation=https://github.com/Leuca/softethervpn-console
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=softethervpn-console
+Group=softethervpn-console
+DynamicUser=yes
+WorkingDirectory=/usr/libexec/softethervpn-console/gateway
+Environment=NODE_ENV=production
+EnvironmentFile=-/etc/sysconfig/softethervpn-console
+ExecStart=/usr/bin/node /usr/libexec/softethervpn-console/gateway/dist/server.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+UMask=0077
+
+AmbientCapabilities=
+CapabilityBoundingSet=
+LockPersonality=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProcSubset=pid
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectProc=invisible
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

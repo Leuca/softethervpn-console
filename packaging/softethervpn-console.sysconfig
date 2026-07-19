@@ -1,0 +1,11 @@
+# The gateway is HTTP only. Keep it on loopback and terminate public TLS at a
+# trusted reverse proxy unless the host firewall provides an equivalent boundary.
+HOST=127.0.0.1
+PORT=8080
+
+# Static managed-mode frontend installed by the RPM.
+FRONTEND_ROOT=/usr/share/softethervpn-console
+
+# Comma-separated proxy addresses or CIDRs. Never use true unless every direct
+# client connection is guaranteed to pass through a trusted reverse proxy.
+TRUST_PROXY=127.0.0.1

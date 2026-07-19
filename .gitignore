@@ -5,6 +5,8 @@ yarn.lock
 stats.json
 coverage
 storybook-static
+*.src.rpm
+*.src.rpm.sha256
 .DS_Store
 .idea
 .env
