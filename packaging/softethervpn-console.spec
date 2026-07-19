@@ -59,6 +59,8 @@ cp -a node_modules_prod/. node_modules/
 cp -a node_modules_dev/. node_modules/
 cp -a gateway/node_modules_prod/. gateway/node_modules/
 cp -a gateway/node_modules_dev/. gateway/node_modules/
+rm -rf node_modules_prod node_modules_dev
+rm -rf gateway/node_modules_prod gateway/node_modules_dev
 
 %build
 export NODE_OPTIONS=--max-old-space-size=4096
