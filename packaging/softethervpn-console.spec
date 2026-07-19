@@ -36,8 +36,8 @@ Requires:       /usr/bin/node
 
 %description
 SoftEther VPN Console is a browser-based management interface for SoftEther
-VPN Server. This package contains the managed frontend and its Node.js gateway.
-The gateway serves the frontend over HTTP and proxies authenticated JSON-RPC
+VPN Server. This package contains the browser application and its managed
+gateway. The gateway serves the application over HTTP and proxies JSON-RPC
 requests to a server selected at login. Public TLS must be provided by a
 trusted reverse proxy.
 
