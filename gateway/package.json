@@ -1,6 +1,6 @@
 {
   "name": "@softethervpn-console/gateway",
-  "version": "0.2.0-rc.9",
+  "version": "0.2.0",
   "description": "HTTP gateway for managed SoftEther VPN Console deployments",
   "private": true,
   "type": "module",
