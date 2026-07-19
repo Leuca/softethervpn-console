@@ -157,11 +157,12 @@ fi
 
 rpmlint "$rendered_spec" "${source_rpms[0]}"
 
-install -p -m 0644 "${source_rpms[0]}" "$output_dir/"
 source_rpm_name="$(basename "${source_rpms[0]}")"
-source_rpm="$output_dir/$source_rpm_name"
+source_rpm_asset_name="${source_rpm_name//\~/.}"
+source_rpm="$output_dir/$source_rpm_asset_name"
+install -p -m 0644 "${source_rpms[0]}" "$source_rpm"
 (
   cd "$output_dir"
-  sha256sum "$source_rpm_name" > "$source_rpm_name.sha256"
+  sha256sum "$source_rpm_asset_name" > "$source_rpm_asset_name.sha256"
 )
 printf '%s\n' "$source_rpm"

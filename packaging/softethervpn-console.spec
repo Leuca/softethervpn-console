@@ -61,10 +61,12 @@ cp -a gateway/node_modules_prod/. gateway/node_modules/
 cp -a gateway/node_modules_dev/. gateway/node_modules/
 
 %build
+export NODE_OPTIONS=--max-old-space-size=4096
 npm run build:managed
 npm --prefix gateway run build
 
 %check
+export NODE_OPTIONS=--max-old-space-size=4096
 npm test
 npm --prefix gateway test
 
