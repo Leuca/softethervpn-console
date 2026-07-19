@@ -174,7 +174,7 @@ const ConnectionsList: React.FunctionComponent = () => {
       <Modal
         variant={ModalVariant.small}
         isOpen={pendingDisconnect !== null}
-        onClose={() => setPendingDisconnect(null)}
+        onClose={() => !disconnecting && setPendingDisconnect(null)}
       >
         <ModalHeader title="Disconnect connection" titleIconVariant="warning" />
         <ModalBody>

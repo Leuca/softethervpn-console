@@ -274,7 +274,11 @@ const DdnsSection: React.FunctionComponent = () => {
         </CardBody>
       </Card>
 
-      <Modal variant={ModalVariant.small} isOpen={certPrompt !== null} onClose={() => setCertPrompt(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={certPrompt !== null}
+        onClose={() => !regenerating && setCertPrompt(null)}
+      >
         <ModalHeader title="Update the server certificate?" />
         <ModalBody>
           <Content component="p">

@@ -106,7 +106,7 @@ const HubExtendedOptions: React.FunctionComponent<HubExtendedOptionsProps> = ({ 
       <Modal
         variant={ModalVariant.large}
         isOpen={open}
-        onClose={() => setOpen(false)}
+        onClose={() => !saving && setOpen(false)}
         aria-label="Virtual Hub Extended Options"
       >
         <ModalHeader title="Virtual Hub Extended Options" />

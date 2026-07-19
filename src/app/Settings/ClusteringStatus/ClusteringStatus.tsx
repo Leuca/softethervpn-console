@@ -144,7 +144,7 @@ const ControllerView: React.FunctionComponent = () => {
         ) : null}
       </Flex>
 
-      <Modal variant={ModalVariant.medium} isOpen={detail !== null} onClose={() => setDetail(null)}>
+      <Modal variant={ModalVariant.medium} isOpen={detail !== null && !certOpen} onClose={() => setDetail(null)}>
         <ModalHeader title={detail ? `Member: ${detail.hostname}` : 'Member'} />
         <ModalBody>
           {detail?.error ? (

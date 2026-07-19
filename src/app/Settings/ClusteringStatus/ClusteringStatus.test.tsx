@@ -95,6 +95,11 @@ describe('ClusteringStatus', () => {
     await user.click(screen.getByRole('button', { name: 'View server certificate' }));
     expect(await screen.findByText('Certificate: test.example.com')).toBeInTheDocument();
     expect(screen.getByText('Self-signed')).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.queryByText('Member: member.example')).not.toBeInTheDocument();
+
+    await user.click(within(screen.getByRole('dialog')).getByText('Close'));
+    expect(await screen.findByText('Member: member.example')).toBeInTheDocument();
   });
 
   it('shows the controller connection status on a cluster member', async () => {

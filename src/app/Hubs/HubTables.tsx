@@ -271,7 +271,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
       <Modal
         variant={ModalVariant.small}
         isOpen={pendingDelete !== null && !confirmInline}
-        onClose={() => setPendingDelete(null)}
+        onClose={() => !deleting && setPendingDelete(null)}
       >
         <ModalHeader
           title={pendingDelete?.kind === 'ip' ? 'Delete IP table entry' : 'Delete MAC table entry'}

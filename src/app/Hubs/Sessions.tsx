@@ -250,7 +250,7 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       <Modal
         variant={ModalVariant.small}
         isOpen={pendingDisconnect !== null}
-        onClose={() => setPendingDisconnect(null)}
+        onClose={() => !disconnecting && setPendingDisconnect(null)}
       >
         <ModalHeader title="Disconnect session" titleIconVariant="warning" />
         <ModalBody>

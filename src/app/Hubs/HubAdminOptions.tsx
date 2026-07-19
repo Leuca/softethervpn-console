@@ -99,7 +99,7 @@ const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, t
       <Modal
         variant={ModalVariant.large}
         isOpen={open}
-        onClose={() => setOpen(false)}
+        onClose={() => !saving && setOpen(false)}
         aria-label="Virtual Hub Administration Options"
       >
         <ModalHeader title="Virtual Hub Administration Options" />

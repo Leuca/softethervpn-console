@@ -404,11 +404,11 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   const setSecureNatEnabled = (nextEnabled: boolean) => {
     setToggling(true);
-    setConfirmEnable(false);
     const payload = new VPN.VpnRpcHub({ HubName_str: hub });
     const call = nextEnabled ? api.EnableSecureNAT(payload) : api.DisableSecureNAT(payload);
     call
       .then(() => {
+        setConfirmEnable(false);
         if (!nextEnabled) {
           setRuntimeOpen(false);
         }
@@ -416,6 +416,7 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         load();
       })
       .catch((e) => {
+        setConfirmEnable(false);
         setError(String(e));
         setToggling(false);
       });
@@ -734,7 +735,7 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       <Modal
         variant={ModalVariant.small}
         isOpen={confirmEnable}
-        onClose={() => setConfirmEnable(false)}
+        onClose={() => !toggling && setConfirmEnable(false)}
         aria-label="Enable Secure NAT"
       >
         <ModalHeader title="Enable Secure NAT" />
@@ -743,10 +744,15 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           network settings are intentional.
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={() => setSecureNatEnabled(true)} isLoading={toggling}>
+          <Button
+            variant="primary"
+            onClick={() => setSecureNatEnabled(true)}
+            isLoading={toggling}
+            isDisabled={toggling}
+          >
             Enable
           </Button>
-          <Button variant="link" onClick={() => setConfirmEnable(false)}>
+          <Button variant="link" onClick={() => setConfirmEnable(false)} isDisabled={toggling}>
             Cancel
           </Button>
         </ModalFooter>
