@@ -95,7 +95,10 @@ describe('HubLogs', () => {
 
   it('lists log files and previews a file downloaded in chunks', async () => {
     getHubLog.mockResolvedValue({ ...logConfig });
-    enumLogFile.mockResolvedValue({ LogFiles: [logFile] });
+    enumLogFile
+      .mockResolvedValueOnce({ LogFiles: [logFile] })
+      .mockResolvedValueOnce({ LogFiles: [{ ...logFile, FileSize_u32: 29 }] })
+      .mockResolvedValue({ LogFiles: [logFile] });
     readLogFile
       .mockResolvedValueOnce({ Buffer_bin: b64('first line\n') })
       .mockResolvedValueOnce({ Buffer_bin: b64('second line\n') })
@@ -111,14 +114,38 @@ describe('HubLogs', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'View' }));
 
     const dialog = await screen.findByRole('dialog');
+    expect(enumLogFile).toHaveBeenCalledTimes(2);
     expect(within(dialog).getByText(/first line/)).toBeInTheDocument();
     expect(within(dialog).getByText(/second line/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/showing 23 of 29 bytes/)).toBeInTheDocument();
     expect(readLogFile.mock.calls[0][0]).toMatchObject({
       ServerName_str: 'vpn1',
       FilePath_str: '@security_log/DEFAULT/20260706.log',
       Offset_u32: 0,
     });
     expect(readLogFile.mock.calls[1][0]).toMatchObject({ Offset_u32: 11 });
+
+    await user.click(within(dialog).getByText('Close'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(enumLogFile).toHaveBeenCalledTimes(3);
+  });
+
+  it('reloads the file list when the Files tab is revisited', async () => {
+    getHubLog.mockResolvedValue({ ...logConfig });
+    enumLogFile.mockResolvedValue({ LogFiles: [logFile] });
+    const user = userEvent.setup();
+
+    render(<HubLogs hub="DEFAULT" />);
+    await user.click(screen.getByRole('tab', { name: 'Files' }));
+    await screen.findByText('@security_log/DEFAULT/20260706.log');
+    expect(enumLogFile).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('tab', { name: 'Settings' }));
+    await user.click(screen.getByRole('tab', { name: 'Files' }));
+    await screen.findByText('@security_log/DEFAULT/20260706.log');
+
+    expect(enumLogFile).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
   });
 
   it('shows newest log files first by reversing the server order', async () => {

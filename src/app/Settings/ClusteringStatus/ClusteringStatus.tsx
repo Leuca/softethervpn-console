@@ -19,7 +19,6 @@ import {
   Stack,
   StackItem,
 } from '@patternfly/react-core';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { ScrollableTable } from '@app/components/ScrollableTable';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
@@ -45,22 +44,14 @@ interface MemberDetail {
 
 // The cluster controller view: the list of farm members it manages.
 const ControllerView: React.FunctionComponent = () => {
-  const [members, setMembers] = React.useState<VPN.VpnRpcEnumFarmItem[] | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<MemberDetail | null>(null);
   const [certOpen, setCertOpen] = React.useState(false);
 
-  const load = React.useCallback(() => {
-    setError(null);
-    api
-      .EnumFarmMember()
-      .then((response) => setMembers(response.FarmMemberList ?? []))
-      .catch((e) => setError(String(e)));
-  }, []);
-
-  React.useEffect(() => {
-    load();
-  }, [load]);
+  const fetchMembers = React.useCallback(
+    () => api.EnumFarmMember().then((response) => response.FarmMemberList ?? []),
+    [],
+  );
+  const { data: members, error, refreshing, lastUpdated } = useAutoRefresh(fetchMembers);
 
   const openDetail = (member: VPN.VpnRpcEnumFarmItem) => {
     setDetail({ hostname: member.Hostname_str, info: null, hubs: [], cert: null, error: null });
@@ -86,27 +77,36 @@ const ControllerView: React.FunctionComponent = () => {
       );
   };
 
-  const refresh = (
-    <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={members === null && error === null}>
-      Refresh
-    </Button>
-  );
+  const isInitialLoading = members === null && error === null;
 
   return (
-    <AppPage title="Clustering Status" description="Members of the cluster this server controls." actions={refresh}>
-      {error ? (
+    <AppPage title="Clustering Status" description="Members of the cluster this server controls.">
+      <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+        <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
+          <FlexItem>
+            <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+              {refreshing && members !== null
+                ? 'Refreshing...'
+                : lastUpdated
+                  ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                  : 'Auto-refreshes every 10s'}
+            </span>
+          </FlexItem>
+        </Flex>
+        {error && (
         <Alert variant="danger" title="Could not load cluster members" isInline>
           {error}
         </Alert>
-      ) : members === null ? (
+        )}
+        {isInitialLoading ? (
         <Bullseye>
           <Spinner size="xl" aria-label="Loading cluster members" />
         </Bullseye>
-      ) : members.length === 0 ? (
+        ) : members !== null && members.length === 0 ? (
         <EmptyState titleText="No cluster members" headingLevel="h2">
           <EmptyStateBody>No servers have joined this cluster yet.</EmptyStateBody>
         </EmptyState>
-      ) : (
+        ) : members !== null ? (
         <ScrollableTable aria-label="Cluster members" variant="compact">
           <Thead>
             <Tr>
@@ -141,7 +141,8 @@ const ControllerView: React.FunctionComponent = () => {
             ))}
           </Tbody>
         </ScrollableTable>
-      )}
+        ) : null}
+      </Flex>
 
       <Modal variant={ModalVariant.medium} isOpen={detail !== null} onClose={() => setDetail(null)}>
         <ModalHeader title={detail ? `Member: ${detail.hostname}` : 'Member'} />

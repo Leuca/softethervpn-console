@@ -100,6 +100,25 @@ describe('useAutoRefresh', () => {
     expect(result.current.data).toBe('recovered');
   });
 
+  it('clears stale data when the fetch target changes', async () => {
+    const firstFetch = vi.fn().mockResolvedValue('first target');
+    const next = deferred();
+    const nextFetch = vi.fn().mockReturnValue(next.promise);
+    const { result, rerender } = renderHook(({ fetch }) => useAutoRefresh(fetch, 10000), {
+      initialProps: { fetch: firstFetch },
+    });
+
+    await act(async () => {});
+    expect(result.current.data).toBe('first target');
+
+    rerender({ fetch: nextFetch });
+    expect(result.current.data).toBeNull();
+    expect(result.current.refreshing).toBe(true);
+
+    await act(async () => next.resolve('next target'));
+    expect(result.current.data).toBe('next target');
+  });
+
   it('stops polling on unmount', async () => {
     const fetch = vi.fn().mockResolvedValue('data');
     const { unmount } = renderHook(() => useAutoRefresh(fetch, 10000));

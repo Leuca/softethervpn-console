@@ -59,9 +59,21 @@ export function useAutoRefresh<T>(fetch: () => Promise<T>, intervalMs = 10000): 
   }, [fetch]);
 
   React.useEffect(() => {
+    // A new fetch callback represents a new data target (for example, another
+    // Virtual Hub). Do not show the previous target's values while it loads.
+    seq.current += 1;
+    inFlight.current = false;
+    setData(null);
+    setError(null);
+    setRefreshing(false);
+    setLastUpdated(null);
     load();
     const timer = window.setInterval(() => load(false), intervalMs);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      seq.current += 1;
+      inFlight.current = false;
+    };
   }, [load, intervalMs]);
 
   return { data, error, refreshing, lastUpdated, load };

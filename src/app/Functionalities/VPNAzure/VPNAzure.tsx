@@ -34,11 +34,13 @@ const VpnAzure: React.FunctionComponent = () => {
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
-  const refreshStatus = React.useCallback(() =>
+  const refreshStatus = React.useCallback((waitForConnection = false) =>
     api
       .GetAzureStatus()
       .then((status) => {
-        setConnected(status.IsConnected_bool);
+        setConnected(
+          status.IsConnected_bool ? true : waitForConnection && status.IsEnabled_bool ? null : false,
+        );
         setEnabled(status.IsEnabled_bool);
         if (status.IsEnabled_bool) {
           return api.GetDDnsClientStatus().then((ddns) => {
@@ -64,7 +66,7 @@ const VpnAzure: React.FunctionComponent = () => {
       return undefined;
     }
     const timer = window.setInterval(() => {
-      refreshStatus().catch((e) => setError(String(e)));
+      refreshStatus(true).catch((e) => setError(String(e)));
     }, CONNECTING_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [connected, refreshStatus]);

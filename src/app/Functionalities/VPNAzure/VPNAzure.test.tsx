@@ -63,6 +63,7 @@ describe('VpnAzure', () => {
   it('enables VPN Azure via the toggle and reloads status', async () => {
     getAzureStatus
       .mockResolvedValueOnce({ IsEnabled_bool: false, IsConnected_bool: false })
+      .mockResolvedValueOnce({ IsEnabled_bool: true, IsConnected_bool: false })
       .mockResolvedValueOnce({ IsEnabled_bool: true, IsConnected_bool: true });
     getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: 'vpn123456' });
     setAzureStatus.mockResolvedValue({ IsEnabled_bool: true });
@@ -79,8 +80,8 @@ describe('VpnAzure', () => {
     expect(screen.getByText('Connecting')).toBeInTheDocument();
     expect(await screen.findByText('vpn123456.vpnazure.net')).toBeInTheDocument();
 
-    expect(await screen.findByText('Connected', {}, { timeout: 2000 })).toBeInTheDocument();
-    expect(getAzureStatus).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText('Connected', {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(getAzureStatus).toHaveBeenCalledTimes(3);
   });
 
   it('navigates to the DDNS page from Change hostname', async () => {

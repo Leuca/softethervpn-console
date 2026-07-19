@@ -25,7 +25,6 @@ import {
   Tabs,
 } from '@patternfly/react-core';
 import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { useServer } from '@app/ServerContext';
@@ -351,20 +350,22 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
   const previewRequestRef = React.useRef(0);
   const downloadRequestRef = React.useRef(0);
 
-  const load = React.useCallback(() => {
+  const load = React.useCallback(async (): Promise<VPN.VpnRpcEnumLogFileItem[] | null> => {
     if (!supported) {
       setFiles([]);
       setError(null);
-      return;
+      return [];
     }
     setError(null);
-    api
-      .EnumLogFile()
-      .then((response) => {
-        setFiles([...(response.LogFiles ?? [])].reverse());
-        setPage(1);
-      })
-      .catch((e) => setError(String(e)));
+    try {
+      const response = await api.EnumLogFile();
+      const nextFiles = [...(response.LogFiles ?? [])].reverse();
+      setFiles(nextFiles);
+      return nextFiles;
+    } catch (e) {
+      setError(String(e));
+      return null;
+    }
   }, [supported]);
 
   React.useEffect(() => {
@@ -381,6 +382,10 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
   const pageCount = files === null ? 1 : Math.max(1, Math.ceil(files.length / perPage));
 
   React.useEffect(() => {
+    setPage((current) => Math.min(current, pageCount));
+  }, [pageCount]);
+
+  React.useEffect(() => {
     if (!preview?.isLoading && preview?.scrollToBottom && previewTextRef.current) {
       window.requestAnimationFrame(() => {
         if (previewTextRef.current) {
@@ -395,48 +400,54 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
     setDownloading(file.FilePath_str);
     setError(null);
     const requestId = ++previewRequestRef.current;
-    window.setTimeout(() => {
-      if (requestId !== previewRequestRef.current) {
-        return;
-      }
-      setPreview({ file, isLoading: true, scrollToBottom: false, text: '' });
-      readLogFileText(file)
-        .then((result) => {
-          if (requestId === previewRequestRef.current) {
-          let notice = '';
-          if (result.fileSize !== null) {
-            if (result.startOffset > 0) {
-              notice = `\n\n[Preview: showing the last ${result.totalBytes} of ${result.fileSize} bytes.]`;
-            } else if (result.truncated) {
-              notice = `\n\n[Preview: showing the first ${result.totalBytes} bytes.]`;
-            } else {
-              notice = `\n\n[Preview: showing ${result.totalBytes} of ${result.fileSize} bytes.]`;
-            }
+    setPreview({ file, isLoading: true, scrollToBottom: false, text: '' });
+    window.setTimeout(async () => {
+      try {
+        const refreshedFiles = await load();
+        if (requestId !== previewRequestRef.current) {
+          return;
+        }
+        const previewFile =
+          refreshedFiles?.find(
+            (candidate) =>
+              candidate.ServerName_str === file.ServerName_str && candidate.FilePath_str === file.FilePath_str,
+          ) ?? file;
+        setPreview({ file: previewFile, isLoading: true, scrollToBottom: false, text: '' });
+        const result = await readLogFileText(previewFile);
+        if (requestId !== previewRequestRef.current) {
+          return;
+        }
+        let notice = '';
+        if (result.fileSize !== null) {
+          if (result.startOffset > 0) {
+            notice = `\n\n[Preview: showing the last ${result.totalBytes} of ${result.fileSize} bytes.]`;
           } else if (result.truncated) {
             notice = `\n\n[Preview: showing the first ${result.totalBytes} bytes.]`;
           } else {
-            notice = `\n\n[Preview: showing ${result.totalBytes} bytes.]`;
+            notice = `\n\n[Preview: showing ${result.totalBytes} of ${result.fileSize} bytes.]`;
           }
-            setPreview({
-              file,
-              isLoading: false,
-              scrollToBottom: true,
-              text: result.text + notice,
-            });
-          }
-        })
-        .catch((e) => {
-          if (requestId === previewRequestRef.current) {
-            setPreview(null);
-            setError(String(e));
-          }
-        })
-        .finally(() => {
-          if (requestId === previewRequestRef.current) {
-            setDownloading(null);
-            setActiveFile(null);
-          }
+        } else if (result.truncated) {
+          notice = `\n\n[Preview: showing the first ${result.totalBytes} bytes.]`;
+        } else {
+          notice = `\n\n[Preview: showing ${result.totalBytes} bytes.]`;
+        }
+        setPreview({
+          file: previewFile,
+          isLoading: false,
+          scrollToBottom: true,
+          text: result.text + notice,
         });
+      } catch (e) {
+        if (requestId === previewRequestRef.current) {
+          setPreview(null);
+          setError(String(e));
+        }
+      } finally {
+        if (requestId === previewRequestRef.current) {
+          setDownloading(null);
+          setActiveFile(null);
+        }
+      }
     }, 0);
   };
 
@@ -458,6 +469,16 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
       });
   };
 
+  const closePreview = () => {
+    if (preview?.isLoading) {
+      previewRequestRef.current += 1;
+      setDownloading(null);
+      setActiveFile(null);
+    }
+    setPreview(null);
+    load();
+  };
+
   const isLoading = supported && files === null && error === null;
 
   if (!supported) {
@@ -470,12 +491,6 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
 
   return (
     <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }}>
-        <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading}>
-          Refresh
-        </Button>
-      </Flex>
-
       {error && (
         <Alert variant="danger" title="Log file operation failed" isInline>
           {error}
@@ -570,7 +585,7 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
         </>
       ) : null}
 
-      <Modal variant={ModalVariant.large} isOpen={preview !== null} onClose={() => setPreview(null)}>
+      <Modal variant={ModalVariant.large} isOpen={preview !== null} onClose={closePreview}>
         <ModalHeader title={preview ? `Log file: ${preview.file.FilePath_str}` : 'Log file'} />
         <ModalBody>
           {preview?.isLoading ? (
@@ -594,7 +609,7 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
           >
             Download
           </Button>
-          <Button variant="link" onClick={() => setPreview(null)}>
+          <Button variant="link" onClick={closePreview}>
             Close
           </Button>
         </ModalFooter>

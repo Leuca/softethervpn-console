@@ -5,6 +5,8 @@ import {
   Button,
   EmptyState,
   EmptyStateBody,
+  Flex,
+  FlexItem,
   Modal,
   ModalBody,
   ModalFooter,
@@ -14,12 +16,12 @@ import {
 } from '@patternfly/react-core';
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { ScrollableTable } from '@app/components/ScrollableTable';
-import { SyncAltIcon } from '@patternfly/react-icons';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
 import { AppPage } from '@app/components/AppPage';
 import { KeyValueTable } from '@app/components/KeyValueTable';
 import { connectionTypeLabel, formatRpcValue } from '@app/utils/format';
+import { useAutoRefresh } from '@app/utils/useAutoRefresh';
 
 interface DetailState {
   name: string;
@@ -35,23 +37,15 @@ function isConnectionGoneError(error: string): boolean {
 }
 
 const ConnectionsList: React.FunctionComponent = () => {
-  const [connections, setConnections] = React.useState<VPN.VpnRpcEnumConnectionItem[] | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const fetchConnections = React.useCallback(
+    () => api.EnumConnection().then((response) => response.ConnectionList ?? []),
+    [],
+  );
+  const { data: connections, error, refreshing, lastUpdated, load } = useAutoRefresh(fetchConnections);
+  const [actionError, setActionError] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<DetailState | null>(null);
   const [pendingDisconnect, setPendingDisconnect] = React.useState<string | null>(null);
   const [disconnecting, setDisconnecting] = React.useState(false);
-
-  const load = React.useCallback(() => {
-    setError(null);
-    api
-      .EnumConnection()
-      .then((response) => setConnections(response.ConnectionList ?? []))
-      .catch((e) => setError(String(e)));
-  }, []);
-
-  React.useEffect(() => {
-    load();
-  }, [load]);
 
   const openDetail = (name: string) => {
     setDetail({ name, info: null, error: null });
@@ -67,6 +61,7 @@ const ConnectionsList: React.FunctionComponent = () => {
     }
     const name = pendingDisconnect;
     setDisconnecting(true);
+    setActionError(null);
     api
       .DisconnectConnection(new VPN.VpnRpcDisconnectConnection({ Name_str: name }))
       .then(() => {
@@ -75,40 +70,46 @@ const ConnectionsList: React.FunctionComponent = () => {
         load();
       })
       .catch((e) => {
-        setError(String(e));
+        setActionError(String(e));
         setPendingDisconnect(null);
         setDisconnecting(false);
       });
   };
 
-  const isLoading = connections === null && error === null;
-
-  const refresh = (
-    <Button variant="secondary" icon={<SyncAltIcon />} onClick={load} isDisabled={isLoading}>
-      Refresh
-    </Button>
-  );
+  const isInitialLoading = connections === null && error === null;
 
   return (
     <AppPage
       title="TCP/IP Connections"
       description="Connections currently established to this VPN server's management and tunneling ports."
-      actions={refresh}
     >
-      {error ? (
-        <Alert variant="danger" title="Could not load connections" isInline>
-          {error}
-        </Alert>
-      ) : connections === null ? (
-        <Bullseye>
-          <Spinner size="xl" aria-label="Loading connections" />
-        </Bullseye>
-      ) : connections.length === 0 ? (
-        <EmptyState titleText="No active connections" headingLevel="h2">
-          <EmptyStateBody>There are currently no TCP/IP connections to this server.</EmptyStateBody>
-        </EmptyState>
-      ) : (
-        <ScrollableTable aria-label="TCP/IP connections" variant="compact">
+      <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+        <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
+          <FlexItem>
+            <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+              {refreshing && connections !== null
+                ? 'Refreshing...'
+                : lastUpdated
+                  ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                  : 'Auto-refreshes every 10s'}
+            </span>
+          </FlexItem>
+        </Flex>
+        {(actionError ?? error) && (
+          <Alert variant="danger" title="Could not load or update connections" isInline>
+            {actionError ?? error}
+          </Alert>
+        )}
+        {isInitialLoading ? (
+          <Bullseye>
+            <Spinner size="xl" aria-label="Loading connections" />
+          </Bullseye>
+        ) : connections !== null && connections.length === 0 ? (
+          <EmptyState titleText="No active connections" headingLevel="h2">
+            <EmptyStateBody>There are currently no TCP/IP connections to this server.</EmptyStateBody>
+          </EmptyState>
+        ) : connections !== null ? (
+          <ScrollableTable aria-label="TCP/IP connections" variant="compact">
           <Thead>
             <Tr>
               <Th>Connection name</Th>
@@ -137,8 +138,9 @@ const ConnectionsList: React.FunctionComponent = () => {
               </Tr>
             ))}
           </Tbody>
-        </ScrollableTable>
-      )}
+          </ScrollableTable>
+        ) : null}
+      </Flex>
 
       <Modal variant={ModalVariant.medium} isOpen={detail !== null} onClose={() => setDetail(null)}>
         <ModalHeader title={detail ? `Connection: ${detail.name}` : ''} />
