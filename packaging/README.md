@@ -22,6 +22,19 @@ The `srpm` release job runs only after the GitHub Release job succeeds. It:
 The resulting SRPM is self-contained. Binary RPM builds use the bundled sources
 and do not contact the npm registry.
 
+## Bundled license review
+
+The bundler's recursive package scan reports two nested fixture manifests as
+missing license declarations. `pino/test/fixtures/transport/package.json` is
+covered by Pino's bundled MIT license, and
+`secure-json-parse/benchmarks/package.json` is covered by the parent package's
+bundled BSD-3-Clause license. Neither fixture is an independent lockfile
+dependency.
+
+These warnings must remain visible and be reviewed again whenever Pino or
+secure-json-parse is updated. Do not add declarations to bundled third-party
+files or suppress the bundler's license diagnostics globally.
+
 ## Local SRPM build
 
 On Fedora, install the same tools used by CI:
