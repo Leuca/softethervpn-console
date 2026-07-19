@@ -24,8 +24,13 @@ interface StatCardProps {
  */
 const StatCard: React.FunctionComponent<StatCardProps> = ({ icon, label, value, tone = 'brand' }) => (
   <Card isFullHeight isCompact>
-    <CardBody>
-      <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }} flexWrap={{ default: 'nowrap' }}>
+    <CardBody style={{ display: 'flex', alignItems: 'center' }}>
+      <Flex
+        alignItems={{ default: 'alignItemsCenter' }}
+        gap={{ default: 'gapMd' }}
+        flexWrap={{ default: 'nowrap' }}
+        style={{ width: '100%' }}
+      >
         <FlexItem>
           <span
             style={{
