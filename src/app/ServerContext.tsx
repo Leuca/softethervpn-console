@@ -2,6 +2,14 @@ import * as React from 'react';
 import { api } from '@app/utils/vpnrpc_settings';
 
 const notEnoughPrivilegesCode = 52;
+const capabilityLabels = [
+  'Local Bridge',
+  'Clustering Configuration',
+  'Layer 3 Switch',
+  'VPN Azure',
+  'Dynamic DNS',
+  'Legacy Protocols',
+];
 
 const probeErrorCode = (error: unknown): number | null => {
   const rpcCode = (error as { Error?: { code?: unknown } } | null | undefined)?.Error?.code;
@@ -177,7 +185,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
       })
       .catch((error) => {
         logUnexpectedProbeError('GetCaps', error);
-        merge({});
+        merge({ hiddenLabels: new Set(capabilityLabels) });
       });
 
     // General server information; a cluster member has no hubs to manage
@@ -185,10 +193,20 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
       .GetServerInfo()
       .then((response) => {
         const hidden = new Set<string>();
+        const serverType = Number(response.ServerType_u32);
+        if (serverType === 0) {
+          hidden.add('Clustering Status');
+        }
         if (response.ServerType_u32 === 2) {
           hidden.add('Hubs');
         }
-        merge({ info: response as unknown as Record<string, unknown>, hiddenLabels: hidden });
+        merge({
+          info: response as unknown as Record<string, unknown>,
+          ...(serverType >= 0 && serverType <= 2
+            ? { hideNonCluster: serverType === 1 || serverType === 2 }
+            : {}),
+          hiddenLabels: hidden,
+        });
       })
       .catch((error) => {
         logUnexpectedProbeError('GetServerInfo', error);

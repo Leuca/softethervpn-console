@@ -14,6 +14,7 @@ import { HubCertificates } from '@app/Hubs/HubCertificates';
 import { SecureNAT } from '@app/Hubs/SecureNAT';
 import { HubLogs } from '@app/Hubs/HubLogs';
 import { HubTables } from '@app/Hubs/HubTables';
+import { useServer } from '@app/ServerContext';
 
 /**
  * Management views for a single Virtual Hub, laid out as tabs.
@@ -34,10 +35,13 @@ const hubTabKeys = new Set([
 ]);
 
 const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
+  const { hideNonCluster } = useServer();
   const activeTabRef = React.useRef<HTMLButtonElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const activeTab = tabParam && hubTabKeys.has(tabParam) ? tabParam : 'status';
+  const activeTab = tabParam && hubTabKeys.has(tabParam) && !(hideNonCluster && tabParam === 'securenat')
+    ? tabParam
+    : 'status';
   const selectedTabRef = (key: string) => (activeTab === key ? activeTabRef : undefined);
 
   const selectTab = (_event: React.MouseEvent<HTMLElement>, key: string | number) => {
@@ -145,9 +149,11 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
           <Tab ref={selectedTabRef('accesslist')} eventKey="accesslist" title={<TabTitleText>Access List</TabTitleText>}>
             <AccessList hub={name} />
           </Tab>
-          <Tab ref={selectedTabRef('securenat')} eventKey="securenat" title={<TabTitleText>Secure NAT</TabTitleText>}>
-            <SecureNAT hub={name} />
-          </Tab>
+          {!hideNonCluster && (
+            <Tab ref={selectedTabRef('securenat')} eventKey="securenat" title={<TabTitleText>Secure NAT</TabTitleText>}>
+              <SecureNAT hub={name} />
+            </Tab>
+          )}
           <Tab ref={selectedTabRef('certificates')} eventKey="certificates" title={<TabTitleText>Trusted CA</TabTitleText>}>
             <HubCertificates hub={name} />
           </Tab>

@@ -25,6 +25,7 @@ const Dashboard: React.FunctionComponent = () => {
   const navigate = useNavigate();
 
   const str = (key: string): string => String(info[key] ?? '-');
+  const showDynamicDns = !loading && !hideAdminOnly && !hideNonBridge && !hiddenLabels.has('Dynamic DNS');
   const showVpnAzure = !loading && !hideAdminOnly && !hideNonBridge && !hiddenLabels.has('VPN Azure');
   const commonTasks = loading
     ? []
@@ -111,10 +112,12 @@ const Dashboard: React.FunctionComponent = () => {
                   <DescriptionListTerm>Hostname</DescriptionListTerm>
                   <DescriptionListDescription>{str('ServerHostName_str')}</DescriptionListDescription>
                 </DescriptionListGroup>
-                <DescriptionListGroup>
-                  <DescriptionListTerm>Dynamic DNS</DescriptionListTerm>
-                  <DescriptionListDescription>{ddnsHostname || '-'}</DescriptionListDescription>
-                </DescriptionListGroup>
+                {showDynamicDns && (
+                  <DescriptionListGroup>
+                    <DescriptionListTerm>Dynamic DNS</DescriptionListTerm>
+                    <DescriptionListDescription>{ddnsHostname || '-'}</DescriptionListDescription>
+                  </DescriptionListGroup>
+                )}
                 {showVpnAzure && (
                   <DescriptionListGroup>
                     <DescriptionListTerm>VPN Azure</DescriptionListTerm>

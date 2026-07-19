@@ -23,13 +23,15 @@ const getCaps = api.GetCaps as unknown as Mock;
 const getServerInfo = api.GetServerInfo as unknown as Mock;
 
 const ProbeState: React.FunctionComponent = () => {
-  const { hideAdminOnly, loading, user } = useServer();
+  const { hiddenLabels, hideAdminOnly, hideNonCluster, loading, user } = useServer();
 
   return (
     <>
       <span data-testid="loading">{loading ? 'loading' : 'ready'}</span>
       <span data-testid="user">{user}</span>
       <span data-testid="hide-admin-only">{hideAdminOnly ? 'hidden' : 'visible'}</span>
+      <span data-testid="hide-non-cluster">{hideNonCluster ? 'hidden' : 'visible'}</span>
+      <span data-testid="hidden-labels">{Array.from(hiddenLabels).join(',')}</span>
     </>
   );
 };
@@ -85,6 +87,20 @@ describe('ServerProvider', () => {
     await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('ready'));
     expect(logSpy).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith('Server probe GetCaps failed', error);
+    expect(screen.getByTestId('hidden-labels')).toHaveTextContent('Local Bridge');
+    expect(screen.getByTestId('hidden-labels')).toHaveTextContent('VPN Azure');
+  });
+
+  it('uses server information as a fallback for cluster visibility', async () => {
+    getFarmSetting.mockRejectedValue(new Error('farm probe failed'));
+    getServerInfo.mockResolvedValue({ ServerType_u32: 2 });
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('hide-non-cluster')).toHaveTextContent('hidden');
+    expect(screen.getByTestId('hidden-labels')).toHaveTextContent('Hubs');
   });
 
   it('settles when a probe rejects with a non-object reason', async () => {
