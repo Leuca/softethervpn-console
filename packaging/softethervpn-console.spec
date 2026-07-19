@@ -1,19 +1,18 @@
-%global upstream_version 0.1.2
 %global github_owner Leuca
 %global frontend_dir %{_datadir}/%{name}
 %global gateway_dir %{_libexecdir}/%{name}/gateway
 
 Name:           softethervpn-console
-Version:        0.1.2
+Version:        0
 Release:        1%{?dist}
 Summary:        Web management console for SoftEther VPN Server
 
 License:        MIT AND 0BSD AND Apache-2.0 AND BSD-3-Clause AND BlueOak-1.0.0 AND ISC
 URL:            https://github.com/%{github_owner}/%{name}
-Source0:        https://github.com/%{github_owner}/%{name}/archive/v%{upstream_version}/%{name}-%{upstream_version}.tar.gz
-Source1:        %{name}-%{upstream_version}-nm-prod.tgz
-Source2:        %{name}-%{upstream_version}-nm-dev.tgz
-Source3:        %{name}-%{upstream_version}-bundled-licenses.txt
+Source0:        https://github.com/%{github_owner}/%{name}/archive/v%{version}/%{name}-%{version}.tar.gz
+Source1:        %{name}-%{version}-nm-prod.tgz
+Source2:        %{name}-%{version}-nm-dev.tgz
+Source3:        %{name}-%{version}-bundled-licenses.txt
 Source4:        %{name}.service
 Source5:        %{name}.sysconfig
 
@@ -39,7 +38,7 @@ requests to a server selected at login. Public TLS must be provided by a
 trusted reverse proxy.
 
 %prep
-%autosetup -n %{name}-%{upstream_version}
+%autosetup -n %{name}-%{version}
 
 cp -p %{SOURCE3} .
 
@@ -86,7 +85,7 @@ install -D -p -m 0644 %{SOURCE5} %{buildroot}%{_sysconfdir}/sysconfig/%{name}
 
 %files
 %license LICENSE
-%license %{name}-%{upstream_version}-bundled-licenses.txt
+%license %{name}-%{version}-bundled-licenses.txt
 %doc README.md
 %doc gateway/README.md
 %doc packaging/README.md

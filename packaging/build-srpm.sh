@@ -101,7 +101,7 @@ create_dependency_bundle() {
 root_package="$name-$upstream_version.tgz"
 create_npm_tarball "$project_dir" "$root_package"
 
-create_dependency_bundle "$name" "$package_tarballs/$root_package" "$name-$upstream_version"
+create_dependency_bundle "$name" "$package_tarballs/$root_package" "$name-$rpm_version"
 
 cp -p "$project_dir/packaging/$name.service" "$sources_dir/$name.service"
 cp -p "$project_dir/packaging/$name.sysconfig" "$sources_dir/$name.sysconfig"
@@ -136,9 +136,10 @@ awk \
   ' "$project_dir/packaging/$name.spec" > "$rendered_spec"
 
 sed -i \
-  -e "s/^%global upstream_version .*/%global upstream_version $upstream_version/" \
-  -e "s/^%global github_owner .*/%global github_owner $owner/" \
   -e "s/^Version:.*/Version:        $rpm_version/" \
+  -e "s/^%global github_owner .*/%global github_owner $owner/" \
+  -e "s|^Source0:.*|Source0:        $source_url|" \
+  -e "s|^%autosetup -n .*|%autosetup -n $name-$upstream_version|" \
   "$rendered_spec"
 
 rpmbuild -bs --define "_topdir $top_dir" "$rendered_spec"
