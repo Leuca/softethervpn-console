@@ -13,12 +13,9 @@ URL:            https://github.com/%{github_owner}/%{name}
 Source0:        https://github.com/%{github_owner}/%{name}/archive/v%{upstream_version}/%{name}-%{upstream_version}.tar.gz
 Source1:        %{name}-%{upstream_version}-nm-prod.tgz
 Source2:        %{name}-%{upstream_version}-nm-dev.tgz
-Source3:        %{name}-gateway-%{upstream_version}-nm-prod.tgz
-Source4:        %{name}-gateway-%{upstream_version}-nm-dev.tgz
-Source5:        %{name}-%{upstream_version}-bundled-licenses.txt
-Source6:        %{name}-gateway-%{upstream_version}-bundled-licenses.txt
-Source7:        %{name}.service
-Source8:        %{name}.sysconfig
+Source3:        %{name}-%{upstream_version}-bundled-licenses.txt
+Source4:        %{name}.service
+Source5:        %{name}.sysconfig
 
 BuildArch:      noarch
 ExclusiveArch:  %{nodejs_arches} noarch
@@ -44,23 +41,16 @@ trusted reverse proxy.
 %prep
 %autosetup -n %{name}-%{upstream_version}
 
-cp -p %{SOURCE5} .
-cp -p %{SOURCE6} .
+cp -p %{SOURCE3} .
 
 # Dependency archives are produced by Fedora's nodejs-packaging-bundler in the
 # release workflow. RPM builds remain offline and never contact npmjs.org.
 tar -xzf %{SOURCE1}
 tar -xzf %{SOURCE2}
-tar -xzf %{SOURCE3} -C gateway
-tar -xzf %{SOURCE4} -C gateway
 
-mkdir -p node_modules gateway/node_modules
-cp -a node_modules_prod/. node_modules/
-cp -a node_modules_dev/. node_modules/
-cp -a gateway/node_modules_prod/. gateway/node_modules/
-cp -a gateway/node_modules_dev/. gateway/node_modules/
-rm -rf node_modules_prod node_modules_dev
-rm -rf gateway/node_modules_prod gateway/node_modules_dev
+mv node_modules_dev node_modules
+mv gateway/node_modules_dev gateway/node_modules
+rm -rf node_modules_prod
 
 %build
 export NODE_OPTIONS=--max-old-space-size=4096
@@ -81,8 +71,8 @@ install -p -m 0644 gateway/package.json %{buildroot}%{gateway_dir}/package.json
 cp -a gateway/dist %{buildroot}%{gateway_dir}/dist
 cp -a gateway/node_modules_prod/. %{buildroot}%{gateway_dir}/node_modules/
 
-install -D -p -m 0644 %{SOURCE7} %{buildroot}%{_unitdir}/%{name}.service
-install -D -p -m 0644 %{SOURCE8} %{buildroot}%{_sysconfdir}/sysconfig/%{name}
+install -D -p -m 0644 %{SOURCE4} %{buildroot}%{_unitdir}/%{name}.service
+install -D -p -m 0644 %{SOURCE5} %{buildroot}%{_sysconfdir}/sysconfig/%{name}
 
 %post
 %systemd_post %{name}.service
@@ -96,7 +86,6 @@ install -D -p -m 0644 %{SOURCE8} %{buildroot}%{_sysconfdir}/sysconfig/%{name}
 %files
 %license LICENSE
 %license %{name}-%{upstream_version}-bundled-licenses.txt
-%license %{name}-gateway-%{upstream_version}-bundled-licenses.txt
 %doc README.md
 %doc gateway/README.md
 %doc packaging/README.md

@@ -10,10 +10,10 @@ frontend remains part of SoftEther VPN Server and is not installed by this RPM.
 The `srpm` release job runs only after the GitHub Release job succeeds. It:
 
 1. Downloads the tagged GitHub source archive used by `Source0`.
-2. Uses Fedora's `nodejs-packaging-bundler` to create separate production and
-   development dependency archives for the frontend and gateway.
+2. Uses Fedora's `nodejs-packaging-bundler` to create production and
+   development dependency archives covering the frontend and nested gateway.
 3. Generates the required `bundled(npm(...))` RPM provides from both lockfiles
-   and includes the bundler-generated dependency license reports for review.
+   and includes the bundler-generated production license report for review.
 4. Injects the release version, RPM-compatible version, repository owner,
    bundled provides, and changelog entry into the spec.
 5. Builds and checks the SRPM, creates its SHA-256 checksum, and uploads both as

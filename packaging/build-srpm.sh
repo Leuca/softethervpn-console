@@ -99,15 +99,9 @@ create_dependency_bundle() {
 }
 
 root_package="$name-$upstream_version.tgz"
-gateway_package="$name-gateway-$upstream_version.tgz"
 create_npm_tarball "$project_dir" "$root_package"
-create_npm_tarball "$project_dir/gateway" "$gateway_package"
 
 create_dependency_bundle "$name" "$package_tarballs/$root_package" "$name-$upstream_version"
-create_dependency_bundle \
-  "$name-gateway" \
-  "$package_tarballs/$gateway_package" \
-  "$name-gateway-$upstream_version"
 
 cp -p "$project_dir/packaging/$name.service" "$sources_dir/$name.service"
 cp -p "$project_dir/packaging/$name.sysconfig" "$sources_dir/$name.sysconfig"
