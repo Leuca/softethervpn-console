@@ -15,6 +15,10 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
   api: { GetHubStatus: vi.fn() },
 }));
 
+vi.mock('@app/Hubs/Sessions', () => ({
+  Sessions: ({ hub }: { hub: string }) => <div>Sessions for {hub}</div>,
+}));
+
 const getHubStatus = api.GetHubStatus as unknown as Mock;
 
 describe('HubDetail', () => {
@@ -33,6 +37,17 @@ describe('HubDetail', () => {
 
     expect(await screen.findByText('Standalone')).toBeInTheDocument();
     expect(getHubStatus.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+  });
+
+  it('restores the selected tab from the URL after reload', async () => {
+    render(
+      <MemoryRouter initialEntries={['/?tab=sessions']}>
+        <HubDetail name="DEFAULT" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('tab', { name: 'Sessions' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByText('Sessions for DEFAULT')).toBeInTheDocument();
   });
 
   it('shows the ported management tabs and no placeholder Security Policy tab', async () => {
