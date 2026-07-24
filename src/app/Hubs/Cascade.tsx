@@ -39,6 +39,7 @@ import { KeyValueTable } from '@app/components/KeyValueTable';
 import { binToBytes } from '@app/utils/blob_utils';
 import { recordChanged } from '@app/utils/dirty';
 import { formatOptionalDate } from '@app/utils/format';
+import { extractPkcs12KeyPair, isPkcs12File } from '@app/utils/pkcs12';
 import { hashSoftEtherPassword } from '@app/utils/sha0';
 import { certificateBytesToDer } from '@app/utils/x509';
 
@@ -69,14 +70,14 @@ const readCertBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m
 
 // Read a private key. The RPC decodes the key with no passphrase
 // (InRpcClientAuth -> BufToK(..., NULL)), so an encrypted key would fail
-// silently server-side; reject one with a clear error (PEM markers).
+// silently server-side; direct those files through the PKCS #12 flow instead.
 const readKeyBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m: string) => void): void => {
   const reader = new FileReader();
   reader.onload = () => {
     const bytes = new Uint8Array(reader.result as ArrayBuffer);
     const text = new TextDecoder('latin1').decode(bytes);
     if (/ENCRYPTED PRIVATE KEY|Proc-Type:\s*4,\s*ENCRYPTED|DEK-Info:/i.test(text)) {
-      onError('Encrypted (password-protected) private keys are not supported yet. Provide an unencrypted key.');
+      onError('Encrypted private-key files cannot be imported separately. Use a PKCS #12 archive instead.');
       return;
     }
     onBytes(bytes);
@@ -502,27 +503,116 @@ const applyAuth = (target: Record<string, unknown>, get: (key: string) => unknow
   }
 };
 
+interface ClientCertificateUploadState {
+  certFilename: string;
+  certError: string | null;
+  keyFilename: string;
+  keyError: string | null;
+  certificateIsPkcs12: boolean;
+  pkcs12Bytes: Uint8Array | null;
+  pkcs12Password: string;
+  pkcs12Error: string | null;
+  openingPkcs12: boolean;
+}
+
+const emptyClientCertificateUpload = (): ClientCertificateUploadState => ({
+  certFilename: '',
+  certError: null,
+  keyFilename: '',
+  keyError: null,
+  certificateIsPkcs12: false,
+  pkcs12Bytes: null,
+  pkcs12Password: '',
+  pkcs12Error: null,
+  openingPkcs12: false,
+});
+
 // Shared authentication editor for the create and edit forms. Reads/writes
 // AuthType_u32, Username_str and the certificate ClientX_bin/ClientK_bin on the
 // parent object via get/set; the plaintext password is a separate controlled
-// value (in edit mode, blank keeps the existing secret). File-picker filenames
-// and errors are transient and kept in local state.
+// value (in edit mode, blank keeps the existing secret). Certificate-upload
+// state is owned by the parent so it survives step-aside modals.
 const AuthFields: React.FunctionComponent<{
   idPrefix: string;
   get: (key: string) => unknown;
   set: (key: string, value: unknown) => void;
+  setCertificatePair: (certificate: Uint8Array | undefined, privateKey: Uint8Array | undefined) => void;
+  certificateUpload: ClientCertificateUploadState;
+  setCertificateUpload: React.Dispatch<React.SetStateAction<ClientCertificateUploadState>>;
   password: string;
   setPassword: (value: string) => void;
   passwordPlaceholder?: string;
   onViewCert: (cert: Uint8Array | string) => void;
-}> = ({ idPrefix, get, set, password, setPassword, passwordPlaceholder, onViewCert }) => {
+}> = ({
+  idPrefix,
+  get,
+  set,
+  setCertificatePair,
+  certificateUpload,
+  setCertificateUpload,
+  password,
+  setPassword,
+  passwordPlaceholder,
+  onViewCert,
+}) => {
   const { Anonymous, SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
   const authType = Number(get('AuthType_u32')) || Anonymous;
   const needsUsername = authType === SHA0_Hashed_Password || authType === PlainPassword || authType === Cert;
-  const [certFilename, setCertFilename] = React.useState('');
-  const [certError, setCertError] = React.useState<string | null>(null);
-  const [keyFilename, setKeyFilename] = React.useState('');
-  const [keyError, setKeyError] = React.useState<string | null>(null);
+  const {
+    certFilename,
+    certError,
+    keyFilename,
+    keyError,
+    certificateIsPkcs12,
+    pkcs12Bytes,
+    pkcs12Password,
+    pkcs12Error,
+    openingPkcs12,
+  } = certificateUpload;
+  const updateCertificateUpload = (update: Partial<ClientCertificateUploadState>) =>
+    setCertificateUpload((current) => ({ ...current, ...update }));
+  const setCertFilename = (value: string) => updateCertificateUpload({ certFilename: value });
+  const setCertError = (value: string | null) => updateCertificateUpload({ certError: value });
+  const setKeyFilename = (value: string) => updateCertificateUpload({ keyFilename: value });
+  const setKeyError = (value: string | null) => updateCertificateUpload({ keyError: value });
+  const setCertificateIsPkcs12 = (value: boolean) => updateCertificateUpload({ certificateIsPkcs12: value });
+  const setPkcs12Bytes = (value: Uint8Array | null) => updateCertificateUpload({ pkcs12Bytes: value });
+  const setPkcs12Password = (value: string) => updateCertificateUpload({ pkcs12Password: value });
+  const setPkcs12Error = (value: string | null) => updateCertificateUpload({ pkcs12Error: value });
+  const setOpeningPkcs12 = (value: boolean) => updateCertificateUpload({ openingPkcs12: value });
+
+  const clearClientIdentity = () => {
+    setCertificatePair(undefined, undefined);
+  };
+
+  const readPkcs12 = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => setPkcs12Bytes(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => {
+      setPkcs12Bytes(null);
+      setPkcs12Error('The PKCS #12 archive could not be read.');
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const openPkcs12 = async () => {
+    if (!pkcs12Bytes) {
+      return;
+    }
+    setOpeningPkcs12(true);
+    setPkcs12Error(null);
+    try {
+      const pair = await extractPkcs12KeyPair(pkcs12Bytes, pkcs12Password);
+      setCertificatePair(certificateBytesToDer(pair.certificate), pair.privateKey);
+      setPkcs12Password('');
+    } catch (error) {
+      clearClientIdentity();
+      setPkcs12Error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOpeningPkcs12(false);
+    }
+  };
+
   return (
     <>
       <FormGroup label="Authentication" fieldId={`${idPrefix}-auth`}>
@@ -563,79 +653,147 @@ const AuthFields: React.FunctionComponent<{
       )}
       {authType === Cert && (
         <>
-          <FormGroup label="Client certificate" isRequired fieldId={`${idPrefix}-cert`}>
+          <FormGroup label="Client certificate or PKCS #12 archive" isRequired fieldId={`${idPrefix}-cert`}>
             <FileUpload
               id={`${idPrefix}-cert`}
               type="dataURL"
               filename={certFilename}
-              filenamePlaceholder="Drag and drop or upload a certificate"
+              filenamePlaceholder="Drag and drop or upload a certificate, .p12, or .pfx file"
               browseButtonText="Upload"
               hideDefaultPreview
               onFileInputChange={(_event, file) => {
+                clearClientIdentity();
                 setCertError(null);
+                setKeyFilename('');
+                setKeyError(null);
+                setPkcs12Bytes(null);
+                setPkcs12Password('');
+                setPkcs12Error(null);
                 setCertFilename(file.name);
-                readCertBytes(
-                  file,
-                  (bytes) => set('ClientX_bin', bytes),
-                  (message) => {
-                    setCertError(message);
-                    set('ClientX_bin', undefined);
-                  },
-                );
+                const archive = isPkcs12File(file);
+                setCertificateIsPkcs12(archive);
+                if (archive) {
+                  readPkcs12(file);
+                } else {
+                  readCertBytes(
+                    file,
+                    (bytes) => set('ClientX_bin', bytes),
+                    (message) => {
+                      setCertError(message);
+                      set('ClientX_bin', undefined);
+                    },
+                  );
+                }
               }}
               onClearClick={() => {
                 setCertFilename('');
                 setCertError(null);
-                set('ClientX_bin', undefined);
+                setKeyFilename('');
+                setKeyError(null);
+                setCertificateIsPkcs12(false);
+                setPkcs12Bytes(null);
+                setPkcs12Password('');
+                setPkcs12Error(null);
+                clearClientIdentity();
               }}
-              dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
-              filenameAriaLabel="Certificate file name"
+              dropzoneProps={{
+                accept: {
+                  'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'],
+                  'application/x-pkcs12': ['.p12', '.pfx'],
+                },
+              }}
+              filenameAriaLabel="Client certificate or PKCS #12 file name"
             />
             {certError && (
               <HelperText>
                 <HelperTextItem variant="error">{certError}</HelperTextItem>
               </HelperText>
             )}
-            {binToBytes(get('ClientX_bin')) && !certError && (
-              <Button variant="link" isInline onClick={() => onViewCert(get('ClientX_bin') as Uint8Array | string)}>
-                View certificate
-              </Button>
-            )}
           </FormGroup>
-          <FormGroup label="Private key" isRequired fieldId={`${idPrefix}-key`}>
-            <FileUpload
-              id={`${idPrefix}-key`}
-              type="dataURL"
-              filename={keyFilename}
-              filenamePlaceholder="Drag and drop or upload the private key"
-              browseButtonText="Upload"
-              hideDefaultPreview
-              onFileInputChange={(_event, file) => {
-                setKeyError(null);
-                setKeyFilename(file.name);
-                readKeyBytes(
-                  file,
-                  (bytes) => set('ClientK_bin', bytes),
-                  (message) => {
-                    setKeyError(message);
+          {!certificateIsPkcs12 ? (
+            <>
+              <FormGroup label="Private key" isRequired fieldId={`${idPrefix}-key`}>
+                <FileUpload
+                  id={`${idPrefix}-key`}
+                  type="dataURL"
+                  filename={keyFilename}
+                  filenamePlaceholder="Drag and drop or upload the private key"
+                  browseButtonText="Upload"
+                  hideDefaultPreview
+                  onFileInputChange={(_event, file) => {
+                    setKeyError(null);
+                    setKeyFilename(file.name);
+                    readKeyBytes(
+                      file,
+                      (bytes) => set('ClientK_bin', bytes),
+                      (message) => {
+                        setKeyError(message);
+                        set('ClientK_bin', undefined);
+                      },
+                    );
+                  }}
+                  onClearClick={() => {
+                    setKeyFilename('');
+                    setKeyError(null);
                     set('ClientK_bin', undefined);
-                  },
-                );
-              }}
-              onClearClick={() => {
-                setKeyFilename('');
-                setKeyError(null);
-                set('ClientK_bin', undefined);
-              }}
-              dropzoneProps={{ accept: { 'application/octet-stream': ['.key', '.pem', '.der'] } }}
-              filenameAriaLabel="Private key file name"
-            />
-            {keyError && (
-              <HelperText>
-                <HelperTextItem variant="error">{keyError}</HelperTextItem>
-              </HelperText>
-            )}
-          </FormGroup>
+                  }}
+                  dropzoneProps={{ accept: { 'application/octet-stream': ['.key', '.pem', '.der'] } }}
+                  filenameAriaLabel="Private key file name"
+                />
+                {keyError && (
+                  <HelperText>
+                    <HelperTextItem variant="error">{keyError}</HelperTextItem>
+                  </HelperText>
+                )}
+              </FormGroup>
+            </>
+          ) : (
+            <>
+              <FormGroup label="Archive password" fieldId={`${idPrefix}-pkcs12-password`}>
+                <TextInput
+                  type="password"
+                  id={`${idPrefix}-pkcs12-password`}
+                  value={pkcs12Password}
+                  onChange={(_event, value) => {
+                    setPkcs12Password(value);
+                    clearClientIdentity();
+                  }}
+                  autoComplete="off"
+                  aria-label="PKCS #12 archive password"
+                />
+                <HelperText>
+                  <HelperTextItem>
+                    The password is used only in this browser to open the archive and is never sent to the server.
+                  </HelperTextItem>
+                </HelperText>
+              </FormGroup>
+              <Button
+                variant="secondary"
+                onClick={openPkcs12}
+                isDisabled={!pkcs12Bytes || openingPkcs12}
+                isLoading={openingPkcs12}
+              >
+                Open archive
+              </Button>
+              {pkcs12Error && (
+                <HelperText>
+                  <HelperTextItem variant="error">{pkcs12Error}</HelperTextItem>
+                </HelperText>
+              )}
+              {binToBytes(get('ClientX_bin')) && binToBytes(get('ClientK_bin')) && !pkcs12Error && (
+                <HelperText>
+                  <HelperTextItem variant="success">
+                    Certificate and private key are ready.
+                  </HelperTextItem>
+                </HelperText>
+              )}
+            </>
+          )}
+          {binToBytes(get('ClientX_bin')) && !certError && !pkcs12Error && (
+            <Button variant="link" isInline onClick={() => onViewCert(get('ClientX_bin') as Uint8Array | string)}>
+              View certificate
+            </Button>
+          )}
         </>
       )}
     </>
@@ -658,6 +816,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     AuthType_u32: VPN.VpnRpcClientAuthType.Anonymous,
   });
   const [password, setPassword] = React.useState('');
+  const [createCertificateUpload, setCreateCertificateUpload] = React.useState(emptyClientCertificateUpload);
   // Plaintext password entered while editing (blank keeps the existing secret).
   const [editPassword, setEditPassword] = React.useState('');
   // Server-certificate verification for a new cascade: CheckServerCert and
@@ -682,6 +841,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
   const [editOriginal, setEditOriginal] = React.useState<Record<string, unknown> | null>(null);
   const [editTouched, setEditTouched] = React.useState<Set<string>>(() => new Set());
+  const [editCertificateUpload, setEditCertificateUpload] = React.useState(emptyClientCertificateUpload);
 
   const load = React.useCallback(() => {
     setError(null);
@@ -703,6 +863,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setDestHub('');
     setAuth({ AuthType_u32: VPN.VpnRpcClientAuthType.Anonymous });
     setPassword('');
+    setCreateCertificateUpload(emptyClientCertificateUpload());
     setServerCert({ CheckServerCert_bool: false });
     setAdvanced({ ...ADVANCED_DEFAULTS });
     setProxy({ ProxyType_u32: VPN.VpnRpcProxyType.Direct });
@@ -790,6 +951,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setError(null);
     setEditPassword('');
     setEditTouched(new Set());
+    setEditCertificateUpload(emptyClientCertificateUpload());
     api
       .GetLink(new VPN.VpnRpcCreateLink({ HubName_Ex_str: hub, AccountName_utf: accountName }))
       .then((response) => {
@@ -1010,6 +1172,15 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               idPrefix="link"
               get={(key) => auth[key]}
               set={(key, value) => setAuth((prev) => ({ ...prev, [key]: value }))}
+              setCertificatePair={(certificate, privateKey) =>
+                setAuth((prev) => ({
+                  ...prev,
+                  ClientX_bin: certificate,
+                  ClientK_bin: privateKey,
+                }))
+              }
+              certificateUpload={createCertificateUpload}
+              setCertificateUpload={setCreateCertificateUpload}
               password={password}
               setPassword={setPassword}
               onViewCert={setViewCert}
@@ -1090,6 +1261,20 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 idPrefix="edit"
                 get={(key) => edit[key]}
                 set={setEditField}
+                setCertificatePair={(certificate, privateKey) => {
+                  setEdit((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          ClientX_bin: certificate,
+                          ClientK_bin: privateKey,
+                        }
+                      : prev,
+                  );
+                  setEditTouched((prev) => new Set(prev).add('ClientX_bin').add('ClientK_bin'));
+                }}
+                certificateUpload={editCertificateUpload}
+                setCertificateUpload={setEditCertificateUpload}
                 password={editPassword}
                 setPassword={(value) => {
                   setEditTouched((prev) => new Set(prev).add('PlainPassword_str'));

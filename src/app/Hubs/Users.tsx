@@ -37,6 +37,7 @@ import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
 import { binToBytes } from '@app/utils/blob_utils';
 import { recordChanged } from '@app/utils/dirty';
 import { formatOptionalDate, userAuthTypeLabel } from '@app/utils/format';
+import { extractPkcs12KeyPair, isPkcs12File } from '@app/utils/pkcs12';
 import { parseCertificate } from '@app/utils/x509';
 
 const ALL_AUTH_TYPES = [
@@ -182,6 +183,41 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
       : rootSerialEnabled
         ? serialResult.error
         : null;
+  const [certificateIsPkcs12, setCertificateIsPkcs12] = React.useState(false);
+  const [pkcs12Filename, setPkcs12Filename] = React.useState('');
+  const [pkcs12Bytes, setPkcs12Bytes] = React.useState<Uint8Array | null>(null);
+  const [pkcs12Password, setPkcs12Password] = React.useState('');
+  const [pkcs12Error, setPkcs12Error] = React.useState<string | null>(null);
+  const [openingPkcs12, setOpeningPkcs12] = React.useState(false);
+
+  const readPkcs12 = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => setPkcs12Bytes(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => {
+      setPkcs12Bytes(null);
+      setPkcs12Error('The PKCS #12 archive could not be read.');
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const openPkcs12 = async () => {
+    if (!pkcs12Bytes) {
+      return;
+    }
+    setOpeningPkcs12(true);
+    setPkcs12Error(null);
+    try {
+      const pair = await extractPkcs12KeyPair(pkcs12Bytes, pkcs12Password);
+      parseCertificate(pair.certificate);
+      onField('UserX_bin', pair.certificate);
+      setPkcs12Password('');
+    } catch (archiveError) {
+      onField('UserX_bin', new Uint8Array());
+      setPkcs12Error(archiveError instanceof Error ? archiveError.message : String(archiveError));
+    } finally {
+      setOpeningPkcs12(false);
+    }
+  };
 
   return (
     <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={() => !isSubmitting && onClose()}>
@@ -249,30 +285,98 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
             </FormGroup>
           )}
           {authType === VPN.VpnRpcUserAuthType.UserCert && (
-            <FormGroup label="User certificate" fieldId={`${idPrefix}-usercert`}>
-              <HelperText>
-                <HelperTextItem>
-                  The user may connect only with an SSL client certificate that exactly matches the one registered here.
-                </HelperTextItem>
-              </HelperText>
-              <FileUpload
-                id={`${idPrefix}-usercert`}
-                type="dataURL"
-                filename={certFilename}
-                filenamePlaceholder="Drag and drop or upload a certificate"
-                browseButtonText="Upload"
-                hideDefaultPreview
-                onFileInputChange={onCertSelected}
-                onClearClick={onClearCert}
-                dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
-                filenameAriaLabel="Certificate file name"
-              />
-              {certError && (
+            <>
+              <FormGroup label="User certificate or PKCS #12 archive" fieldId={`${idPrefix}-usercert`}>
                 <HelperText>
-                  <HelperTextItem variant="error">{certError}</HelperTextItem>
+                  <HelperTextItem>
+                    The user may connect only with an SSL client certificate that exactly matches the one registered here.
+                  </HelperTextItem>
                 </HelperText>
+                <FileUpload
+                  id={`${idPrefix}-usercert`}
+                  type="dataURL"
+                  filename={certificateIsPkcs12 ? pkcs12Filename : certFilename}
+                  filenamePlaceholder="Drag and drop or upload a certificate, .p12, or .pfx file"
+                  browseButtonText="Upload"
+                  hideDefaultPreview
+                  onFileInputChange={(event, file) => {
+                    const archive = isPkcs12File(file);
+                    setCertificateIsPkcs12(archive);
+                    setPkcs12Filename('');
+                    setPkcs12Bytes(null);
+                    setPkcs12Password('');
+                    setPkcs12Error(null);
+                    if (archive) {
+                      onClearCert();
+                      setPkcs12Filename(file.name);
+                      readPkcs12(file);
+                    } else {
+                      onCertSelected(event, file);
+                    }
+                  }}
+                  onClearClick={() => {
+                    setCertificateIsPkcs12(false);
+                    setPkcs12Filename('');
+                    setPkcs12Bytes(null);
+                    setPkcs12Password('');
+                    setPkcs12Error(null);
+                    onClearCert();
+                  }}
+                  dropzoneProps={{
+                    accept: {
+                      'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'],
+                      'application/x-pkcs12': ['.p12', '.pfx'],
+                    },
+                  }}
+                  filenameAriaLabel="User certificate or PKCS #12 file name"
+                />
+                {!certificateIsPkcs12 && certError && (
+                  <HelperText>
+                    <HelperTextItem variant="error">{certError}</HelperTextItem>
+                  </HelperText>
+                )}
+              </FormGroup>
+              {certificateIsPkcs12 && (
+                <>
+                  <FormGroup label="Archive password" fieldId={`${idPrefix}-usercert-pkcs12-password`}>
+                    <TextInput
+                      type="password"
+                      id={`${idPrefix}-usercert-pkcs12-password`}
+                      value={pkcs12Password}
+                      onChange={(_event, value) => {
+                        setPkcs12Password(value);
+                        onClearCert();
+                      }}
+                      autoComplete="off"
+                      aria-label="PKCS #12 archive password"
+                    />
+                    <HelperText>
+                      <HelperTextItem>
+                        The archive is opened only in this browser. Its private key is discarded and is never sent to the server.
+                      </HelperTextItem>
+                    </HelperText>
+                  </FormGroup>
+                  <Button
+                    variant="secondary"
+                    onClick={openPkcs12}
+                    isDisabled={!pkcs12Bytes || openingPkcs12}
+                    isLoading={openingPkcs12}
+                  >
+                    Open archive
+                  </Button>
+                  {pkcs12Error && (
+                    <HelperText>
+                      <HelperTextItem variant="error">{pkcs12Error}</HelperTextItem>
+                    </HelperText>
+                  )}
+                  {certBytes && !pkcs12Error && (
+                    <HelperText>
+                      <HelperTextItem variant="success">User certificate is ready.</HelperTextItem>
+                    </HelperText>
+                  )}
+                </>
               )}
-              {certBytes && !certError && (
+              {certBytes && !certError && !pkcs12Error && (
                 <Button
                   variant="link"
                   isInline
@@ -282,7 +386,7 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
                   View registered certificate
                 </Button>
               )}
-            </FormGroup>
+            </>
           )}
           {authType === VPN.VpnRpcUserAuthType.RootCert && (
             <>

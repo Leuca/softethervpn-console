@@ -1,8 +1,9 @@
 import * as React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Users } from './Users';
+import { extractPkcs12KeyPair } from '@app/utils/pkcs12';
 import { api } from '@app/utils/vpnrpc_settings';
 import { SELF_SIGNED_CERT_B64, SELF_SIGNED_CERT_DER } from '@app/utils/x509.fixture';
 
@@ -16,11 +17,17 @@ vi.mock('@app/utils/vpnrpc_settings', () => ({
   },
 }));
 
+vi.mock('@app/utils/pkcs12', () => ({
+  extractPkcs12KeyPair: vi.fn(),
+  isPkcs12File: (file: File) => /\.(p12|pfx)$/i.test(file.name),
+}));
+
 const enumUser = api.EnumUser as unknown as Mock;
 const createUser = api.CreateUser as unknown as Mock;
 const deleteUser = api.DeleteUser as unknown as Mock;
 const getUser = api.GetUser as unknown as Mock;
 const setUser = api.SetUser as unknown as Mock;
+const extractPkcs12 = extractPkcs12KeyPair as unknown as Mock;
 
 const alice = {
   Name_str: 'alice',
@@ -435,6 +442,51 @@ describe('Users', () => {
     const sent = setUser.mock.calls[0][0];
     expect(sent.UserX_bin).toBeInstanceOf(Uint8Array);
     expect(sent.UserX_bin.length).toBeGreaterThan(0);
+  });
+
+  it('extracts a user certificate from a password-protected PKCS #12 archive', async () => {
+    enumUser.mockResolvedValue({ UserList: [alice] });
+    getUser.mockResolvedValue({
+      HubName_str: 'DEFAULT',
+      Name_str: 'alice',
+      AuthType_u32: 2,
+      UserX_bin: new Uint8Array(),
+    });
+    setUser.mockResolvedValue({});
+    extractPkcs12.mockResolvedValue({
+      certificate: SELF_SIGNED_CERT_DER(),
+      privateKey: new Uint8Array([1, 2, 3, 4]),
+    });
+    const user = userEvent.setup();
+
+    render(<Users hub="DEFAULT" />);
+    await screen.findByText('alice');
+    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
+    await user.click(await screen.findByText('Edit'));
+
+    let dialog = await screen.findByRole('dialog');
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(
+      fileInput,
+      new File([new Uint8Array([5, 6, 7, 8])], 'user.p12', { type: 'application/x-pkcs12' }),
+    );
+    await user.type(within(dialog).getByLabelText('PKCS #12 archive password'), 'archive-password');
+    await user.click(within(dialog).getByRole('button', { name: 'Add security policy' }));
+    await screen.findByText('Security policy: alice');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('User certificate or PKCS #12 file name')).toHaveValue('user.p12');
+    expect(within(dialog).getByLabelText('PKCS #12 archive password')).toHaveValue('archive-password');
+    const openArchiveBtn = within(dialog).getByRole('button', { name: 'Open archive' });
+    await waitFor(() => expect(openArchiveBtn).toBeEnabled());
+    await user.click(openArchiveBtn);
+    await within(dialog).findByText('User certificate is ready.');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(extractPkcs12).toHaveBeenCalledWith(expect.any(Uint8Array), 'archive-password');
+    const sent = setUser.mock.calls[0][0];
+    expect(Array.from(sent.UserX_bin)).toEqual(Array.from(SELF_SIGNED_CERT_DER()));
+    expect(sent).not.toHaveProperty('ClientK_bin');
   });
 
   it('edits the security policy and sends it with the user on save', async () => {

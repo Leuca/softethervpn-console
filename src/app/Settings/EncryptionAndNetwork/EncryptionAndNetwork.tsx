@@ -28,6 +28,7 @@ import {
 } from '@patternfly/react-core';
 import * as VPN from 'vpnrpc/dist/vpnrpc';
 import { api } from '@app/utils/vpnrpc_settings';
+import { extractPkcs12KeyPair, isPkcs12File } from '@app/utils/pkcs12';
 import { AppPage } from '@app/components/AppPage';
 import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
 
@@ -122,6 +123,10 @@ const ServerCertCard: React.FunctionComponent = () => {
   const [keyFile, setKeyFile] = React.useState('');
   const certBytes = React.useRef<Uint8Array | null>(null);
   const keyBytes = React.useRef<Uint8Array | null>(null);
+  const [certificateIsPkcs12, setCertificateIsPkcs12] = React.useState(false);
+  const [pkcs12Bytes, setPkcs12Bytes] = React.useState<Uint8Array | null>(null);
+  const [pkcs12Password, setPkcs12Password] = React.useState('');
+  const [importing, setImporting] = React.useState(false);
 
   const load = React.useCallback(() => {
     setError(null);
@@ -154,20 +159,41 @@ const ServerCertCard: React.FunctionComponent = () => {
       .finally(() => setRegenerating(false));
   };
 
-  const importCert = () => {
-    if (!certBytes.current || !keyBytes.current) {
+  const clearImport = () => {
+    setCertFile('');
+    setKeyFile('');
+    certBytes.current = null;
+    keyBytes.current = null;
+    setCertificateIsPkcs12(false);
+    setPkcs12Bytes(null);
+    setPkcs12Password('');
+  };
+
+  const importCert = async () => {
+    if (!certificateIsPkcs12 && (!certBytes.current || !keyBytes.current)) {
       return;
     }
-    api
-      .SetServerCert(new VPN.VpnRpcKeyPair({ Cert_bin: certBytes.current, Key_bin: keyBytes.current }))
-      .then(() => {
-        setCertFile('');
-        setKeyFile('');
-        certBytes.current = null;
-        keyBytes.current = null;
-        load();
-      })
-      .catch((e) => setError(String(e)));
+    if (certificateIsPkcs12 && !pkcs12Bytes) {
+      return;
+    }
+
+    setImporting(true);
+    setError(null);
+    try {
+      const keyPair = certificateIsPkcs12
+        ? await extractPkcs12KeyPair(pkcs12Bytes!, pkcs12Password)
+        : { certificate: certBytes.current!, privateKey: keyBytes.current! };
+      await api.SetServerCert(new VPN.VpnRpcKeyPair({
+        Cert_bin: keyPair.certificate,
+        Key_bin: keyPair.privateKey,
+      }));
+      clearImport();
+      load();
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setImporting(false);
+    }
   };
 
   return (
@@ -192,41 +218,89 @@ const ServerCertCard: React.FunctionComponent = () => {
               </span>
             </StackItem>
             <StackItem>
-              <Content component="h3">Import a certificate and private key</Content>
+              <Content component="h3">Import a certificate</Content>
               <Form>
-                <FormGroup label="Certificate (PEM/DER)" fieldId="cert-file">
+                <FormGroup label="Certificate or PKCS #12 archive" fieldId="cert-file">
                   <FileUpload
                     id="cert-file"
                     type="dataURL"
                     filename={certFile}
-                    filenamePlaceholder="Upload the X.509 certificate"
+                    filenamePlaceholder="Upload a certificate, .p12, or .pfx file"
                     browseButtonText="Upload"
                     hideDefaultPreview
                     onFileInputChange={(_e, file) => {
+                      clearImport();
+                      setError(null);
                       setCertFile(file.name);
-                      readFileBytes(file).then((b) => (certBytes.current = b)).catch(() => setError('Could not read the certificate file.'));
+                      const archive = isPkcs12File(file);
+                      setCertificateIsPkcs12(archive);
+                      readFileBytes(file)
+                        .then((bytes) => {
+                          if (archive) {
+                            setPkcs12Bytes(bytes);
+                          } else {
+                            certBytes.current = bytes;
+                          }
+                        })
+                        .catch(() =>
+                          setError(archive ? 'Could not read the PKCS #12 archive.' : 'Could not read the certificate file.'),
+                        );
                     }}
-                    onClearClick={() => { setCertFile(''); certBytes.current = null; }}
-                    filenameAriaLabel="Certificate file name"
+                    onClearClick={clearImport}
+                    dropzoneProps={{
+                      accept: {
+                        'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'],
+                        'application/x-pkcs12': ['.p12', '.pfx'],
+                      },
+                    }}
+                    filenameAriaLabel="Certificate or PKCS #12 file name"
                   />
                 </FormGroup>
-                <FormGroup label="Private key" fieldId="key-file">
-                  <FileUpload
-                    id="key-file"
-                    type="dataURL"
-                    filename={keyFile}
-                    filenamePlaceholder="Upload the matching private key"
-                    browseButtonText="Upload"
-                    hideDefaultPreview
-                    onFileInputChange={(_e, file) => {
-                      setKeyFile(file.name);
-                      readFileBytes(file).then((b) => (keyBytes.current = b)).catch(() => setError('Could not read the private key file.'));
-                    }}
-                    onClearClick={() => { setKeyFile(''); keyBytes.current = null; }}
-                    filenameAriaLabel="Private key file name"
-                  />
-                </FormGroup>
-                <Button variant="primary" onClick={importCert} isDisabled={certFile === '' || keyFile === ''}>
+                {!certificateIsPkcs12 ? (
+                  <>
+                    <FormGroup label="Private key" fieldId="key-file">
+                      <FileUpload
+                        id="key-file"
+                        type="dataURL"
+                        filename={keyFile}
+                        filenamePlaceholder="Upload the matching private key"
+                        browseButtonText="Upload"
+                        hideDefaultPreview
+                        onFileInputChange={(_e, file) => {
+                          setKeyFile(file.name);
+                          readFileBytes(file).then((b) => (keyBytes.current = b)).catch(() => setError('Could not read the private key file.'));
+                        }}
+                        onClearClick={() => { setKeyFile(''); keyBytes.current = null; }}
+                        filenameAriaLabel="Private key file name"
+                      />
+                    </FormGroup>
+                  </>
+                ) : (
+                  <>
+                    <FormGroup label="Archive password" fieldId="pkcs12-password">
+                      <TextInput
+                        type="password"
+                        id="pkcs12-password"
+                        value={pkcs12Password}
+                        onChange={(_e, value) => setPkcs12Password(value)}
+                        placeholder="Leave empty if the archive is not encrypted"
+                        autoComplete="off"
+                        aria-label="PKCS #12 archive password"
+                      />
+                      <FormHelperText>
+                        <HelperText>
+                          <HelperTextItem>The password is used only in this browser to decrypt the archive.</HelperTextItem>
+                        </HelperText>
+                      </FormHelperText>
+                    </FormGroup>
+                  </>
+                )}
+                <Button
+                  variant="primary"
+                  onClick={importCert}
+                  isDisabled={importing || (certificateIsPkcs12 ? pkcs12Bytes === null : certFile === '' || keyFile === '')}
+                  isLoading={importing}
+                >
                   Import certificate
                 </Button>
               </Form>

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import forge from 'node-forge';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Cascade } from './Cascade';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -35,6 +36,30 @@ const setLinkOnline = api.SetLinkOnline as unknown as Mock;
 const setLinkOffline = api.SetLinkOffline as unknown as Mock;
 const deleteLink = api.DeleteLink as unknown as Mock;
 const getLinkStatus = api.GetLinkStatus as unknown as Mock;
+
+const pkcs12File = (password: string) => {
+  const keys = forge.pki.rsa.generateKeyPair(512);
+  const cert = forge.pki.createCertificate();
+  cert.publicKey = keys.publicKey;
+  cert.serialNumber = '01';
+  cert.validity.notBefore = new Date('2026-01-01T00:00:00Z');
+  cert.validity.notAfter = new Date('2027-01-01T00:00:00Z');
+  const attributes = [{ name: 'commonName', value: 'cascade.example.com' }];
+  cert.setSubject(attributes);
+  cert.setIssuer(attributes);
+  cert.sign(keys.privateKey, forge.md.sha256.create());
+
+  const pfx = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [cert], password, {
+    algorithm: '3des',
+    generateLocalKeyId: true,
+  });
+  const der = forge.asn1.toDer(pfx).getBytes();
+  const bytes = Uint8Array.from(der, (character) => character.charCodeAt(0));
+  return {
+    file: new File([bytes.buffer], 'client.p12', { type: 'application/x-pkcs12' }),
+    modulus: keys.privateKey.n,
+  };
+};
 
 const connectedLink = {
   AccountName_utf: 'to-branch',
@@ -238,6 +263,49 @@ describe('Cascade', () => {
     expect(Array.from(sent.ClientK_bin)).toEqual([1, 2, 3, 4]);
   });
 
+  it('creates a certificate cascade from a password-protected PKCS #12 archive', async () => {
+    enumLink.mockResolvedValue({ LinkList: [] });
+    createLink.mockResolvedValue({});
+    const archive = pkcs12File('archive-password');
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText('No cascade connections');
+    await user.click(screen.getAllByRole('button', { name: /new cascade/i })[0]);
+
+    let dialog = await screen.findByRole('dialog');
+    await fillCommonFields(user, dialog);
+    await user.selectOptions(within(dialog).getByLabelText('Authentication method'), 'Client certificate');
+    await user.type(within(dialog).getByLabelText('Username'), 'carol');
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, archive.file);
+    await user.type(within(dialog).getByLabelText('PKCS #12 archive password'), 'archive-password');
+    await user.click(within(dialog).getByRole('button', { name: 'Edit security policy' }));
+    await screen.findByText('Cascade security policy');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Client certificate or PKCS #12 file name')).toHaveValue('client.p12');
+    expect(within(dialog).getByLabelText('PKCS #12 archive password')).toHaveValue('archive-password');
+    const openArchiveBtn = within(dialog).getByRole('button', { name: 'Open archive' });
+    await waitFor(() => expect(openArchiveBtn).toBeEnabled());
+    await user.click(openArchiveBtn);
+    await within(dialog).findByText('Certificate and private key are ready.');
+
+    const createBtn = within(dialog).getByRole('button', { name: 'Create' });
+    await waitFor(() => expect(createBtn).toBeEnabled());
+    await user.click(createBtn);
+
+    const sent = createLink.mock.calls[0][0];
+    expect(sent.ClientX_bin).toBeInstanceOf(Uint8Array);
+    expect(sent.ClientX_bin.length).toBeGreaterThan(0);
+    expect(sent.ClientK_bin).toBeInstanceOf(Uint8Array);
+    expect(sent.ClientK_bin[0]).toBe(0x30);
+    const privateKey = forge.pki.privateKeyFromAsn1(
+      forge.asn1.fromDer(String.fromCharCode(...sent.ClientK_bin)),
+    );
+    expect(privateKey.n.compareTo(archive.modulus)).toBe(0);
+  });
+
   it('rejects an encrypted private key with a clear error', async () => {
     enumLink.mockResolvedValue({ LinkList: [] });
     const user = userEvent.setup();
@@ -262,7 +330,7 @@ describe('Cascade', () => {
       new File([encryptedKey], 'client.key', { type: 'application/octet-stream' }),
     );
 
-    expect(await within(dialog).findByText(/Encrypted .*private keys are not supported/i)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/Encrypted private-key files cannot be imported separately/i)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled();
   });
 

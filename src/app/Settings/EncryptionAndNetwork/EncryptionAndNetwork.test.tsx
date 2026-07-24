@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import forge from 'node-forge';
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EncryptionNetwork } from './EncryptionAndNetwork';
 import { api } from '@app/utils/vpnrpc_settings';
@@ -32,6 +33,30 @@ const setup = () => {
   m('GetKeep').mockResolvedValue({ UseKeepConnect_bool: false, KeepConnectHost_str: 'keepalive.softether.org', KeepConnectPort_u32: 80, KeepConnectProtocol_u32: 0, KeepConnectInterval_u32: 50 });
   m('GetSysLog').mockResolvedValue({ SaveType_u32: 0, Hostname_str: '', Port_u32: 514 });
   m('GetSpecialListener').mockResolvedValue({ VpnOverIcmpListener_bool: false, VpnOverDnsListener_bool: false });
+};
+
+const pkcs12File = (password: string) => {
+  const keys = forge.pki.rsa.generateKeyPair(512);
+  const cert = forge.pki.createCertificate();
+  cert.publicKey = keys.publicKey;
+  cert.serialNumber = '01';
+  cert.validity.notBefore = new Date('2026-01-01T00:00:00Z');
+  cert.validity.notAfter = new Date('2027-01-01T00:00:00Z');
+  const attributes = [{ name: 'commonName', value: 'vpn.example.com' }];
+  cert.setSubject(attributes);
+  cert.setIssuer(attributes);
+  cert.sign(keys.privateKey, forge.md.sha256.create());
+
+  const pfx = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [cert], password, {
+    algorithm: '3des',
+    generateLocalKeyId: true,
+  });
+  const der = forge.asn1.toDer(pfx).getBytes();
+  const bytes = new Uint8Array(der.length);
+  for (let index = 0; index < der.length; index += 1) {
+    bytes[index] = der.charCodeAt(index);
+  }
+  return new File([bytes.buffer], 'server.p12', { type: 'application/x-pkcs12' });
 };
 
 describe('EncryptionNetwork', () => {
@@ -160,5 +185,31 @@ describe('EncryptionNetwork', () => {
 
     await waitFor(() => expect(m('RegenerateServerCert')).toHaveBeenCalledTimes(1));
     expect(m('RegenerateServerCert').mock.calls[0][0].StrValue_str).toBe('vpn.example.com');
+  });
+
+  it('decrypts and imports a PKCS #12 certificate in the browser', async () => {
+    m('SetServerCert').mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<EncryptionNetwork />);
+
+    const c = card('Server SSL certificate');
+    await within(c).findByLabelText('Certificate or PKCS #12 file name');
+    const fileInput = c.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, pkcs12File('archive-secret'));
+    await user.type(within(c).getByLabelText('PKCS #12 archive password'), 'archive-secret');
+
+    const importButton = within(c).getByRole('button', { name: 'Import certificate' });
+    await waitFor(() => expect(importButton).toBeEnabled());
+    await user.click(importButton);
+
+    await waitFor(() => expect(m('SetServerCert')).toHaveBeenCalledTimes(1));
+    const sent = m('SetServerCert').mock.calls[0][0];
+    expect(new TextDecoder().decode(sent.Cert_bin)).toContain('BEGIN CERTIFICATE');
+    expect(sent.Key_bin[0]).toBe(0x30);
+    expect(() =>
+      forge.pki.privateKeyFromAsn1(forge.asn1.fromDer(String.fromCharCode(...sent.Key_bin))),
+    ).not.toThrow();
+    expect(JSON.stringify(sent)).not.toContain('archive-secret');
+    expect(within(c).queryByLabelText('PKCS #12 archive password')).not.toBeInTheDocument();
   });
 });
