@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { Content, Flex, FlexItem, PageSection, Title } from '@patternfly/react-core';
+import * as React from "react";
+import { Content, Flex, FlexItem, PageSection, Title } from "@patternfly/react-core";
 
 interface AppPageProps {
   /** Page title, rendered as the single h1 of the view. */
@@ -16,14 +16,19 @@ interface AppPageProps {
  * over a filled body section. Every content page renders through this so the
  * whole console shares one rhythm and alignment.
  */
-const AppPage: React.FunctionComponent<AppPageProps> = ({ title, description, actions, children }) => (
+const AppPage: React.FunctionComponent<AppPageProps> = ({
+  title,
+  description,
+  actions,
+  children,
+}) => (
   <>
-    <PageSection className={`se-app-page__header${actions ? ' se-app-page__header--sticky' : ''}`}>
+    <PageSection className={`se-app-page__header${actions ? " se-app-page__header--sticky" : ""}`}>
       <Flex
-        justifyContent={{ default: 'justifyContentSpaceBetween' }}
-        alignItems={{ default: 'alignItemsCenter' }}
-        flexWrap={{ default: 'wrap' }}
-        gap={{ default: 'gapMd' }}
+        justifyContent={{ default: "justifyContentSpaceBetween" }}
+        alignItems={{ default: "alignItemsCenter" }}
+        flexWrap={{ default: "wrap" }}
+        gap={{ default: "gapMd" }}
       >
         <FlexItem>
           <Title headingLevel="h1" size="2xl">
@@ -33,8 +38,8 @@ const AppPage: React.FunctionComponent<AppPageProps> = ({ title, description, ac
             <Content
               component="p"
               style={{
-                color: 'var(--pf-t--global--text--color--subtle)',
-                marginBlockStart: 'var(--pf-t--global--spacer--xs)',
+                color: "var(--pf-t--global--text--color--subtle)",
+                marginBlockStart: "var(--pf-t--global--spacer--xs)",
               }}
             >
               {description}

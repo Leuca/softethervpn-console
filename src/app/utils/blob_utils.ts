@@ -6,7 +6,7 @@ export const binToBytes = (value: unknown): Uint8Array | null => {
   if (value instanceof Uint8Array) {
     return value.length > 0 ? value : null;
   }
-  if (typeof value === 'string' && value.length > 0) {
+  if (typeof value === "string" && value.length > 0) {
     try {
       return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
     } catch {
@@ -16,7 +16,7 @@ export const binToBytes = (value: unknown): Uint8Array | null => {
   return null;
 };
 
-export const b64toBlob = (b64Data: string, contentType = '', sliceSize = 512) => {
+export const b64toBlob = (b64Data: string, contentType = "", sliceSize = 512) => {
   const byteCharacters = atob(b64Data);
   const byteArrays: Uint8Array[] = [];
 
@@ -36,12 +36,12 @@ export const b64toBlob = (b64Data: string, contentType = '', sliceSize = 512) =>
   return blob;
 };
 
-export function downloadBlob(blob: Blob, name = 'file.txt') {
+export function downloadBlob(blob: Blob, name = "file.txt") {
   // Convert your blob into a Blob URL (a special url that points to an object in the browser's memory)
   const blobUrl = URL.createObjectURL(blob);
 
   // Create a link element
-  const link = document.createElement('a');
+  const link = document.createElement("a");
 
   // Set link's href to point to the Blob URL
   link.href = blobUrl;
@@ -52,11 +52,11 @@ export function downloadBlob(blob: Blob, name = 'file.txt') {
 
   // Dispatch click event on the link
   // This is necessary as link.click() does not work on the latest firefox
-  if (typeof (link as HTMLAnchorElement).click === 'function') {
+  if (typeof (link as HTMLAnchorElement).click === "function") {
     link.click();
   } else {
     link.dispatchEvent(
-      new MouseEvent('click', {
+      new MouseEvent("click", {
         bubbles: true,
         cancelable: true,
       }),

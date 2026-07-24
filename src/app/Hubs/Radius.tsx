@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -12,9 +12,9 @@ import {
   HelperTextItem,
   Spinner,
   TextInput,
-} from '@patternfly/react-core';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
+} from "@patternfly/react-core";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
 
 // SoftEther's defaults (Radius.h), shown when RADIUS is unconfigured, matching
 // the native Server Manager dialog.
@@ -30,11 +30,11 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [config, setConfig] = React.useState<Record<string, unknown> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
-  const [newSecret, setNewSecret] = React.useState('');
+  const [newSecret, setNewSecret] = React.useState("");
 
   const load = React.useCallback(() => {
     setError(null);
-    setNewSecret('');
+    setNewSecret("");
     api
       .GetHubRadius(new VPN.VpnRpcRadius({ HubName_str: hub }))
       .then((response) => {
@@ -56,7 +56,8 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     load();
   }, [load]);
 
-  const setField = (key: string, value: unknown) => setConfig((prev) => (prev ? { ...prev, [key]: value } : prev));
+  const setField = (key: string, value: unknown) =>
+    setConfig((prev) => (prev ? { ...prev, [key]: value } : prev));
 
   const save = () => {
     if (!config) {
@@ -88,16 +89,18 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   const isLoading = config === null && error === null;
 
-  const retry = config ? Number(config.RadiusRetryInterval_u32 ?? DEFAULT_RETRY_INTERVAL) : DEFAULT_RETRY_INTERVAL;
+  const retry = config
+    ? Number(config.RadiusRetryInterval_u32 ?? DEFAULT_RETRY_INTERVAL)
+    : DEFAULT_RETRY_INTERVAL;
   const retryValid = retry >= MIN_RETRY_INTERVAL && retry <= MAX_RETRY_INTERVAL;
 
   return (
     <Flex
-      direction={{ default: 'column' }}
-      gap={{ default: 'gapMd' }}
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
+      <Flex justifyContent={{ default: "justifyContentFlexEnd" }} gap={{ default: "gapSm" }}>
         <FlexItem>
           <Button
             variant="primary"
@@ -121,17 +124,19 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <Spinner size="xl" aria-label="Loading RADIUS settings" />
         </Bullseye>
       ) : config !== null ? (
-        <Form style={{ maxWidth: '32rem' }}>
+        <Form style={{ maxWidth: "32rem" }}>
           <FormGroup label="RADIUS server" fieldId="radius-server">
             <TextInput
               id="radius-server"
-              value={String(config.RadiusServerName_str ?? '')}
-              onChange={(_event, value) => setField('RadiusServerName_str', value)}
+              value={String(config.RadiusServerName_str ?? "")}
+              onChange={(_event, value) => setField("RadiusServerName_str", value)}
               aria-label="RADIUS server"
             />
             <FormHelperText>
               <HelperText>
-                <HelperTextItem>Leave empty to disable RADIUS authentication for this hub.</HelperTextItem>
+                <HelperTextItem>
+                  Leave empty to disable RADIUS authentication for this hub.
+                </HelperTextItem>
               </HelperText>
             </FormHelperText>
           </FormGroup>
@@ -142,7 +147,7 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               min={1}
               max={65535}
               value={String(config.RadiusPort_u32 ?? DEFAULT_PORT)}
-              onChange={(_event, value) => setField('RadiusPort_u32', Number(value) || 0)}
+              onChange={(_event, value) => setField("RadiusPort_u32", Number(value) || 0)}
               aria-label="Port"
             />
           </FormGroup>
@@ -163,15 +168,16 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               min={MIN_RETRY_INTERVAL}
               max={MAX_RETRY_INTERVAL}
               value={String(config.RadiusRetryInterval_u32 ?? DEFAULT_RETRY_INTERVAL)}
-              onChange={(_event, value) => setField('RadiusRetryInterval_u32', Number(value) || 0)}
-              validated={retryValid ? 'default' : 'error'}
+              onChange={(_event, value) => setField("RadiusRetryInterval_u32", Number(value) || 0)}
+              validated={retryValid ? "default" : "error"}
               aria-label="Retry interval (ms)"
             />
             {!retryValid && (
               <FormHelperText>
                 <HelperText>
                   <HelperTextItem variant="error">
-                    Enter a value between {MIN_RETRY_INTERVAL} and {MAX_RETRY_INTERVAL} milliseconds.
+                    Enter a value between {MIN_RETRY_INTERVAL} and {MAX_RETRY_INTERVAL}{" "}
+                    milliseconds.
                   </HelperTextItem>
                 </HelperText>
               </FormHelperText>

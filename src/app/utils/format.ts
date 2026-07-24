@@ -1,5 +1,5 @@
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { binToBytes } from '@app/utils/blob_utils';
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { binToBytes } from "@app/utils/blob_utils";
 
 /**
  * Format a raw JSON-RPC field value for display. SoftEther's API suffixes field
@@ -9,43 +9,43 @@ import { binToBytes } from '@app/utils/blob_utils';
  */
 export function formatRpcValue(key: string, value: unknown): string {
   if (value === null || value === undefined) {
-    return '-';
+    return "-";
   }
-  if (key.endsWith('_dt') && (typeof value === 'string' || value instanceof Date)) {
+  if (key.endsWith("_dt") && (typeof value === "string" || value instanceof Date)) {
     const date = new Date(value as string | Date);
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
   }
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     return value.toLocaleString();
   }
-  if (typeof value === 'boolean') {
-    return value ? 'Yes' : 'No';
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
   }
   return String(value);
 }
 
 /** Format a binary MAC address as AA:BB:CC:DD:EE:FF. */
-export function formatMacAddress(value: unknown, empty = '-'): string {
+export function formatMacAddress(value: unknown, empty = "-"): string {
   const bytes = binToBytes(value);
   if (!bytes) {
     return empty;
   }
   return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0').toUpperCase())
-    .join(':');
+    .map((b) => b.toString(16).padStart(2, "0").toUpperCase())
+    .join(":");
 }
 
 const connectionTypeLabels: Record<number, string> = {
-  [VPN.VpnRpcConnectionType.Client]: 'VPN Client',
-  [VPN.VpnRpcConnectionType.Init]: 'Initializing',
-  [VPN.VpnRpcConnectionType.Login]: 'Login',
-  [VPN.VpnRpcConnectionType.Additional]: 'Additional',
-  [VPN.VpnRpcConnectionType.FarmRpc]: 'Server farm RPC',
-  [VPN.VpnRpcConnectionType.AdminRpc]: 'Management RPC',
-  [VPN.VpnRpcConnectionType.EnumHub]: 'Hub enumeration',
-  [VPN.VpnRpcConnectionType.Password]: 'Password change',
-  [VPN.VpnRpcConnectionType.SSTP]: 'SSTP',
-  [VPN.VpnRpcConnectionType.OpenVPN]: 'OpenVPN',
+  [VPN.VpnRpcConnectionType.Client]: "VPN Client",
+  [VPN.VpnRpcConnectionType.Init]: "Initializing",
+  [VPN.VpnRpcConnectionType.Login]: "Login",
+  [VPN.VpnRpcConnectionType.Additional]: "Additional",
+  [VPN.VpnRpcConnectionType.FarmRpc]: "Server farm RPC",
+  [VPN.VpnRpcConnectionType.AdminRpc]: "Management RPC",
+  [VPN.VpnRpcConnectionType.EnumHub]: "Hub enumeration",
+  [VPN.VpnRpcConnectionType.Password]: "Password change",
+  [VPN.VpnRpcConnectionType.SSTP]: "SSTP",
+  [VPN.VpnRpcConnectionType.OpenVPN]: "OpenVPN",
 };
 
 /** Human-readable label for a VpnRpcConnectionType value. */
@@ -54,9 +54,9 @@ export function connectionTypeLabel(type: number): string {
 }
 
 const hubTypeLabels: Record<number, string> = {
-  [VPN.VpnRpcHubType.Standalone]: 'Standalone',
-  [VPN.VpnRpcHubType.FarmStatic]: 'Static',
-  [VPN.VpnRpcHubType.FarmDynamic]: 'Dynamic',
+  [VPN.VpnRpcHubType.Standalone]: "Standalone",
+  [VPN.VpnRpcHubType.FarmStatic]: "Static",
+  [VPN.VpnRpcHubType.FarmDynamic]: "Dynamic",
 };
 
 /** Human-readable label for a VpnRpcHubType value. */
@@ -65,12 +65,12 @@ export function hubTypeLabel(type: number): string {
 }
 
 const userAuthTypeLabels: Record<number, string> = {
-  [VPN.VpnRpcUserAuthType.Anonymous]: 'Anonymous',
-  [VPN.VpnRpcUserAuthType.Password]: 'Password',
-  [VPN.VpnRpcUserAuthType.UserCert]: 'User certificate',
-  [VPN.VpnRpcUserAuthType.RootCert]: 'Root certificate',
-  [VPN.VpnRpcUserAuthType.Radius]: 'RADIUS',
-  [VPN.VpnRpcUserAuthType.NTDomain]: 'NT domain',
+  [VPN.VpnRpcUserAuthType.Anonymous]: "Anonymous",
+  [VPN.VpnRpcUserAuthType.Password]: "Password",
+  [VPN.VpnRpcUserAuthType.UserCert]: "User certificate",
+  [VPN.VpnRpcUserAuthType.RootCert]: "Root certificate",
+  [VPN.VpnRpcUserAuthType.Radius]: "RADIUS",
+  [VPN.VpnRpcUserAuthType.NTDomain]: "NT domain",
 };
 
 /** Human-readable label for a VpnRpcUserAuthType value. */
@@ -83,7 +83,7 @@ export function userAuthTypeLabel(type: number): string {
  * around the Unix epoch. Render real dates as locale strings and the sentinel
  * as a caller-supplied placeholder.
  */
-export function formatOptionalDate(value: unknown, placeholder = 'Never'): string {
+export function formatOptionalDate(value: unknown, placeholder = "Never"): string {
   if (value === null || value === undefined) {
     return placeholder;
   }

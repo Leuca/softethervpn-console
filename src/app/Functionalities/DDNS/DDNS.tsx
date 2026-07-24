@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   ActionGroup,
   Alert,
@@ -31,35 +31,37 @@ import {
   Spinner,
   TextInput,
   Tooltip,
-} from '@patternfly/react-core';
-import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { useServer } from '@app/ServerContext';
-import { AppPage } from '@app/components/AppPage';
-import { binToBytes } from '@app/utils/blob_utils';
-import { parseCertificate } from '@app/utils/x509';
+} from "@patternfly/react-core";
+import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { useServer } from "@app/ServerContext";
+import { AppPage } from "@app/components/AppPage";
+import { binToBytes } from "@app/utils/blob_utils";
+import { parseCertificate } from "@app/utils/x509";
 
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 const MIN_HOSTNAME = 3;
 
 // Hostnames accept letters, numbers and dashes only.
-const isValidHostname = (value: string): boolean => value.length >= MIN_HOSTNAME && /^[A-Za-z0-9-]+$/.test(value);
+const isValidHostname = (value: string): boolean =>
+  value.length >= MIN_HOSTNAME && /^[A-Za-z0-9-]+$/.test(value);
 
 // The DDNS error strings carry a trailing detail after the first dot; the UI
 // shows only the leading summary.
-const errorSummary = (value: string): string => value.split('.')[0];
+const errorSummary = (value: string): string => value.split(".")[0];
 
 // Some builds advertise the DDNS proxy capability but reject the proxy RPCs
 // with error code 33 (Unsupported); handled as an informational note.
-const isUnsupportedError = (error: string): boolean => /code[=\s]*33\b/i.test(error) || /unsupported/i.test(error);
+const isUnsupportedError = (error: string): boolean =>
+  /code[=\s]*33\b/i.test(error) || /unsupported/i.test(error);
 
 // This server's connection to the SoftEther DDNS service, plus a change form.
 const DdnsSection: React.FunctionComponent = () => {
   const [status, setStatus] = React.useState<VPN.VpnDDnsClientStatus | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [hostname, setHostname] = React.useState('');
+  const [hostname, setHostname] = React.useState("");
   const [changing, setChanging] = React.useState(false);
   const [changeError, setChangeError] = React.useState<string | null>(null);
   // FQDN to offer regenerating the server cert for (null = no prompt).
@@ -148,12 +150,20 @@ const DdnsSection: React.FunctionComponent = () => {
   };
 
   const isLoading = status === null && error === null;
-  const suffix = status?.DnsSuffix_str || '.softether.net';
+  const suffix = status?.DnsSuffix_str || ".softether.net";
   const unchanged = status !== null && hostname === status.CurrentHostName_str;
-  const validationState = hostname === '' || isValidHostname(hostname) ? 'default' : 'error';
+  const validationState = hostname === "" || isValidHostname(hostname) ? "default" : "error";
 
-  const ipv4 = status && (status.Err_IPv4_u32 === 0 ? status.CurrentIPv4_str || '(none)' : errorSummary(status.ErrStr_IPv4_utf));
-  const ipv6 = status && (status.Err_IPv6_u32 === 0 ? status.CurrentIPv6_str || '(none)' : errorSummary(status.ErrStr_IPv6_utf));
+  const ipv4 =
+    status &&
+    (status.Err_IPv4_u32 === 0
+      ? status.CurrentIPv4_str || "(none)"
+      : errorSummary(status.ErrStr_IPv4_utf));
+  const ipv6 =
+    status &&
+    (status.Err_IPv6_u32 === 0
+      ? status.CurrentIPv6_str || "(none)"
+      : errorSummary(status.ErrStr_IPv6_utf));
 
   if (error) {
     return (
@@ -172,19 +182,20 @@ const DdnsSection: React.FunctionComponent = () => {
   }
 
   return (
-    <Gallery hasGutter minWidths={{ default: '320px' }}>
+    <Gallery hasGutter minWidths={{ default: "320px" }}>
       <Card isFullHeight>
         <CardTitle>Assigned hostname</CardTitle>
         <CardBody>
           <DescriptionList>
             <DescriptionListGroup>
               <DescriptionListTerm>
-                Hostname{' '}
+                Hostname{" "}
                 <Tooltip
                   content={
                     <div>
-                      Access this server by its DNS hostname {status.CurrentFqdn_str}. To force an address family, use{' '}
-                      {status.CurrentHostName_str}.v4.softether.net or {status.CurrentHostName_str}.v6.softether.net.
+                      Access this server by its DNS hostname {status.CurrentFqdn_str}. To force an
+                      address family, use {status.CurrentHostName_str}.v4.softether.net or{" "}
+                      {status.CurrentHostName_str}.v6.softether.net.
                     </div>
                   }
                 >
@@ -193,7 +204,9 @@ const DdnsSection: React.FunctionComponent = () => {
                   </span>
                 </Tooltip>
               </DescriptionListTerm>
-              <DescriptionListDescription>{status.CurrentFqdn_str || '-'}</DescriptionListDescription>
+              <DescriptionListDescription>
+                {status.CurrentFqdn_str || "-"}
+              </DescriptionListDescription>
             </DescriptionListGroup>
             <DescriptionListGroup>
               <DescriptionListTerm>Global IPv4 address</DescriptionListTerm>
@@ -215,7 +228,7 @@ const DdnsSection: React.FunctionComponent = () => {
               variant="danger"
               title="Could not change the hostname"
               isInline
-              style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
+              style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}
             >
               {changeError}
             </Alert>
@@ -225,7 +238,7 @@ const DdnsSection: React.FunctionComponent = () => {
               variant="success"
               title="The server certificate was regenerated to match the new hostname."
               isInline
-              style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
+              style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}
             />
           )}
           <Form>
@@ -243,7 +256,7 @@ const DdnsSection: React.FunctionComponent = () => {
                 </InputGroupItem>
                 <InputGroupText>{suffix}</InputGroupText>
               </InputGroup>
-              {validationState === 'error' && (
+              {validationState === "error" && (
                 <FormHelperText>
                   <HelperText>
                     <HelperTextItem variant="error">
@@ -257,7 +270,7 @@ const DdnsSection: React.FunctionComponent = () => {
               <Button
                 variant="primary"
                 onClick={changeHostname}
-                isDisabled={unchanged || validationState === 'error' || changing}
+                isDisabled={unchanged || validationState === "error" || changing}
                 isLoading={changing}
               >
                 Set hostname
@@ -282,16 +295,22 @@ const DdnsSection: React.FunctionComponent = () => {
         <ModalHeader title="Update the server certificate?" />
         <ModalBody>
           <Content component="p">
-            The Dynamic DNS hostname is now <strong>{certPrompt}</strong>. Microsoft SSTP and VPN Azure clients require
-            the server certificate&apos;s common name (CN) to exactly match the hostname they connect to.
+            The Dynamic DNS hostname is now <strong>{certPrompt}</strong>. Microsoft SSTP and VPN
+            Azure clients require the server certificate&apos;s common name (CN) to exactly match
+            the hostname they connect to.
           </Content>
           <Content component="p">
-            Regenerate the self-signed server certificate with CN = <strong>{certPrompt}</strong>? Keep the current one
-            if you use your own CA-issued certificate.
+            Regenerate the self-signed server certificate with CN = <strong>{certPrompt}</strong>?
+            Keep the current one if you use your own CA-issued certificate.
           </Content>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={regenerateCert} isLoading={regenerating} isDisabled={regenerating}>
+          <Button
+            variant="primary"
+            onClick={regenerateCert}
+            isLoading={regenerating}
+            isDisabled={regenerating}
+          >
             Regenerate certificate
           </Button>
           <Button variant="link" onClick={() => setCertPrompt(null)} isDisabled={regenerating}>
@@ -310,10 +329,10 @@ const ProxySection: React.FunctionComponent = () => {
   const [unsupported, setUnsupported] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [proxyType, setProxyType] = React.useState<number>(VPN.VpnRpcProxyType.Direct);
-  const [host, setHost] = React.useState('');
+  const [host, setHost] = React.useState("");
   const [port, setPort] = React.useState(8080);
-  const [user, setUser] = React.useState('');
-  const [password, setPassword] = React.useState('');
+  const [user, setUser] = React.useState("");
+  const [password, setPassword] = React.useState("");
 
   const load = React.useCallback(() => {
     setError(null);
@@ -381,13 +400,17 @@ const ProxySection: React.FunctionComponent = () => {
             variant="danger"
             title="Proxy settings error"
             isInline
-            style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
+            style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}
           >
             {error}
           </Alert>
         )}
         {unsupported ? (
-          <Alert variant="info" title="Proxy configuration is not supported by this server" isInline>
+          <Alert
+            variant="info"
+            title="Proxy configuration is not supported by this server"
+            isInline
+          >
             This server reports the Dynamic DNS client cannot be configured to use a proxy.
           </Alert>
         ) : !loaded ? (
@@ -467,7 +490,12 @@ const ProxySection: React.FunctionComponent = () => {
               />
             </FormGroup>
             <ActionGroup>
-              <Button variant="primary" onClick={save} isDisabled={saving || (!isDirect && host === '')} isLoading={saving}>
+              <Button
+                variant="primary"
+                onClick={save}
+                isDisabled={saving || (!isDirect && host === "")}
+                isLoading={saving}
+              >
                 Save
               </Button>
             </ActionGroup>
@@ -488,7 +516,7 @@ const DynDNS: React.FunctionComponent = () => {
     >
       <DdnsSection />
       {ddnsProxy && (
-        <div style={{ marginBlockStart: 'var(--pf-t--global--spacer--lg)' }}>
+        <div style={{ marginBlockStart: "var(--pf-t--global--spacer--lg)" }}>
           <ProxySection />
         </div>
       )}

@@ -1,12 +1,12 @@
-import * as React from 'react';
-import { MemoryRouter } from 'react-router-dom';
-import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HubList } from './HubList';
-import { api } from '@app/utils/vpnrpc_settings';
+import * as React from "react";
+import { MemoryRouter } from "react-router-dom";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import { HubList } from "./HubList";
+import { api } from "@app/utils/vpnrpc_settings";
 
-vi.mock('@app/utils/vpnrpc_settings', () => ({
+vi.mock("@app/utils/vpnrpc_settings", () => ({
   api: {
     EnumHub: vi.fn(),
     SetHubOnline: vi.fn(),
@@ -22,7 +22,7 @@ const serverState = vi.hoisted(() => ({
 
 // HubList reads the server type from the ServerContext to decide the hub type
 // on creation; a standalone server is enough for these tests.
-vi.mock('@app/ServerContext', () => ({
+vi.mock("@app/ServerContext", () => ({
   useServer: () => serverState,
 }));
 
@@ -32,7 +32,7 @@ const createHub = api.CreateHub as unknown as Mock;
 const deleteHub = api.DeleteHub as unknown as Mock;
 
 const defaultHub = {
-  HubName_str: 'DEFAULT',
+  HubName_str: "DEFAULT",
   Online_bool: true,
   HubType_u32: 0,
   NumUsers_u32: 3,
@@ -41,8 +41,8 @@ const defaultHub = {
   NumMacTables_u32: 0,
   NumIpTables_u32: 0,
   NumLogin_u32: 5,
-  LastLoginTime_dt: '2026-07-03T17:17:54.000Z',
-  LastCommTime_dt: '2026-07-03T17:17:54.000Z',
+  LastLoginTime_dt: "2026-07-03T17:17:54.000Z",
+  LastCommTime_dt: "2026-07-03T17:17:54.000Z",
 };
 
 function renderList() {
@@ -53,131 +53,134 @@ function renderList() {
   );
 }
 
-describe('HubList', () => {
+describe("HubList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     serverState.info = { ServerType_u32: 0 };
     serverState.hideAdminOnly = false;
   });
 
-  it('renders a hub row with type label and counts', async () => {
+  it("renders a hub row with type label and counts", async () => {
     enumHub.mockResolvedValue({ HubList: [defaultHub] });
 
     renderList();
 
-    expect(await screen.findByText('DEFAULT')).toBeInTheDocument();
-    expect(screen.getByText('Standalone')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument(); // users
+    expect(await screen.findByText("DEFAULT")).toBeInTheDocument();
+    expect(screen.getByText("Standalone")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument(); // users
   });
 
-  it('shows an empty state when there are no hubs', async () => {
+  it("shows an empty state when there are no hubs", async () => {
     enumHub.mockResolvedValue({ HubList: [] });
 
     renderList();
 
-    expect(await screen.findByText('No Virtual Hubs')).toBeInTheDocument();
+    expect(await screen.findByText("No Virtual Hubs")).toBeInTheDocument();
   });
 
-  it('hides the empty-state create action for hub administrators', async () => {
+  it("hides the empty-state create action for hub administrators", async () => {
     serverState.hideAdminOnly = true;
     enumHub.mockResolvedValue({ HubList: [] });
 
     renderList();
 
-    expect(await screen.findByText('No Virtual Hubs')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /create virtual hub/i })).not.toBeInTheDocument();
+    expect(await screen.findByText("No Virtual Hubs")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create virtual hub/i })).not.toBeInTheDocument();
   });
 
-  it('takes a hub offline through the dedicated SetHubOnline API', async () => {
+  it("takes a hub offline through the dedicated SetHubOnline API", async () => {
     enumHub.mockResolvedValue({ HubList: [defaultHub] });
     setHubOnline.mockResolvedValue({});
     const user = userEvent.setup();
 
     renderList();
-    const toggle = await screen.findByLabelText('DEFAULT online');
+    const toggle = await screen.findByLabelText("DEFAULT online");
     await user.click(toggle);
 
     expect(setHubOnline).toHaveBeenCalledOnce();
-    expect(setHubOnline.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Online_bool: false });
+    expect(setHubOnline.mock.calls[0][0]).toMatchObject({
+      HubName_str: "DEFAULT",
+      Online_bool: false,
+    });
   });
 
-  it('disables Create until a name is set and the passwords match', async () => {
+  it("disables Create until a name is set and the passwords match", async () => {
     enumHub.mockResolvedValue({ HubList: [defaultHub] });
     const user = userEvent.setup();
 
     renderList();
-    await screen.findByText('DEFAULT');
-    await user.click(screen.getByRole('button', { name: /create virtual hub/i }));
+    await screen.findByText("DEFAULT");
+    await user.click(screen.getByRole("button", { name: /create virtual hub/i }));
 
-    const dialog = await screen.findByRole('dialog');
-    const create = within(dialog).getByRole('button', { name: 'Create' });
+    const dialog = await screen.findByRole("dialog");
+    const create = within(dialog).getByRole("button", { name: "Create" });
     expect(create).toBeDisabled();
 
-    await user.type(within(dialog).getByLabelText('Virtual Hub name'), 'sales');
-    await user.type(within(dialog).getByLabelText('Administrator password'), 'secret');
-    await user.type(within(dialog).getByLabelText('Confirm password'), 'different');
-    expect(within(dialog).getByText('Passwords do not match.')).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Virtual Hub name"), "sales");
+    await user.type(within(dialog).getByLabelText("Administrator password"), "secret");
+    await user.type(within(dialog).getByLabelText("Confirm password"), "different");
+    expect(within(dialog).getByText("Passwords do not match.")).toBeInTheDocument();
     expect(create).toBeDisabled();
 
-    await user.clear(within(dialog).getByLabelText('Confirm password'));
-    await user.type(within(dialog).getByLabelText('Confirm password'), 'secret');
+    await user.clear(within(dialog).getByLabelText("Confirm password"));
+    await user.type(within(dialog).getByLabelText("Confirm password"), "secret");
     expect(create).toBeEnabled();
   });
 
-  it('creates a hub with the entered name and password', async () => {
+  it("creates a hub with the entered name and password", async () => {
     enumHub.mockResolvedValue({ HubList: [defaultHub] });
     createHub.mockResolvedValue({});
     const user = userEvent.setup();
 
     renderList();
-    await screen.findByText('DEFAULT');
-    await user.click(screen.getByRole('button', { name: /create virtual hub/i }));
+    await screen.findByText("DEFAULT");
+    await user.click(screen.getByRole("button", { name: /create virtual hub/i }));
 
-    const dialog = await screen.findByRole('dialog');
-    await user.type(within(dialog).getByLabelText('Virtual Hub name'), 'sales');
-    await user.type(within(dialog).getByLabelText('Administrator password'), 'secret');
-    await user.type(within(dialog).getByLabelText('Confirm password'), 'secret');
-    await user.click(within(dialog).getByRole('button', { name: 'Create' }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Virtual Hub name"), "sales");
+    await user.type(within(dialog).getByLabelText("Administrator password"), "secret");
+    await user.type(within(dialog).getByLabelText("Confirm password"), "secret");
+    await user.click(within(dialog).getByRole("button", { name: "Create" }));
 
     expect(createHub).toHaveBeenCalledOnce();
     expect(createHub.mock.calls[0][0]).toMatchObject({
-      HubName_str: 'sales',
-      AdminPasswordPlainText_str: 'secret',
+      HubName_str: "sales",
+      AdminPasswordPlainText_str: "secret",
       HubType_u32: 0,
     });
   });
 
-  it('deletes a hub after confirmation', async () => {
+  it("deletes a hub after confirmation", async () => {
     enumHub.mockResolvedValue({ HubList: [defaultHub] });
     deleteHub.mockResolvedValue({});
     const user = userEvent.setup();
 
     renderList();
-    await screen.findByText('DEFAULT');
-    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
-    await user.click(await screen.findByText('Delete'));
+    await screen.findByText("DEFAULT");
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByText("Delete"));
 
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
     expect(deleteHub).toHaveBeenCalledOnce();
-    expect(deleteHub.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+    expect(deleteHub.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT" });
     expect(enumHub).toHaveBeenCalledTimes(2);
   });
 
-  it('hides server-admin-only hub actions for hub administrators', async () => {
+  it("hides server-admin-only hub actions for hub administrators", async () => {
     serverState.hideAdminOnly = true;
     enumHub.mockResolvedValue({ HubList: [defaultHub] });
     const user = userEvent.setup();
 
     renderList();
-    await screen.findByText('DEFAULT');
+    await screen.findByText("DEFAULT");
 
-    expect(screen.queryByRole('button', { name: /create virtual hub/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create virtual hub/i })).not.toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
-    expect(await screen.findByText('Manage')).toBeInTheDocument();
-    expect(screen.queryByText('Delete')).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    expect(await screen.findByText("Manage")).toBeInTheDocument();
+    expect(screen.queryByText("Delete")).not.toBeInTheDocument();
     expect(createHub).not.toHaveBeenCalled();
     expect(deleteHub).not.toHaveBeenCalled();
   });

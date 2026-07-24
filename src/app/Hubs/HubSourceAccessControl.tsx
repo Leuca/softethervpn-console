@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -18,27 +18,27 @@ import {
   Radio,
   Spinner,
   TextInput,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { PlusCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { useServer } from '@app/ServerContext';
-import { capBool } from '@app/utils/caps';
-import { api } from '@app/utils/vpnrpc_settings';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { PlusCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { useServer } from "@app/ServerContext";
+import { capBool } from "@app/utils/caps";
+import { api } from "@app/utils/vpnrpc_settings";
 
 type RuleDraft = {
   id: number | null;
-  action: 'allow' | 'deny';
+  action: "allow" | "deny";
   priority: string;
-  ipVersion: 'ipv4' | 'ipv6';
+  ipVersion: "ipv4" | "ipv6";
   masked: boolean;
   ipAddress: string;
   subnetMask: string;
 };
 
-const ZERO4 = '0.0.0.0';
-const FULL4 = '255.255.255.255';
+const ZERO4 = "0.0.0.0";
+const FULL4 = "255.255.255.255";
 
 const parseInteger = (value: string): number | null => {
   const text = value.trim();
@@ -49,7 +49,7 @@ const parseInteger = (value: string): number | null => {
 };
 
 const parseIpv4 = (value: string): number[] | null => {
-  const parts = value.trim().split('.');
+  const parts = value.trim().split(".");
   if (parts.length !== 4) {
     return null;
   }
@@ -71,14 +71,14 @@ const parseIpv4Tail = (value: string): number[] | null => {
 };
 
 const parseIpv6Part = (value: string): number[] | null => {
-  if (value === '') {
+  if (value === "") {
     return [];
   }
-  const pieces = value.split(':');
+  const pieces = value.split(":");
   const groups: number[] = [];
   for (let i = 0; i < pieces.length; i++) {
     const piece = pieces[i];
-    if (piece.includes('.')) {
+    if (piece.includes(".")) {
       if (i !== pieces.length - 1) {
         return null;
       }
@@ -102,7 +102,7 @@ const isIpv6 = (value: string): boolean => {
   if (!text) {
     return false;
   }
-  const split = text.split('::');
+  const split = text.split("::");
   if (split.length > 2) {
     return false;
   }
@@ -117,7 +117,7 @@ const isIpv6 = (value: string): boolean => {
 
 const isIpv6Mask = (value: string): boolean => {
   const text = value.trim();
-  if (text.startsWith('/')) {
+  if (text.startsWith("/")) {
     const prefix = parseInteger(text.slice(1));
     return prefix !== null && prefix >= 0 && prefix <= 128;
   }
@@ -133,24 +133,25 @@ const ipv6MaskFromPrefix = (prefix: number): string => {
   for (let i = 0; i < bytes.length; i += 2) {
     groups.push(((bytes[i] << 8) | bytes[i + 1]).toString(16));
   }
-  return groups.join(':');
+  return groups.join(":");
 };
 
 const normalizeSubnetMask = (draft: RuleDraft): string => {
   if (!draft.masked) {
-    return draft.ipVersion === 'ipv4' ? FULL4 : '';
+    return draft.ipVersion === "ipv4" ? FULL4 : "";
   }
   const mask = draft.subnetMask.trim();
-  if (draft.ipVersion === 'ipv6' && mask.startsWith('/')) {
+  if (draft.ipVersion === "ipv6" && mask.startsWith("/")) {
     return ipv6MaskFromPrefix(Number(mask.slice(1)));
   }
   return mask;
 };
 
 const canChangeAccessControl = (user: string, adminOptions: VPN.VpnAdminOption[]): boolean =>
-  user === 'Administrator' ||
+  user === "Administrator" ||
   !adminOptions.some(
-    (option) => option.Name_str.toLowerCase() === 'no_change_access_control_list' && option.Value_u32 !== 0,
+    (option) =>
+      option.Name_str.toLowerCase() === "no_change_access_control_list" && option.Value_u32 !== 0,
   );
 
 interface HubSourceAccessControlProps {
@@ -162,54 +163,56 @@ const ruleAddress = (rule: VPN.VpnAc): string =>
   rule.Masked_bool ? `${rule.IpAddress_ip}/${rule.SubnetMask_ip}` : rule.IpAddress_ip;
 
 const sortRules = (rules: VPN.VpnAc[]): VPN.VpnAc[] =>
-  [...rules].sort((a, b) => a.Priority_u32 - b.Priority_u32 || Number(a.Deny_bool) - Number(b.Deny_bool));
+  [...rules].sort(
+    (a, b) => a.Priority_u32 - b.Priority_u32 || Number(a.Deny_bool) - Number(b.Deny_bool),
+  );
 
 const normalizeRules = (rules: VPN.VpnAc[]): VPN.VpnAc[] =>
   sortRules(rules).map((rule, index) => new VPN.VpnAc({ ...rule, Id_u32: index + 1 }));
 
 const defaultDraft = (rules: VPN.VpnAc[]): RuleDraft => ({
   id: null,
-  action: 'allow',
+  action: "allow",
   priority: String((rules.length ? Math.max(...rules.map((rule) => rule.Priority_u32)) : 0) + 100),
-  ipVersion: 'ipv4',
+  ipVersion: "ipv4",
   masked: false,
-  ipAddress: '',
-  subnetMask: '',
+  ipAddress: "",
+  subnetMask: "",
 });
 
 const draftFromRule = (rule: VPN.VpnAc): RuleDraft => ({
   id: rule.Id_u32,
-  action: rule.Deny_bool ? 'deny' : 'allow',
+  action: rule.Deny_bool ? "deny" : "allow",
   priority: String(rule.Priority_u32),
-  ipVersion: rule.IpAddress_ip.includes(':') ? 'ipv6' : 'ipv4',
+  ipVersion: rule.IpAddress_ip.includes(":") ? "ipv6" : "ipv4",
   masked: rule.Masked_bool,
   ipAddress: rule.IpAddress_ip,
-  subnetMask: rule.Masked_bool ? rule.SubnetMask_ip : '',
+  subnetMask: rule.Masked_bool ? rule.SubnetMask_ip : "",
 });
 
 const validateDraft = (draft: RuleDraft): string[] => {
   const errors: string[] = [];
   const priority = parseInteger(draft.priority);
   if (priority === null || priority < 1) {
-    errors.push('Priority must be 1 or higher.');
+    errors.push("Priority must be 1 or higher.");
   }
-  if (draft.ipVersion === 'ipv4') {
+  if (draft.ipVersion === "ipv4") {
     if (!isIpv4(draft.ipAddress)) {
-      errors.push('Enter a valid IPv4 address.');
+      errors.push("Enter a valid IPv4 address.");
     } else if (!draft.masked && (draft.ipAddress === ZERO4 || draft.ipAddress === FULL4)) {
-      errors.push('A single IPv4 address cannot be 0.0.0.0 or 255.255.255.255.');
+      errors.push("A single IPv4 address cannot be 0.0.0.0 or 255.255.255.255.");
     } else if (draft.masked && draft.ipAddress === FULL4) {
-      errors.push('A masked IPv4 address cannot be 255.255.255.255.');
+      errors.push("A masked IPv4 address cannot be 255.255.255.255.");
     }
     if (draft.masked && !isIpv4(draft.subnetMask)) {
-      errors.push('Enter a valid IPv4 subnet mask.');
+      errors.push("Enter a valid IPv4 subnet mask.");
     }
   } else {
     if (!isIpv6(draft.ipAddress)) {
-      errors.push('Enter a valid IPv6 address.');
+      errors.push("Enter a valid IPv6 address.");
     }
     if (draft.masked && !isIpv6Mask(draft.subnetMask)) {
-      errors.push('Enter a valid IPv6 mask or prefix.');
+      errors.push("Enter a valid IPv6 mask or prefix.");
     }
   }
   return errors;
@@ -219,15 +222,18 @@ const ruleFromDraft = (draft: RuleDraft): VPN.VpnAc =>
   new VPN.VpnAc({
     Id_u32: draft.id ?? 0,
     Priority_u32: Number(draft.priority),
-    Deny_bool: draft.action === 'deny',
+    Deny_bool: draft.action === "deny",
     Masked_bool: draft.masked,
     IpAddress_ip: draft.ipAddress.trim(),
     SubnetMask_ip: normalizeSubnetMask(draft),
   });
 
-const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProps> = ({ hub, trigger }) => {
+const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProps> = ({
+  hub,
+  trigger,
+}) => {
   const { capsList, user } = useServer();
-  const supportsIpv6 = capBool(capsList, 'b_support_ipv6_ac');
+  const supportsIpv6 = capBool(capsList, "b_support_ipv6_ac");
   const [open, setOpen] = React.useState(false);
   const [rules, setRules] = React.useState<VPN.VpnAc[] | null>(null);
   const [adminOptions, setAdminOptions] = React.useState<VPN.VpnAdminOption[]>([]);
@@ -272,7 +278,9 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
     const next = ruleFromDraft(draft);
     setRules(
       normalizeRules(
-        draft.id === null ? [...rules, next] : rules.map((rule) => (rule.Id_u32 === draft.id ? next : rule)),
+        draft.id === null
+          ? [...rules, next]
+          : rules.map((rule) => (rule.Id_u32 === draft.id ? next : rule)),
       ),
     );
     setDraft(null);
@@ -322,8 +330,8 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
       >
         <ModalHeader title="Source IP Access Control" />
         <ModalBody>
-          <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
-            <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
+          <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
+            <Flex justifyContent={{ default: "justifyContentSpaceBetween" }}>
               <Button
                 variant="secondary"
                 icon={<PlusCircleIcon />}
@@ -335,7 +343,11 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
             </Flex>
 
             {error && (
-              <Alert variant="danger" title="Could not load or save source IP access control" isInline>
+              <Alert
+                variant="danger"
+                title="Could not load or save source IP access control"
+                isInline
+              >
                 {error}
               </Alert>
             )}
@@ -351,10 +363,16 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
               </Bullseye>
             ) : rules !== null && rules.length === 0 ? (
               <EmptyState titleText="No source IP access control rules" headingLevel="h2">
-                <EmptyStateBody>With no rules, connections are allowed unless another server setting rejects them.</EmptyStateBody>
+                <EmptyStateBody>
+                  With no rules, connections are allowed unless another server setting rejects them.
+                </EmptyStateBody>
               </EmptyState>
             ) : rules !== null ? (
-              <ScrollableTable aria-label="Source IP Access Control" variant="compact" gridBreakPoint="grid-md">
+              <ScrollableTable
+                aria-label="Source IP Access Control"
+                variant="compact"
+                gridBreakPoint="grid-md"
+              >
                 <Thead>
                   <Tr>
                     <Th width={10}>ID</Th>
@@ -369,15 +387,23 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
                     <Tr key={rule.Id_u32}>
                       <Td dataLabel="ID">{rule.Id_u32}</Td>
                       <Td dataLabel="Priority">{rule.Priority_u32}</Td>
-                      <Td dataLabel="Action">{rule.Deny_bool ? 'Deny' : 'Allow'}</Td>
+                      <Td dataLabel="Action">{rule.Deny_bool ? "Deny" : "Allow"}</Td>
                       <Td dataLabel="Source IP" modifier="breakWord">
                         {ruleAddress(rule)}
                       </Td>
                       <Td isActionCell>
                         <ActionsColumn
                           items={[
-                            { title: 'Edit', onClick: () => setDraft(draftFromRule(rule)), isDisabled: !canChange },
-                            { title: 'Delete', onClick: () => setPendingDelete(rule.Id_u32), isDisabled: !canChange },
+                            {
+                              title: "Edit",
+                              onClick: () => setDraft(draftFromRule(rule)),
+                              isDisabled: !canChange,
+                            },
+                            {
+                              title: "Delete",
+                              onClick: () => setPendingDelete(rule.Id_u32),
+                              isDisabled: !canChange,
+                            },
                           ]}
                         />
                       </Td>
@@ -403,21 +429,30 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
         </ModalFooter>
       </Modal>
 
-      <Modal variant={ModalVariant.medium} isOpen={draft !== null} onClose={() => setDraft(null)} aria-label="Source IP rule">
-        <ModalHeader title={draft?.id === null ? 'Add source IP rule' : `Edit source IP rule #${draft?.id}`} />
+      <Modal
+        variant={ModalVariant.medium}
+        isOpen={draft !== null}
+        onClose={() => setDraft(null)}
+        aria-label="Source IP rule"
+      >
+        <ModalHeader
+          title={draft?.id === null ? "Add source IP rule" : `Edit source IP rule #${draft?.id}`}
+        />
         <ModalBody>
           {draft && (
             <Form>
               {validation.length > 0 && (
                 <Alert variant="danger" title="Rule is incomplete" isInline>
-                  {validation.join(' ')}
+                  {validation.join(" ")}
                 </Alert>
               )}
               <FormGroup label="Action" fieldId="source-ac-action">
                 <FormSelect
                   id="source-ac-action"
                   value={draft.action}
-                  onChange={(_event, value) => setDraftField({ action: value as RuleDraft['action'] })}
+                  onChange={(_event, value) =>
+                    setDraftField({ action: value as RuleDraft["action"] })
+                  }
                   aria-label="Action"
                 >
                   <FormSelectOption value="allow" label="Allow" />
@@ -439,16 +474,20 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
                   id="source-ac-ipv4"
                   name="source-ac-ip-version"
                   label="IPv4"
-                  isChecked={draft.ipVersion === 'ipv4'}
-                  onChange={() => setDraftField({ ipVersion: 'ipv4', ipAddress: '', subnetMask: '' })}
+                  isChecked={draft.ipVersion === "ipv4"}
+                  onChange={() =>
+                    setDraftField({ ipVersion: "ipv4", ipAddress: "", subnetMask: "" })
+                  }
                 />
                 <Radio
                   id="source-ac-ipv6"
                   name="source-ac-ip-version"
                   label="IPv6"
-                  isChecked={draft.ipVersion === 'ipv6'}
+                  isChecked={draft.ipVersion === "ipv6"}
                   isDisabled={!supportsIpv6}
-                  onChange={() => setDraftField({ ipVersion: 'ipv6', ipAddress: '', subnetMask: '' })}
+                  onChange={() =>
+                    setDraftField({ ipVersion: "ipv6", ipAddress: "", subnetMask: "" })
+                  }
                 />
               </FormGroup>
               <FormGroup label="Match" fieldId="source-ac-single">
@@ -457,7 +496,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
                   name="source-ac-match"
                   label="Single address"
                   isChecked={!draft.masked}
-                  onChange={() => setDraftField({ masked: false, subnetMask: '' })}
+                  onChange={() => setDraftField({ masked: false, subnetMask: "" })}
                 />
                 <Radio
                   id="source-ac-masked"
@@ -473,7 +512,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
                   value={draft.ipAddress}
                   onChange={(_event, value) => setDraftField({ ipAddress: value })}
                   aria-label="IP address"
-                  placeholder={draft.ipVersion === 'ipv4' ? '192.0.2.10' : '2001:db8::1'}
+                  placeholder={draft.ipVersion === "ipv4" ? "192.0.2.10" : "2001:db8::1"}
                 />
               </FormGroup>
               {draft.masked && (
@@ -483,7 +522,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
                     value={draft.subnetMask}
                     onChange={(_event, value) => setDraftField({ subnetMask: value })}
                     aria-label="Subnet mask"
-                    placeholder={draft.ipVersion === 'ipv4' ? '255.255.255.0' : '/64'}
+                    placeholder={draft.ipVersion === "ipv4" ? "255.255.255.0" : "/64"}
                   />
                 </FormGroup>
               )}
@@ -492,7 +531,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
         </ModalBody>
         <ModalFooter>
           <Button variant="primary" onClick={saveDraft} isDisabled={validation.length > 0}>
-            {draft?.id === null ? 'Add rule' : 'Save rule'}
+            {draft?.id === null ? "Add rule" : "Save rule"}
           </Button>
           <Button variant="link" onClick={() => setDraft(null)}>
             Cancel

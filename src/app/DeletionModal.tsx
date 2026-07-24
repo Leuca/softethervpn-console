@@ -1,5 +1,12 @@
-import * as React from 'react';
-import { Button, Modal, ModalBody, ModalFooter, ModalHeader, ModalVariant } from '@patternfly/react-core';
+import * as React from "react";
+import {
+  Button,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalVariant,
+} from "@patternfly/react-core";
 
 interface IDeletionModal {
   buttonText?: string;

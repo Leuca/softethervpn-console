@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 
 export interface AutoRefreshState<T> {
   /** Latest fetch result; null until the first request settles. */
@@ -22,7 +22,10 @@ export interface AutoRefreshState<T> {
  * request settles, not cleared up front, so a visible message stays
  * readable through the next refresh.
  */
-export function useAutoRefresh<T>(fetch: () => Promise<T>, intervalMs = 10000): AutoRefreshState<T> {
+export function useAutoRefresh<T>(
+  fetch: () => Promise<T>,
+  intervalMs = 10000,
+): AutoRefreshState<T> {
   const [data, setData] = React.useState<T | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -30,33 +33,36 @@ export function useAutoRefresh<T>(fetch: () => Promise<T>, intervalMs = 10000): 
   const seq = React.useRef(0);
   const inFlight = React.useRef(false);
 
-  const load = React.useCallback((force = true) => {
-    if (!force && inFlight.current) {
-      return;
-    }
-    const id = ++seq.current;
-    inFlight.current = true;
-    setRefreshing(true);
-    fetch()
-      .then((result) => {
-        if (id === seq.current) {
-          setData(result);
-          setError(null);
-          setLastUpdated(new Date());
-        }
-      })
-      .catch((e) => {
-        if (id === seq.current) {
-          setError(String(e));
-        }
-      })
-      .finally(() => {
-        if (id === seq.current) {
-          inFlight.current = false;
-          setRefreshing(false);
-        }
-      });
-  }, [fetch]);
+  const load = React.useCallback(
+    (force = true) => {
+      if (!force && inFlight.current) {
+        return;
+      }
+      const id = ++seq.current;
+      inFlight.current = true;
+      setRefreshing(true);
+      fetch()
+        .then((result) => {
+          if (id === seq.current) {
+            setData(result);
+            setError(null);
+            setLastUpdated(new Date());
+          }
+        })
+        .catch((e) => {
+          if (id === seq.current) {
+            setError(String(e));
+          }
+        })
+        .finally(() => {
+          if (id === seq.current) {
+            inFlight.current = false;
+            setRefreshing(false);
+          }
+        });
+    },
+    [fetch],
+  );
 
   React.useEffect(() => {
     // A new fetch callback represents a new data target (for example, another

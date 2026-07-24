@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Breadcrumb,
@@ -21,14 +21,14 @@ import {
   Stack,
   StackItem,
   TextInput,
-} from '@patternfly/react-core';
-import { PlusCircleIcon } from '@patternfly/react-icons';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { useNavigate } from 'react-router-dom';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { AppPage } from '@app/components/AppPage';
+} from "@patternfly/react-core";
+import { PlusCircleIcon } from "@patternfly/react-icons";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { useNavigate } from "react-router-dom";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { AppPage } from "@app/components/AppPage";
 
 const EtherIPDetailed: React.FunctionComponent = () => {
   const navigate = useNavigate();
@@ -39,10 +39,10 @@ const EtherIPDetailed: React.FunctionComponent = () => {
   const [busy, setBusy] = React.useState(false);
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [id, setId] = React.useState('');
-  const [hub, setHub] = React.useState('');
-  const [username, setUsername] = React.useState('');
-  const [password, setPassword] = React.useState('');
+  const [id, setId] = React.useState("");
+  const [hub, setHub] = React.useState("");
+  const [username, setUsername] = React.useState("");
+  const [password, setPassword] = React.useState("");
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
 
@@ -75,10 +75,10 @@ const EtherIPDetailed: React.FunctionComponent = () => {
   };
 
   const openCreate = () => {
-    setId('');
-    setHub(hubs[0] ?? '');
-    setUsername('');
-    setPassword('');
+    setId("");
+    setHub(hubs[0] ?? "");
+    setUsername("");
+    setPassword("");
     setCreateOpen(true);
   };
 
@@ -108,17 +108,24 @@ const EtherIPDetailed: React.FunctionComponent = () => {
   const isLoading = settings === null && error === null;
 
   const createButton = (
-    <Button variant="primary" icon={<PlusCircleIcon />} onClick={openCreate} isDisabled={isLoading || hubs.length === 0}>
+    <Button
+      variant="primary"
+      icon={<PlusCircleIcon />}
+      onClick={openCreate}
+      isDisabled={isLoading || hubs.length === 0}
+    >
       Add client setting
     </Button>
   );
 
-  const canCreate = id.trim() !== '' && hub !== '' && username.trim() !== '';
+  const canCreate = id.trim() !== "" && hub !== "" && username.trim() !== "";
 
   return (
     <>
-      <Breadcrumb style={{ padding: 'var(--pf-t--global--spacer--md) var(--pf-t--global--spacer--lg) 0' }}>
-        <BreadcrumbItem to="#" onClick={() => navigate('/functionalities/legacyprotocols')}>
+      <Breadcrumb
+        style={{ padding: "var(--pf-t--global--spacer--md) var(--pf-t--global--spacer--lg) 0" }}
+      >
+        <BreadcrumbItem to="#" onClick={() => navigate("/functionalities/legacyprotocols")}>
           Legacy Protocols
         </BreadcrumbItem>
         <BreadcrumbItem isActive>EtherIP / L2TPv3</BreadcrumbItem>
@@ -144,7 +151,9 @@ const EtherIPDetailed: React.FunctionComponent = () => {
               </Bullseye>
             ) : settings !== null && settings.length === 0 ? (
               <EmptyState titleText="No client settings" headingLevel="h2">
-                <EmptyStateBody>Add a client setting for each EtherIP / L2TPv3 router that connects.</EmptyStateBody>
+                <EmptyStateBody>
+                  Add a client setting for each EtherIP / L2TPv3 router that connects.
+                </EmptyStateBody>
               </EmptyState>
             ) : settings !== null ? (
               <ScrollableTable aria-label="EtherIP client settings" variant="compact">
@@ -164,7 +173,9 @@ const EtherIPDetailed: React.FunctionComponent = () => {
                       <Td dataLabel="User name">{setting.UserName_str}</Td>
                       <Td isActionCell>
                         <ActionsColumn
-                          items={[{ title: 'Delete', onClick: () => setPendingDelete(setting.Id_str) }]}
+                          items={[
+                            { title: "Delete", onClick: () => setPendingDelete(setting.Id_str) },
+                          ]}
                           isDisabled={busy}
                         />
                       </Td>
@@ -177,15 +188,29 @@ const EtherIPDetailed: React.FunctionComponent = () => {
         </Stack>
 
         {/* Add client setting */}
-        <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+        <Modal
+          variant={ModalVariant.small}
+          isOpen={createOpen}
+          onClose={() => setCreateOpen(false)}
+        >
           <ModalHeader title="Add EtherIP / L2TPv3 client setting" />
           <ModalBody>
             <Form>
               <FormGroup label="ISAKMP Phase 1 ID" fieldId="etherip-id">
-                <TextInput id="etherip-id" value={id} onChange={(_event, value) => setId(value)} aria-label="ISAKMP Phase 1 ID" />
+                <TextInput
+                  id="etherip-id"
+                  value={id}
+                  onChange={(_event, value) => setId(value)}
+                  aria-label="ISAKMP Phase 1 ID"
+                />
               </FormGroup>
               <FormGroup label="Virtual Hub" fieldId="etherip-hub">
-                <FormSelect id="etherip-hub" value={hub} onChange={(_event, value) => setHub(value)} aria-label="Virtual Hub">
+                <FormSelect
+                  id="etherip-hub"
+                  value={hub}
+                  onChange={(_event, value) => setHub(value)}
+                  aria-label="Virtual Hub"
+                >
                   {hubs.map((h) => (
                     <FormSelectOption key={h} value={h} label={h} />
                   ))}
@@ -209,7 +234,9 @@ const EtherIPDetailed: React.FunctionComponent = () => {
                 />
               </FormGroup>
             </Form>
-            <Content component="small">The user name and password identify the client to the Virtual Hub.</Content>
+            <Content component="small">
+              The user name and password identify the client to the Virtual Hub.
+            </Content>
           </ModalBody>
           <ModalFooter>
             <Button variant="primary" onClick={create} isDisabled={!canCreate}>
@@ -222,7 +249,11 @@ const EtherIPDetailed: React.FunctionComponent = () => {
         </Modal>
 
         {/* Delete confirmation */}
-        <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+        <Modal
+          variant={ModalVariant.small}
+          isOpen={pendingDelete !== null}
+          onClose={() => setPendingDelete(null)}
+        >
           <ModalHeader title="Delete client setting" titleIconVariant="warning" />
           <ModalBody>
             Delete the EtherIP / L2TPv3 client setting <strong>{pendingDelete}</strong>?

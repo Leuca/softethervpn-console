@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Button,
@@ -14,9 +14,9 @@ import {
   ModalVariant,
   Stack,
   StackItem,
-} from '@patternfly/react-core';
-import { binToBytes, downloadBlob } from '@app/utils/blob_utils';
-import { type CertificateName, type ParsedCertificate, parseCertificate } from '@app/utils/x509';
+} from "@patternfly/react-core";
+import { binToBytes, downloadBlob } from "@app/utils/blob_utils";
+import { type CertificateName, type ParsedCertificate, parseCertificate } from "@app/utils/x509";
 
 interface CertificateModalProps {
   /**
@@ -32,19 +32,19 @@ const NameList: React.FunctionComponent<{ name: CertificateName }> = ({ name }) 
   <DescriptionList isHorizontal isCompact>
     <DescriptionListGroup>
       <DescriptionListTerm>Common name</DescriptionListTerm>
-      <DescriptionListDescription>{name.commonName || '-'}</DescriptionListDescription>
+      <DescriptionListDescription>{name.commonName || "-"}</DescriptionListDescription>
     </DescriptionListGroup>
     <DescriptionListGroup>
       <DescriptionListTerm>Organization</DescriptionListTerm>
-      <DescriptionListDescription>{name.organization || '-'}</DescriptionListDescription>
+      <DescriptionListDescription>{name.organization || "-"}</DescriptionListDescription>
     </DescriptionListGroup>
     <DescriptionListGroup>
       <DescriptionListTerm>Organizational unit</DescriptionListTerm>
-      <DescriptionListDescription>{name.organizationalUnit || '-'}</DescriptionListDescription>
+      <DescriptionListDescription>{name.organizationalUnit || "-"}</DescriptionListDescription>
     </DescriptionListGroup>
     <DescriptionListGroup>
       <DescriptionListTerm>Country</DescriptionListTerm>
-      <DescriptionListDescription>{name.country || '-'}</DescriptionListDescription>
+      <DescriptionListDescription>{name.country || "-"}</DescriptionListDescription>
     </DescriptionListGroup>
   </DescriptionList>
 );
@@ -53,9 +53,9 @@ const NameList: React.FunctionComponent<{ name: CertificateName }> = ({ name }) 
 const HexBlock: React.FunctionComponent<{ children: React.ReactNode }> = ({ children }) => (
   <div
     style={{
-      fontFamily: 'var(--pf-t--global--font--family--mono)',
-      fontSize: 'var(--pf-t--global--font--size--body--sm)',
-      wordBreak: 'break-all',
+      fontFamily: "var(--pf-t--global--font--family--mono)",
+      fontSize: "var(--pf-t--global--font--size--body--sm)",
+      wordBreak: "break-all",
     }}
   >
     {children}
@@ -67,7 +67,11 @@ const HexBlock: React.FunctionComponent<{ children: React.ReactNode }> = ({ chil
  * Controlled: the parent owns open state and passes the DER bytes. Shared by
  * the pages that expose a certificate (cluster member server cert, user certs).
  */
-const CertificateModal: React.FunctionComponent<CertificateModalProps> = ({ certBin, isOpen, onClose }) => {
+const CertificateModal: React.FunctionComponent<CertificateModalProps> = ({
+  certBin,
+  isOpen,
+  onClose,
+}) => {
   const bytes = React.useMemo(() => binToBytes(certBin), [certBin]);
   const parsed = React.useMemo<ParsedCertificate | null>(() => {
     if (!bytes) {
@@ -84,11 +88,11 @@ const CertificateModal: React.FunctionComponent<CertificateModalProps> = ({ cert
     if (!parsed) {
       return;
     }
-    const filename = `${parsed.subject.commonName || 'certificate'}.pem`;
-    downloadBlob(new Blob([parsed.pem], { type: 'application/x-pem-file' }), filename);
+    const filename = `${parsed.subject.commonName || "certificate"}.pem`;
+    downloadBlob(new Blob([parsed.pem], { type: "application/x-pem-file" }), filename);
   };
 
-  const title = parsed ? `Certificate: ${parsed.subject.commonName || 'Unknown'}` : 'Certificate';
+  const title = parsed ? `Certificate: ${parsed.subject.commonName || "Unknown"}` : "Certificate";
 
   return (
     <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={onClose}>
@@ -105,8 +109,8 @@ const CertificateModal: React.FunctionComponent<CertificateModalProps> = ({ cert
                 <DescriptionListGroup>
                   <DescriptionListTerm>Type</DescriptionListTerm>
                   <DescriptionListDescription>
-                    <Label color={parsed.isSelfIssued ? 'orange' : 'blue'} isCompact>
-                      {parsed.isSelfIssued ? 'Self-signed' : 'CA-issued'}
+                    <Label color={parsed.isSelfIssued ? "orange" : "blue"} isCompact>
+                      {parsed.isSelfIssued ? "Self-signed" : "CA-issued"}
                     </Label>
                   </DescriptionListDescription>
                 </DescriptionListGroup>
@@ -130,11 +134,15 @@ const CertificateModal: React.FunctionComponent<CertificateModalProps> = ({ cert
                 </DescriptionListGroup>
                 <DescriptionListGroup>
                   <DescriptionListTerm>Issued on</DescriptionListTerm>
-                  <DescriptionListDescription>{parsed.notBefore.toLocaleString()}</DescriptionListDescription>
+                  <DescriptionListDescription>
+                    {parsed.notBefore.toLocaleString()}
+                  </DescriptionListDescription>
                 </DescriptionListGroup>
                 <DescriptionListGroup>
                   <DescriptionListTerm>Expires on</DescriptionListTerm>
-                  <DescriptionListDescription>{parsed.notAfter.toLocaleString()}</DescriptionListDescription>
+                  <DescriptionListDescription>
+                    {parsed.notAfter.toLocaleString()}
+                  </DescriptionListDescription>
                 </DescriptionListGroup>
                 <DescriptionListGroup>
                   <DescriptionListTerm>Signature ({parsed.signatureAlgorithm})</DescriptionListTerm>

@@ -1,17 +1,17 @@
 // Import the vpnrpc.ts RPC stub.
-import * as VPN from 'vpnrpc/dist/vpnrpc';
+import * as VPN from "vpnrpc/dist/vpnrpc";
 
 // Output JSON-RPC request / reply strings to the debug console.
-VPN.VpnServerRpc.SetDebugMode(process.env.NODE_ENV === 'development');
+VPN.VpnServerRpc.SetDebugMode(process.env.NODE_ENV === "development");
 
 export let api: VPN.VpnServerRpc;
 
 const isTransientLoadFailure = (error: unknown): boolean => {
   const message = String(error);
   return (
-    message === 'TypeError: Load failed' ||
-    message === 'TypeError: Failed to fetch' ||
-    message === 'TypeError: NetworkError when attempting to fetch resource.'
+    message === "TypeError: Load failed" ||
+    message === "TypeError: Failed to fetch" ||
+    message === "TypeError: NetworkError when attempting to fetch resource."
   );
 };
 
@@ -48,10 +48,11 @@ api = new Proxy(rpc, {
   get(target, property, receiver) {
     const value = Reflect.get(target, property, receiver);
 
-    if (typeof value !== 'function') {
+    if (typeof value !== "function") {
       return value;
     }
 
-    return (...args: unknown[]) => retryTransientLoadFailure(String(property), () => value.apply(target, args));
+    return (...args: unknown[]) =>
+      retryTransientLoadFailure(String(property), () => value.apply(target, args));
   },
 }) as VPN.VpnServerRpc;

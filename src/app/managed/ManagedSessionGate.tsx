@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   AlertActionCloseButton,
@@ -8,11 +8,11 @@ import {
   Spinner,
   Stack,
   StackItem,
-} from '@patternfly/react-core';
-import { ManagedLoginForm } from './ManagedLoginForm';
-import { ManagedSession, getSession, logout } from './sessionApi';
-import logo from '@app/bgimages/icons8-softether-vpn.svg';
-import './ManagedSessionGate.css';
+} from "@patternfly/react-core";
+import { ManagedLoginForm } from "./ManagedLoginForm";
+import { ManagedSession, getSession, logout } from "./sessionApi";
+import logo from "@app/bgimages/icons8-softether-vpn.svg";
+import "./ManagedSessionGate.css";
 
 type AuthenticatedManagedSession = Extract<ManagedSession, { authenticated: true }>;
 
@@ -27,7 +27,8 @@ interface ManagedSessionControls {
 
 const ManagedSessionContext = React.createContext<ManagedSessionControls | null>(null);
 
-export const useManagedSession = (): ManagedSessionControls | null => React.useContext(ManagedSessionContext);
+export const useManagedSession = (): ManagedSessionControls | null =>
+  React.useContext(ManagedSessionContext);
 
 const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ children }) => {
   const [session, setSession] = React.useState<ManagedSession | null>(null);
@@ -94,7 +95,8 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
             <div className="se-managed-login__copy">
               <Content component="h1">Connect to SoftEther VPN Server</Content>
               <Content component="p">
-                Choose the server to manage. Your administrator password is used only to open this secure session.
+                Choose the server to manage. Your administrator password is used only to open this
+                secure session.
               </Content>
             </div>
           </div>
@@ -123,7 +125,10 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
             variant="danger"
             title="Could not log out"
             actionClose={
-              <AlertActionCloseButton aria-label="Dismiss logout error" onClose={() => setLogoutError(null)} />
+              <AlertActionCloseButton
+                aria-label="Dismiss logout error"
+                onClose={() => setLogoutError(null)}
+              />
             }
           >
             {logoutError}

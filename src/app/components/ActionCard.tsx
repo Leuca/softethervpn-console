@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { Card, CardBody, CardHeader, CardTitle } from '@patternfly/react-core';
+import * as React from "react";
+import { Card, CardBody, CardHeader, CardTitle } from "@patternfly/react-core";
 
 interface ActionCardProps {
   title: string;
@@ -8,7 +8,12 @@ interface ActionCardProps {
   style?: React.CSSProperties;
 }
 
-const ActionCard: React.FunctionComponent<ActionCardProps> = ({ title, description, onClick, style }) => (
+const ActionCard: React.FunctionComponent<ActionCardProps> = ({
+  title,
+  description,
+  onClick,
+  style,
+}) => (
   <Card isClickable isFullHeight style={style}>
     <CardHeader
       selectableActions={{
@@ -20,9 +25,9 @@ const ActionCard: React.FunctionComponent<ActionCardProps> = ({ title, descripti
     </CardHeader>
     <CardBody
       style={{
-        color: 'var(--pf-t--global--text--color--subtle)',
-        fontSize: 'var(--pf-t--global--font--size--sm)',
-        overflowWrap: 'anywhere',
+        color: "var(--pf-t--global--text--color--subtle)",
+        fontSize: "var(--pf-t--global--font--size--sm)",
+        overflowWrap: "anywhere",
       }}
     >
       {description}

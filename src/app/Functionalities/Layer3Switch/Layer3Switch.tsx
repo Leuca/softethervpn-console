@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -25,16 +25,16 @@ import {
   Stack,
   StackItem,
   TextInput,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { PlusCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { AppPage } from '@app/components/AppPage';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { PlusCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { AppPage } from "@app/components/AppPage";
 
 const parseIPv4 = (value: string): number | null => {
-  const parts = value.split('.');
+  const parts = value.split(".");
   if (parts.length !== 4) {
     return null;
   }
@@ -81,12 +81,12 @@ const isInterfaceAddress = (ipValue: string, maskValue: string): boolean => {
     return false;
   }
 
-  return ((ip & (~mask >>> 0)) >>> 0) !== 0;
+  return (ip & (~mask >>> 0)) >>> 0 !== 0;
 };
 const isNetworkAddress = (ipValue: string, maskValue: string): boolean => {
   const ip = parseIPv4(ipValue);
   const mask = parseIPv4(maskValue);
-  return ip !== null && mask !== null && isSubnetMask(maskValue) && ((ip & mask) >>> 0) === ip;
+  return ip !== null && mask !== null && isSubnetMask(maskValue) && (ip & mask) >>> 0 === ip;
 };
 const parseMetric = (value: string): number | null => {
   if (!/^\d+$/.test(value)) {
@@ -96,76 +96,91 @@ const parseMetric = (value: string): number | null => {
   return metric >= 1 && metric <= 0xffffffff ? metric : null;
 };
 
-const hostIpValidated = (value: string): 'default' | 'error' => (value === '' || isHostIPv4(value) ? 'default' : 'error');
-const subnetMaskValidated = (value: string): 'default' | 'error' => (value === '' || isSubnetMask(value) ? 'default' : 'error');
-const interfaceIpValidated = (ipValue: string, maskValue: string): 'default' | 'error' => {
-  if (ipValue === '') {
-    return 'default';
+const hostIpValidated = (value: string): "default" | "error" =>
+  value === "" || isHostIPv4(value) ? "default" : "error";
+const subnetMaskValidated = (value: string): "default" | "error" =>
+  value === "" || isSubnetMask(value) ? "default" : "error";
+const interfaceIpValidated = (ipValue: string, maskValue: string): "default" | "error" => {
+  if (ipValue === "") {
+    return "default";
   }
   if (!isHostIPv4(ipValue)) {
-    return 'error';
+    return "error";
   }
-  if (maskValue !== '' && isSubnetMask(maskValue) && !isInterfaceAddress(ipValue, maskValue)) {
-    return 'error';
+  if (maskValue !== "" && isSubnetMask(maskValue) && !isInterfaceAddress(ipValue, maskValue)) {
+    return "error";
   }
-  return 'default';
+  return "default";
 };
-const metricValidated = (value: string): 'default' | 'error' => (value === '' || parseMetric(value) !== null ? 'default' : 'error');
+const metricValidated = (value: string): "default" | "error" =>
+  value === "" || parseMetric(value) !== null ? "default" : "error";
 
-const helperVariant = (valid: boolean): 'default' | 'error' => (valid ? 'default' : 'error');
+const helperVariant = (valid: boolean): "default" | "error" => (valid ? "default" : "error");
 
-const interfaceIpHelp = (ipValue: string, maskValue: string): { variant: 'default' | 'error'; text: string } => {
-  if (ipValue === '') {
-    return { variant: 'default', text: 'Enter a host IPv4 address.' };
+const interfaceIpHelp = (
+  ipValue: string,
+  maskValue: string,
+): { variant: "default" | "error"; text: string } => {
+  if (ipValue === "") {
+    return { variant: "default", text: "Enter a host IPv4 address." };
   }
   if (!isHostIPv4(ipValue)) {
-    return { variant: 'error', text: 'Enter a host IPv4 address other than 0.0.0.0 or 255.255.255.255.' };
+    return {
+      variant: "error",
+      text: "Enter a host IPv4 address other than 0.0.0.0 or 255.255.255.255.",
+    };
   }
-  if (maskValue !== '' && isSubnetMask(maskValue) && !isInterfaceAddress(ipValue, maskValue)) {
-    return { variant: 'error', text: 'The address cannot be the network address for this subnet.' };
+  if (maskValue !== "" && isSubnetMask(maskValue) && !isInterfaceAddress(ipValue, maskValue)) {
+    return { variant: "error", text: "The address cannot be the network address for this subnet." };
   }
-  return { variant: 'default', text: 'Host IPv4 address for this virtual interface.' };
+  return { variant: "default", text: "Host IPv4 address for this virtual interface." };
 };
-const networkAddressHelp = (ipValue: string, maskValue: string): { variant: 'default' | 'error'; text: string } => {
-  if (ipValue === '') {
-    return { variant: 'default', text: 'Enter a network IPv4 address.' };
+const networkAddressHelp = (
+  ipValue: string,
+  maskValue: string,
+): { variant: "default" | "error"; text: string } => {
+  if (ipValue === "") {
+    return { variant: "default", text: "Enter a network IPv4 address." };
   }
   if (!isIPv4(ipValue)) {
-    return { variant: 'error', text: 'Enter a valid IPv4 address.' };
+    return { variant: "error", text: "Enter a valid IPv4 address." };
   }
-  if (maskValue !== '' && isSubnetMask(maskValue) && !isNetworkAddress(ipValue, maskValue)) {
-    return { variant: 'error', text: 'The network address must match the subnet mask.' };
+  if (maskValue !== "" && isSubnetMask(maskValue) && !isNetworkAddress(ipValue, maskValue)) {
+    return { variant: "error", text: "The network address must match the subnet mask." };
   }
-  return { variant: 'default', text: 'Network IPv4 address for this route.' };
+  return { variant: "default", text: "Network IPv4 address for this route." };
 };
-const maskHelp = (value: string): { variant: 'default' | 'error'; text: string } => ({
-  variant: helperVariant(value === '' || isSubnetMask(value)),
-  text: 'Enter a contiguous IPv4 subnet mask.',
+const maskHelp = (value: string): { variant: "default" | "error"; text: string } => ({
+  variant: helperVariant(value === "" || isSubnetMask(value)),
+  text: "Enter a contiguous IPv4 subnet mask.",
 });
-const hostHelp = (value: string): { variant: 'default' | 'error'; text: string } => {
-  if (value === '') {
-    return { variant: 'default', text: 'Enter a gateway host IPv4 address.' };
+const hostHelp = (value: string): { variant: "default" | "error"; text: string } => {
+  if (value === "") {
+    return { variant: "default", text: "Enter a gateway host IPv4 address." };
   }
   if (!isHostIPv4(value)) {
-    return { variant: 'error', text: 'Enter a usable host IPv4 address other than 0.0.0.0 or 255.255.255.255.' };
+    return {
+      variant: "error",
+      text: "Enter a usable host IPv4 address other than 0.0.0.0 or 255.255.255.255.",
+    };
   }
-  return { variant: 'default', text: 'Next-hop gateway host address.' };
+  return { variant: "default", text: "Next-hop gateway host address." };
 };
-const metricHelp = (value: string): { variant: 'default' | 'error'; text: string } => ({
-  variant: helperVariant(value === '' || parseMetric(value) !== null),
-  text: 'Metric must be a whole number from 1 to 4294967295.',
+const metricHelp = (value: string): { variant: "default" | "error"; text: string } => ({
+  variant: helperVariant(value === "" || parseMetric(value) !== null),
+  text: "Metric must be a whole number from 1 to 4294967295.",
 });
-const networkAddressValidated = (ipValue: string, maskValue: string): 'default' | 'error' => {
-  if (ipValue === '') {
-    return 'default';
+const networkAddressValidated = (ipValue: string, maskValue: string): "default" | "error" => {
+  if (ipValue === "") {
+    return "default";
   }
   if (!isIPv4(ipValue)) {
-    return 'error';
+    return "error";
   }
-  if (maskValue !== '' && isSubnetMask(maskValue) && !isNetworkAddress(ipValue, maskValue)) {
-    return 'error';
+  if (maskValue !== "" && isSubnetMask(maskValue) && !isNetworkAddress(ipValue, maskValue)) {
+    return "error";
   }
-  return 'default';
+  return "default";
 };
 
 const Layer3Switch: React.FunctionComponent = () => {
@@ -179,18 +194,18 @@ const Layer3Switch: React.FunctionComponent = () => {
   const [routes, setRoutes] = React.useState<VPN.VpnRpcL3Table[] | null>(null);
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [newName, setNewName] = React.useState('');
+  const [newName, setNewName] = React.useState("");
 
   const [ifOpen, setIfOpen] = React.useState(false);
-  const [ifHub, setIfHub] = React.useState('');
-  const [ifIp, setIfIp] = React.useState('');
-  const [ifMask, setIfMask] = React.useState('');
+  const [ifHub, setIfHub] = React.useState("");
+  const [ifIp, setIfIp] = React.useState("");
+  const [ifMask, setIfMask] = React.useState("");
 
   const [routeOpen, setRouteOpen] = React.useState(false);
-  const [rNet, setRNet] = React.useState('');
-  const [rMask, setRMask] = React.useState('');
-  const [rGw, setRGw] = React.useState('');
-  const [rMetric, setRMetric] = React.useState('1');
+  const [rNet, setRNet] = React.useState("");
+  const [rMask, setRMask] = React.useState("");
+  const [rGw, setRGw] = React.useState("");
+  const [rMetric, setRMetric] = React.useState("1");
 
   const [pendingSwitch, setPendingSwitch] = React.useState<string | null>(null);
   const [pendingIf, setPendingIf] = React.useState<VPN.VpnRpcL3If | null>(null);
@@ -256,14 +271,14 @@ const Layer3Switch: React.FunctionComponent = () => {
   const createSwitch = () => {
     const name = newName.trim();
     setCreateOpen(false);
-    setNewName('');
+    setNewName("");
     run(api.AddL3Switch(new VPN.VpnRpcL3Sw({ Name_str: name })), () => setSelected(name));
   };
 
   const openAddIf = () => {
-    setIfHub(hubs[0] ?? '');
-    setIfIp('');
-    setIfMask('');
+    setIfHub(hubs[0] ?? "");
+    setIfIp("");
+    setIfMask("");
     setIfOpen(true);
   };
   const addIf = () => {
@@ -274,7 +289,7 @@ const Layer3Switch: React.FunctionComponent = () => {
     run(
       api.AddL3If(
         new VPN.VpnRpcL3If({
-          Name_str: selected ?? '',
+          Name_str: selected ?? "",
           HubName_str: ifHub,
           IpAddress_ip: ifIp,
           SubnetMask_ip: ifMask,
@@ -284,10 +299,10 @@ const Layer3Switch: React.FunctionComponent = () => {
   };
 
   const openAddRoute = () => {
-    setRNet('');
-    setRMask('');
-    setRGw('');
-    setRMetric('1');
+    setRNet("");
+    setRMask("");
+    setRGw("");
+    setRMetric("1");
     setRouteOpen(true);
   };
   const addRoute = () => {
@@ -298,7 +313,7 @@ const Layer3Switch: React.FunctionComponent = () => {
     run(
       api.AddL3Table(
         new VPN.VpnRpcL3Table({
-          Name_str: selected ?? '',
+          Name_str: selected ?? "",
           NetworkAddress_ip: rNet,
           SubnetMask_ip: rMask,
           GatewayAddress_ip: rGw,
@@ -326,7 +341,11 @@ const Layer3Switch: React.FunctionComponent = () => {
     if (!target) {
       return;
     }
-    run(api.DelL3If(new VPN.VpnRpcL3If({ Name_str: selected ?? '', HubName_str: target.HubName_str })));
+    run(
+      api.DelL3If(
+        new VPN.VpnRpcL3If({ Name_str: selected ?? "", HubName_str: target.HubName_str }),
+      ),
+    );
   };
 
   const confirmDeleteRoute = () => {
@@ -338,7 +357,7 @@ const Layer3Switch: React.FunctionComponent = () => {
     run(
       api.DelL3Table(
         new VPN.VpnRpcL3Table({
-          Name_str: selected ?? '',
+          Name_str: selected ?? "",
           NetworkAddress_ip: target.NetworkAddress_ip,
           SubnetMask_ip: target.SubnetMask_ip,
           GatewayAddress_ip: target.GatewayAddress_ip,
@@ -355,7 +374,7 @@ const Layer3Switch: React.FunctionComponent = () => {
       variant="primary"
       icon={<PlusCircleIcon />}
       onClick={() => {
-        setNewName('');
+        setNewName("");
         setCreateOpen(true);
       }}
       isDisabled={isLoading}
@@ -381,8 +400,9 @@ const Layer3Switch: React.FunctionComponent = () => {
   const routeMaskHelper = maskHelp(rMask);
   const routeGatewayHelper = hostHelp(rGw);
   const routeMetricHelper = metricHelp(rMetric);
-  const ifCanCreate = ifHub !== '' && isInterfaceAddress(ifIp, ifMask) && !duplicateIf;
-  const routeCanCreate = isNetworkAddress(rNet, rMask) && isHostIPv4(rGw) && routeMetric !== null && !duplicateRoute;
+  const ifCanCreate = ifHub !== "" && isInterfaceAddress(ifIp, ifMask) && !duplicateIf;
+  const routeCanCreate =
+    isNetworkAddress(rNet, rMask) && isHostIPv4(rGw) && routeMetric !== null && !duplicateRoute;
 
   return (
     <AppPage
@@ -406,7 +426,9 @@ const Layer3Switch: React.FunctionComponent = () => {
             </Bullseye>
           ) : switches !== null && switches.length === 0 ? (
             <EmptyState titleText="No Layer 3 switches" headingLevel="h2">
-              <EmptyStateBody>Create a switch, add interfaces and routes, then start it.</EmptyStateBody>
+              <EmptyStateBody>
+                Create a switch, add interfaces and routes, then start it.
+              </EmptyStateBody>
             </EmptyState>
           ) : switches !== null ? (
             <ScrollableTable aria-label="Layer 3 switches" variant="compact">
@@ -422,8 +444,12 @@ const Layer3Switch: React.FunctionComponent = () => {
               <Tbody>
                 {switches.map((sw) => {
                   const active = !!sw.Active_bool;
-                  const statusLabel = active ? (sw.Online_bool ? 'Operational' : 'Active (offline)') : 'Stopped';
-                  const statusColor = active ? (sw.Online_bool ? 'green' : 'orange') : 'grey';
+                  const statusLabel = active
+                    ? sw.Online_bool
+                      ? "Operational"
+                      : "Active (offline)"
+                    : "Stopped";
+                  const statusColor = active ? (sw.Online_bool ? "green" : "orange") : "grey";
                   return (
                     <Tr key={sw.Name_str} isRowSelected={sw.Name_str === selected}>
                       <Td dataLabel="Name">
@@ -442,11 +468,27 @@ const Layer3Switch: React.FunctionComponent = () => {
                         <ActionsColumn
                           items={[
                             active
-                              ? { title: 'Stop', onClick: () => run(api.StopL3Switch(new VPN.VpnRpcL3Sw({ Name_str: sw.Name_str }))) }
-                              : { title: 'Start', onClick: () => run(api.StartL3Switch(new VPN.VpnRpcL3Sw({ Name_str: sw.Name_str }))) },
-                            { title: 'Manage', onClick: () => setSelected(sw.Name_str) },
+                              ? {
+                                  title: "Stop",
+                                  onClick: () =>
+                                    run(
+                                      api.StopL3Switch(
+                                        new VPN.VpnRpcL3Sw({ Name_str: sw.Name_str }),
+                                      ),
+                                    ),
+                                }
+                              : {
+                                  title: "Start",
+                                  onClick: () =>
+                                    run(
+                                      api.StartL3Switch(
+                                        new VPN.VpnRpcL3Sw({ Name_str: sw.Name_str }),
+                                      ),
+                                    ),
+                                },
+                            { title: "Manage", onClick: () => setSelected(sw.Name_str) },
                             { isSeparator: true },
-                            { title: 'Delete', onClick: () => setPendingSwitch(sw.Name_str) },
+                            { title: "Delete", onClick: () => setPendingSwitch(sw.Name_str) },
                           ]}
                           isDisabled={busy}
                         />
@@ -463,7 +505,10 @@ const Layer3Switch: React.FunctionComponent = () => {
           <StackItem>
             <Stack hasGutter>
               <StackItem>
-                <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+                <Flex
+                  justifyContent={{ default: "justifyContentSpaceBetween" }}
+                  alignItems={{ default: "alignItemsCenter" }}
+                >
                   <FlexItem>
                     <Content component="h2">Switch: {selectedItem.Name_str}</Content>
                   </FlexItem>
@@ -476,13 +521,20 @@ const Layer3Switch: React.FunctionComponent = () => {
               </StackItem>
               {selectedActive && (
                 <StackItem>
-                  <Alert variant="info" title="Stop the switch to change its interfaces and routing table" isInline />
+                  <Alert
+                    variant="info"
+                    title="Stop the switch to change its interfaces and routing table"
+                    isInline
+                  />
                 </StackItem>
               )}
 
               {/* Virtual interfaces */}
               <StackItem>
-                <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+                <Flex
+                  justifyContent={{ default: "justifyContentSpaceBetween" }}
+                  alignItems={{ default: "alignItemsCenter" }}
+                >
                   <FlexItem>
                     <Content component="h3">Virtual interfaces</Content>
                   </FlexItem>
@@ -522,7 +574,7 @@ const Layer3Switch: React.FunctionComponent = () => {
                           <Td dataLabel="Subnet mask">{it.SubnetMask_ip}</Td>
                           <Td isActionCell>
                             <ActionsColumn
-                              items={[{ title: 'Delete', onClick: () => setPendingIf(it) }]}
+                              items={[{ title: "Delete", onClick: () => setPendingIf(it) }]}
                               isDisabled={busy || selectedActive}
                             />
                           </Td>
@@ -535,7 +587,10 @@ const Layer3Switch: React.FunctionComponent = () => {
 
               {/* Routing table */}
               <StackItem>
-                <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+                <Flex
+                  justifyContent={{ default: "justifyContentSpaceBetween" }}
+                  alignItems={{ default: "alignItemsCenter" }}
+                >
                   <FlexItem>
                     <Content component="h3">Routing table</Content>
                   </FlexItem>
@@ -570,14 +625,16 @@ const Layer3Switch: React.FunctionComponent = () => {
                     </Thead>
                     <Tbody>
                       {routes.map((rt) => (
-                        <Tr key={`${rt.NetworkAddress_ip}/${rt.SubnetMask_ip}/${rt.GatewayAddress_ip}`}>
+                        <Tr
+                          key={`${rt.NetworkAddress_ip}/${rt.SubnetMask_ip}/${rt.GatewayAddress_ip}`}
+                        >
                           <Td dataLabel="Network address">{rt.NetworkAddress_ip}</Td>
                           <Td dataLabel="Subnet mask">{rt.SubnetMask_ip}</Td>
                           <Td dataLabel="Gateway">{rt.GatewayAddress_ip}</Td>
                           <Td dataLabel="Metric">{rt.Metric_u32}</Td>
                           <Td isActionCell>
                             <ActionsColumn
-                              items={[{ title: 'Delete', onClick: () => setPendingRoute(rt) }]}
+                              items={[{ title: "Delete", onClick: () => setPendingRoute(rt) }]}
                               isDisabled={busy || selectedActive}
                             />
                           </Td>
@@ -608,7 +665,7 @@ const Layer3Switch: React.FunctionComponent = () => {
           </Form>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={createSwitch} isDisabled={newName.trim() === ''}>
+          <Button variant="primary" onClick={createSwitch} isDisabled={newName.trim() === ""}>
             Create
           </Button>
           <Button variant="link" onClick={() => setCreateOpen(false)}>
@@ -623,7 +680,12 @@ const Layer3Switch: React.FunctionComponent = () => {
         <ModalBody>
           <Form>
             <FormGroup label="Virtual Hub" fieldId="l3-if-hub">
-              <FormSelect id="l3-if-hub" value={ifHub} onChange={(_event, value) => setIfHub(value)} aria-label="Virtual Hub">
+              <FormSelect
+                id="l3-if-hub"
+                value={ifHub}
+                onChange={(_event, value) => setIfHub(value)}
+                aria-label="Virtual Hub"
+              >
                 {hubs.map((h) => (
                   <FormSelectOption key={h} value={h} label={h} />
                 ))}
@@ -653,12 +715,18 @@ const Layer3Switch: React.FunctionComponent = () => {
               />
               <FormHelperText>
                 <HelperText>
-                  <HelperTextItem variant={ifMaskHelper.variant}>{ifMaskHelper.text}</HelperTextItem>
+                  <HelperTextItem variant={ifMaskHelper.variant}>
+                    {ifMaskHelper.text}
+                  </HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>
             {duplicateIf && (
-              <Alert variant="warning" title="This switch already has an interface for the selected hub." isInline />
+              <Alert
+                variant="warning"
+                title="This switch already has an interface for the selected hub."
+                isInline
+              />
             )}
           </Form>
         </ModalBody>
@@ -687,7 +755,9 @@ const Layer3Switch: React.FunctionComponent = () => {
               />
               <FormHelperText>
                 <HelperText>
-                  <HelperTextItem variant={routeNetworkHelper.variant}>{routeNetworkHelper.text}</HelperTextItem>
+                  <HelperTextItem variant={routeNetworkHelper.variant}>
+                    {routeNetworkHelper.text}
+                  </HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>
@@ -701,7 +771,9 @@ const Layer3Switch: React.FunctionComponent = () => {
               />
               <FormHelperText>
                 <HelperText>
-                  <HelperTextItem variant={routeMaskHelper.variant}>{routeMaskHelper.text}</HelperTextItem>
+                  <HelperTextItem variant={routeMaskHelper.variant}>
+                    {routeMaskHelper.text}
+                  </HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>
@@ -715,7 +787,9 @@ const Layer3Switch: React.FunctionComponent = () => {
               />
               <FormHelperText>
                 <HelperText>
-                  <HelperTextItem variant={routeGatewayHelper.variant}>{routeGatewayHelper.text}</HelperTextItem>
+                  <HelperTextItem variant={routeGatewayHelper.variant}>
+                    {routeGatewayHelper.text}
+                  </HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>
@@ -731,11 +805,15 @@ const Layer3Switch: React.FunctionComponent = () => {
               />
               <FormHelperText>
                 <HelperText>
-                  <HelperTextItem variant={routeMetricHelper.variant}>{routeMetricHelper.text}</HelperTextItem>
+                  <HelperTextItem variant={routeMetricHelper.variant}>
+                    {routeMetricHelper.text}
+                  </HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>
-            {duplicateRoute && <Alert variant="warning" title="This routing table entry already exists." isInline />}
+            {duplicateRoute && (
+              <Alert variant="warning" title="This routing table entry already exists." isInline />
+            )}
           </Form>
           <Content component="small">
             For the default gateway, set both the network address and subnet mask to 0.0.0.0.
@@ -752,10 +830,15 @@ const Layer3Switch: React.FunctionComponent = () => {
       </Modal>
 
       {/* Delete confirmations */}
-      <Modal variant={ModalVariant.small} isOpen={pendingSwitch !== null} onClose={() => setPendingSwitch(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingSwitch !== null}
+        onClose={() => setPendingSwitch(null)}
+      >
         <ModalHeader title="Delete Layer 3 switch" titleIconVariant="warning" />
         <ModalBody>
-          Delete the switch <strong>{pendingSwitch}</strong>? Its interfaces and routing table are removed.
+          Delete the switch <strong>{pendingSwitch}</strong>? Its interfaces and routing table are
+          removed.
         </ModalBody>
         <ModalFooter>
           <Button variant="danger" onClick={confirmDeleteSwitch}>
@@ -767,10 +850,15 @@ const Layer3Switch: React.FunctionComponent = () => {
         </ModalFooter>
       </Modal>
 
-      <Modal variant={ModalVariant.small} isOpen={pendingIf !== null} onClose={() => setPendingIf(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingIf !== null}
+        onClose={() => setPendingIf(null)}
+      >
         <ModalHeader title="Delete interface" titleIconVariant="warning" />
         <ModalBody>
-          Delete the interface on <strong>{pendingIf?.HubName_str}</strong> ({pendingIf?.IpAddress_ip})?
+          Delete the interface on <strong>{pendingIf?.HubName_str}</strong> (
+          {pendingIf?.IpAddress_ip})?
         </ModalBody>
         <ModalFooter>
           <Button variant="danger" onClick={confirmDeleteIf}>
@@ -782,7 +870,11 @@ const Layer3Switch: React.FunctionComponent = () => {
         </ModalFooter>
       </Modal>
 
-      <Modal variant={ModalVariant.small} isOpen={pendingRoute !== null} onClose={() => setPendingRoute(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingRoute !== null}
+        onClose={() => setPendingRoute(null)}
+      >
         <ModalHeader title="Delete route" titleIconVariant="warning" />
         <ModalBody>
           Delete the route to <strong>{pendingRoute?.NetworkAddress_ip}</strong>?

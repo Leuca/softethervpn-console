@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -15,14 +15,14 @@ import {
   Stack,
   StackItem,
   Switch,
-} from '@patternfly/react-core';
-import { ExternalLinkAltIcon } from '@patternfly/react-icons';
-import { useNavigate } from 'react-router-dom';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { AppPage } from '@app/components/AppPage';
+} from "@patternfly/react-core";
+import { ExternalLinkAltIcon } from "@patternfly/react-icons";
+import { useNavigate } from "react-router-dom";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { AppPage } from "@app/components/AppPage";
 
-const VPN_AZURE_URL = 'https://www.vpnazure.net/en/';
+const VPN_AZURE_URL = "https://www.vpnazure.net/en/";
 const CONNECTING_REFRESH_MS = 1000;
 
 const VpnAzure: React.FunctionComponent = () => {
@@ -30,16 +30,19 @@ const VpnAzure: React.FunctionComponent = () => {
 
   const [enabled, setEnabled] = React.useState<boolean | null>(null);
   const [connected, setConnected] = React.useState<boolean | null>(false);
-  const [hostname, setHostname] = React.useState('');
+  const [hostname, setHostname] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
-  const refreshStatus = React.useCallback((waitForConnection = false) =>
-    api
-      .GetAzureStatus()
-      .then((status) => {
+  const refreshStatus = React.useCallback(
+    (waitForConnection = false) =>
+      api.GetAzureStatus().then((status) => {
         setConnected(
-          status.IsConnected_bool ? true : waitForConnection && status.IsEnabled_bool ? null : false,
+          status.IsConnected_bool
+            ? true
+            : waitForConnection && status.IsEnabled_bool
+              ? null
+              : false,
         );
         setEnabled(status.IsEnabled_bool);
         if (status.IsEnabled_bool) {
@@ -48,9 +51,11 @@ const VpnAzure: React.FunctionComponent = () => {
             return status;
           });
         }
-        setHostname('');
+        setHostname("");
         return status;
-      }), []);
+      }),
+    [],
+  );
 
   const load = React.useCallback(() => {
     setError(null);
@@ -77,7 +82,8 @@ const VpnAzure: React.FunctionComponent = () => {
     api
       .SetAzureStatus(new VPN.VpnRpcAzureStatus({ IsEnabled_bool: isChecked }))
       .then((status) => {
-        const nextEnabled = typeof status.IsEnabled_bool === 'boolean' ? status.IsEnabled_bool : isChecked;
+        const nextEnabled =
+          typeof status.IsEnabled_bool === "boolean" ? status.IsEnabled_bool : isChecked;
         setEnabled(nextEnabled);
         if (nextEnabled) {
           setConnected(null);
@@ -87,7 +93,7 @@ const VpnAzure: React.FunctionComponent = () => {
           });
         } else {
           setConnected(false);
-          setHostname('');
+          setHostname("");
           setBusy(false);
           return undefined;
         }
@@ -116,8 +122,8 @@ const VpnAzure: React.FunctionComponent = () => {
 
         <StackItem>
           <Content component="p">
-            VPN Azure works behind firewalls and NATs and requires no configuration. Home clients can connect using the
-            built-in SSTP VPN client of Windows.{' '}
+            VPN Azure works behind firewalls and NATs and requires no configuration. Home clients
+            can connect using the built-in SSTP VPN client of Windows.{" "}
             <Button
               variant="link"
               isInline
@@ -156,8 +162,15 @@ const VpnAzure: React.FunctionComponent = () => {
                       <DescriptionListGroup>
                         <DescriptionListTerm>Status</DescriptionListTerm>
                         <DescriptionListDescription>
-                          <Label color={connected === null ? 'blue' : connected ? 'green' : 'grey'} isCompact>
-                            {connected === null ? 'Connecting' : connected ? 'Connected' : 'Not connected'}
+                          <Label
+                            color={connected === null ? "blue" : connected ? "green" : "grey"}
+                            isCompact
+                          >
+                            {connected === null
+                              ? "Connecting"
+                              : connected
+                                ? "Connected"
+                                : "Not connected"}
                           </Label>
                         </DescriptionListDescription>
                       </DescriptionListGroup>
@@ -165,7 +178,7 @@ const VpnAzure: React.FunctionComponent = () => {
                         <DescriptionListGroup>
                           <DescriptionListTerm>VPN Azure hostname</DescriptionListTerm>
                           <DescriptionListDescription>
-                            {hostname ? `${hostname}.vpnazure.net` : '-'}
+                            {hostname ? `${hostname}.vpnazure.net` : "-"}
                           </DescriptionListDescription>
                         </DescriptionListGroup>
                       )}
@@ -175,12 +188,15 @@ const VpnAzure: React.FunctionComponent = () => {
                     <>
                       <StackItem>
                         <Content component="small">
-                          The VPN Azure hostname mirrors the Dynamic DNS hostname with the domain suffix changed to
-                          vpnazure.net.
+                          The VPN Azure hostname mirrors the Dynamic DNS hostname with the domain
+                          suffix changed to vpnazure.net.
                         </Content>
                       </StackItem>
                       <StackItem>
-                        <Button variant="secondary" onClick={() => navigate('/functionalities/ddns')}>
+                        <Button
+                          variant="secondary"
+                          onClick={() => navigate("/functionalities/ddns")}
+                        >
                           Change hostname
                         </Button>
                       </StackItem>

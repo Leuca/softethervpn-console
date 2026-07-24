@@ -1,7 +1,7 @@
-import * as React from 'react';
-import { Table, Tbody, Td, Th, Tr } from '@patternfly/react-table';
-import { split_string_by_capitalization } from '@app/utils/string_utils';
-import { formatRpcValue } from '@app/utils/format';
+import * as React from "react";
+import { Table, Tbody, Td, Th, Tr } from "@patternfly/react-table";
+import { split_string_by_capitalization } from "@app/utils/string_utils";
+import { formatRpcValue } from "@app/utils/format";
 
 interface KeyValueTableProps {
   /** A raw JSON-RPC response object; every own key becomes a row. */
@@ -27,7 +27,7 @@ const KeyValueTable: React.FunctionComponent<KeyValueTableProps> = ({ data, aria
             {/* Hidden in the stacked mobile layout, where the value cell's
                 dataLabel shows the same label and the row header would
                 duplicate it. */}
-            <Th scope="row" width={40} visibility={['hidden', 'visibleOnMd']}>
+            <Th scope="row" width={40} visibility={["hidden", "visibleOnMd"]}>
               {label}
             </Th>
             <Td dataLabel={label}>{formatRpcValue(key, data[key])}</Td>

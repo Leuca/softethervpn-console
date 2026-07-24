@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -19,15 +19,15 @@ import {
   ModalVariant,
   Spinner,
   TextInput,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { BanIcon, PlusCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { FormErrorAlert } from '@app/components/FormErrorAlert';
-import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
-import { recordChanged } from '@app/utils/dirty';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { BanIcon, PlusCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { FormErrorAlert } from "@app/components/FormErrorAlert";
+import { SecurityPolicyModal } from "@app/Hubs/SecurityPolicyModal";
+import { recordChanged } from "@app/utils/dirty";
 
 const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [groups, setGroups] = React.useState<VPN.VpnRpcEnumGroupItem[] | null>(null);
@@ -35,9 +35,9 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [submitting, setSubmitting] = React.useState(false);
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [name, setName] = React.useState('');
-  const [realname, setRealname] = React.useState('');
-  const [note, setNote] = React.useState('');
+  const [name, setName] = React.useState("");
+  const [realname, setRealname] = React.useState("");
+  const [note, setNote] = React.useState("");
 
   // Working copy of the group being edited (the full GetGroup response).
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
@@ -58,9 +58,9 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   }, [load]);
 
   const openCreate = () => {
-    setName('');
-    setRealname('');
-    setNote('');
+    setName("");
+    setRealname("");
+    setNote("");
     setError(null);
     setCreateOpen(true);
   };
@@ -70,7 +70,12 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     setError(null);
     api
       .CreateGroup(
-        new VPN.VpnRpcSetGroup({ HubName_str: hub, Name_str: name.trim(), Realname_utf: realname, Note_utf: note }),
+        new VPN.VpnRpcSetGroup({
+          HubName_str: hub,
+          Name_str: name.trim(),
+          Realname_utf: realname,
+          Note_utf: note,
+        }),
       )
       .then(() => {
         setSubmitting(false);
@@ -95,7 +100,8 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       .catch((e) => setError(String(e)));
   };
 
-  const setEditField = (key: string, value: unknown) => setEdit((prev) => (prev ? { ...prev, [key]: value } : prev));
+  const setEditField = (key: string, value: unknown) =>
+    setEdit((prev) => (prev ? { ...prev, [key]: value } : prev));
 
   const saveEdit = () => {
     if (!edit) {
@@ -142,13 +148,18 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <Flex
-      direction={{ default: 'column' }}
-      gap={{ default: 'gapMd' }}
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
+      <Flex justifyContent={{ default: "justifyContentFlexEnd" }} gap={{ default: "gapSm" }}>
         <FlexItem>
-          <Button variant="primary" icon={<PlusCircleIcon />} onClick={openCreate} isDisabled={isLoading}>
+          <Button
+            variant="primary"
+            icon={<PlusCircleIcon />}
+            onClick={openCreate}
+            isDisabled={isLoading}
+          >
             New group
           </Button>
         </FlexItem>
@@ -190,7 +201,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             {groups.map((group) => (
               <Tr key={group.Name_str}>
                 <Td dataLabel="Group name">
-                  <Flex gap={{ default: 'gapSm' }} alignItems={{ default: 'alignItemsCenter' }}>
+                  <Flex gap={{ default: "gapSm" }} alignItems={{ default: "alignItemsCenter" }}>
                     <FlexItem>{group.Name_str}</FlexItem>
                     {group.DenyAccess_bool && (
                       <FlexItem>
@@ -201,15 +212,15 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     )}
                   </Flex>
                 </Td>
-                <Td dataLabel="Real name">{group.Realname_utf || '-'}</Td>
-                <Td dataLabel="Note">{group.Note_utf || '-'}</Td>
+                <Td dataLabel="Real name">{group.Realname_utf || "-"}</Td>
+                <Td dataLabel="Note">{group.Note_utf || "-"}</Td>
                 <Td dataLabel="Users">{group.NumUsers_u32.toLocaleString()}</Td>
                 <Td isActionCell>
                   <ActionsColumn
                     items={[
-                      { title: 'Edit', onClick: () => openEdit(group.Name_str) },
+                      { title: "Edit", onClick: () => openEdit(group.Name_str) },
                       { isSeparator: true },
-                      { title: 'Delete', onClick: () => setPendingDelete(group.Name_str) },
+                      { title: "Delete", onClick: () => setPendingDelete(group.Name_str) },
                     ]}
                   />
                 </Td>
@@ -247,7 +258,12 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               />
             </FormGroup>
             <FormGroup label="Note" fieldId="group-note">
-              <TextInput id="group-note" value={note} onChange={(_event, value) => setNote(value)} aria-label="Note" />
+              <TextInput
+                id="group-note"
+                value={note}
+                onChange={(_event, value) => setNote(value)}
+                aria-label="Note"
+              />
             </FormGroup>
           </Form>
         </ModalBody>
@@ -274,7 +290,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         isOpen={edit !== null && !policyOpen}
         onClose={() => !submitting && setEdit(null)}
       >
-        <ModalHeader title={edit ? `Edit ${String(edit.Name_str)}` : ''} />
+        <ModalHeader title={edit ? `Edit ${String(edit.Name_str)}` : ""} />
         <ModalBody>
           <FormErrorAlert error={error} title="Group operation failed" />
           {edit && (
@@ -282,29 +298,34 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               <FormGroup label="Real name" fieldId="edit-group-realname">
                 <TextInput
                   id="edit-group-realname"
-                  value={String(edit.Realname_utf ?? '')}
-                  onChange={(_event, value) => setEditField('Realname_utf', value)}
+                  value={String(edit.Realname_utf ?? "")}
+                  onChange={(_event, value) => setEditField("Realname_utf", value)}
                   aria-label="Real name"
                 />
               </FormGroup>
               <FormGroup label="Note" fieldId="edit-group-note">
                 <TextInput
                   id="edit-group-note"
-                  value={String(edit.Note_utf ?? '')}
-                  onChange={(_event, value) => setEditField('Note_utf', value)}
+                  value={String(edit.Note_utf ?? "")}
+                  onChange={(_event, value) => setEditField("Note_utf", value)}
                   aria-label="Note"
                 />
               </FormGroup>
               <FormGroup label="Security policy" fieldId="edit-group-policy">
                 <Button variant="secondary" onClick={() => setPolicyOpen(true)}>
-                  {edit.UsePolicy_bool ? 'Edit security policy' : 'Add security policy'}
+                  {edit.UsePolicy_bool ? "Edit security policy" : "Add security policy"}
                 </Button>
               </FormGroup>
             </Form>
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={saveEdit} isDisabled={!editDirty || submitting} isLoading={submitting}>
+          <Button
+            variant="primary"
+            onClick={saveEdit}
+            isDisabled={!editDirty || submitting}
+            isLoading={submitting}
+          >
             Save
           </Button>
           <Button variant="link" onClick={() => setEdit(null)} isDisabled={submitting}>
@@ -321,11 +342,16 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       >
         <ModalHeader title="Delete group" titleIconVariant="warning" />
         <ModalBody>
-          Delete the group <strong>{pendingDelete}</strong>? Its members are not deleted, but they stop belonging to the
-          group.
+          Delete the group <strong>{pendingDelete}</strong>? Its members are not deleted, but they
+          stop belonging to the group.
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete} isLoading={submitting} isDisabled={submitting}>
+          <Button
+            variant="danger"
+            onClick={confirmDelete}
+            isLoading={submitting}
+            isDisabled={submitting}
+          >
             Delete
           </Button>
           <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={submitting}>
@@ -335,7 +361,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Modal>
 
       <SecurityPolicyModal
-        title={edit ? `Security policy: ${String(edit.Name_str ?? '')}` : 'Security policy'}
+        title={edit ? `Security policy: ${String(edit.Name_str ?? "")}` : "Security policy"}
         subject={edit}
         isOpen={policyOpen}
         onClose={() => setPolicyOpen(false)}

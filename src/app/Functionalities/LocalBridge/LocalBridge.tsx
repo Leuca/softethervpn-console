@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -21,27 +21,27 @@ import {
   Stack,
   StackItem,
   TextInput,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { PlusCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { useServer } from '@app/ServerContext';
-import { AppPage } from '@app/components/AppPage';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { PlusCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { useServer } from "@app/ServerContext";
+import { AppPage } from "@app/components/AppPage";
 
 // Tap device names are limited to 11 characters by SoftEther.
 const MAX_TAP_NAME = 11;
 
-type BridgeMode = 'adapter' | 'tap';
+type BridgeMode = "adapter" | "tap";
 
-type StatusColor = 'green' | 'red';
+type StatusColor = "green" | "red";
 
 function bridgeStatus(bridge: VPN.VpnRpcLocalBridge): { label: string; color: StatusColor } {
   if (bridge.Online_bool && bridge.Active_bool) {
-    return { label: 'Operational', color: 'green' };
+    return { label: "Operational", color: "green" };
   }
-  return { label: 'Error', color: 'red' };
+  return { label: "Error", color: "red" };
 }
 
 const LocalBridge: React.FunctionComponent = () => {
@@ -55,10 +55,10 @@ const LocalBridge: React.FunctionComponent = () => {
   const [busy, setBusy] = React.useState(false);
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [mode, setMode] = React.useState<BridgeMode>('adapter');
-  const [newHub, setNewHub] = React.useState('');
-  const [newAdapter, setNewAdapter] = React.useState('');
-  const [tapName, setTapName] = React.useState('');
+  const [mode, setMode] = React.useState<BridgeMode>("adapter");
+  const [newHub, setNewHub] = React.useState("");
+  const [newAdapter, setNewAdapter] = React.useState("");
+  const [tapName, setTapName] = React.useState("");
 
   const [pendingDelete, setPendingDelete] = React.useState<VPN.VpnRpcLocalBridge | null>(null);
 
@@ -92,22 +92,22 @@ const LocalBridge: React.FunctionComponent = () => {
   };
 
   const openCreate = () => {
-    setMode(isTapSupported ? mode : 'adapter');
-    setNewHub(hubs[0] ?? '');
-    setNewAdapter(adapters[0]?.DeviceName_str ?? '');
-    setTapName('');
+    setMode(isTapSupported ? mode : "adapter");
+    setNewHub(hubs[0] ?? "");
+    setNewAdapter(adapters[0]?.DeviceName_str ?? "");
+    setTapName("");
     setCreateOpen(true);
   };
 
   const create = () => {
-    const deviceName = mode === 'tap' ? tapName : newAdapter;
+    const deviceName = mode === "tap" ? tapName : newAdapter;
     setCreateOpen(false);
     run(
       api.AddLocalBridge(
         new VPN.VpnRpcLocalBridge({
           DeviceName_str: deviceName,
           HubNameLB_str: newHub,
-          TapMode_bool: mode === 'tap',
+          TapMode_bool: mode === "tap",
         }),
       ),
     );
@@ -133,7 +133,9 @@ const LocalBridge: React.FunctionComponent = () => {
 
   // A bridge needs a hub plus either an adapter or a non-empty tap name.
   const canCreate =
-    newHub !== '' && (mode === 'tap' ? tapName.trim() !== '' : newAdapter !== '') && bridgeSupported;
+    newHub !== "" &&
+    (mode === "tap" ? tapName.trim() !== "" : newAdapter !== "") &&
+    bridgeSupported;
 
   const createButton = (
     <Button
@@ -163,7 +165,11 @@ const LocalBridge: React.FunctionComponent = () => {
 
         {!isLoading && !bridgeSupported && (
           <StackItem>
-            <Alert variant="warning" title="Local Bridge is not supported on this operating system" isInline>
+            <Alert
+              variant="warning"
+              title="Local Bridge is not supported on this operating system"
+              isInline
+            >
               This VPN server cannot create local bridges.
             </Alert>
           </StackItem>
@@ -177,7 +183,8 @@ const LocalBridge: React.FunctionComponent = () => {
           ) : bridges !== null && bridges.length === 0 ? (
             <EmptyState titleText="No local bridge defined" headingLevel="h2">
               <EmptyStateBody>
-                A local bridge connects a Virtual Hub to a physical network. Use Create local bridge to add one.
+                A local bridge connects a Virtual Hub to a physical network. Use Create local bridge
+                to add one.
               </EmptyStateBody>
             </EmptyState>
           ) : bridges !== null ? (
@@ -198,7 +205,9 @@ const LocalBridge: React.FunctionComponent = () => {
                   return (
                     <Tr key={`${bridge.HubNameLB_str}/${bridge.DeviceName_str}`}>
                       <Td dataLabel="#">{index + 1}</Td>
-                      <Td dataLabel="Type">{bridge.TapMode_bool ? 'Tap device' : 'Network adapter'}</Td>
+                      <Td dataLabel="Type">
+                        {bridge.TapMode_bool ? "Tap device" : "Network adapter"}
+                      </Td>
                       <Td dataLabel="Virtual Hub">{bridge.HubNameLB_str}</Td>
                       <Td dataLabel="Network adapter or tap device">{bridge.DeviceName_str}</Td>
                       <Td dataLabel="Status">
@@ -208,7 +217,7 @@ const LocalBridge: React.FunctionComponent = () => {
                       </Td>
                       <Td isActionCell>
                         <ActionsColumn
-                          items={[{ title: 'Delete', onClick: () => setPendingDelete(bridge) }]}
+                          items={[{ title: "Delete", onClick: () => setPendingDelete(bridge) }]}
                           isDisabled={busy}
                         />
                       </Td>
@@ -245,20 +254,20 @@ const LocalBridge: React.FunctionComponent = () => {
                   id="bridge-mode-adapter"
                   name="bridge-mode"
                   label="Existing physical network adapter"
-                  isChecked={mode === 'adapter'}
-                  onChange={() => setMode('adapter')}
+                  isChecked={mode === "adapter"}
+                  onChange={() => setMode("adapter")}
                 />
                 <Radio
                   id="bridge-mode-tap"
                   name="bridge-mode"
                   label="New tap device"
-                  isChecked={mode === 'tap'}
-                  onChange={() => setMode('tap')}
+                  isChecked={mode === "tap"}
+                  onChange={() => setMode("tap")}
                 />
               </FormGroup>
             )}
 
-            {mode === 'adapter' ? (
+            {mode === "adapter" ? (
               <FormGroup label="Network adapter" fieldId="bridge-adapter">
                 <FormSelect
                   id="bridge-adapter"
@@ -304,10 +313,14 @@ const LocalBridge: React.FunctionComponent = () => {
       </Modal>
 
       {/* Delete confirmation */}
-      <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+      >
         <ModalHeader title="Delete local bridge" titleIconVariant="warning" />
         <ModalBody>
-          Delete the local bridge between <strong>{pendingDelete?.HubNameLB_str}</strong> and{' '}
+          Delete the local bridge between <strong>{pendingDelete?.HubNameLB_str}</strong> and{" "}
           <strong>{pendingDelete?.DeviceName_str}</strong>?
         </ModalBody>
         <ModalFooter>

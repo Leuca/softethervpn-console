@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Button,
   Content,
@@ -14,9 +14,9 @@ import {
   Stack,
   StackItem,
   Switch,
-} from '@patternfly/react-core';
-import { POLICY_FIELDS, POLICY_GROUPS, policyBool, policyInt } from '@app/Hubs/securityPolicy';
-import { recordChanged } from '@app/utils/dirty';
+} from "@patternfly/react-core";
+import { POLICY_FIELDS, POLICY_GROUPS, policyBool, policyInt } from "@app/Hubs/securityPolicy";
+import { recordChanged } from "@app/utils/dirty";
 
 interface SecurityPolicyModalProps {
   title: string;
@@ -65,7 +65,7 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
       onSave(draft);
       return;
     }
-    const updated: Record<string, unknown> = { ...draft, 'policy:Ver3_bool': true };
+    const updated: Record<string, unknown> = { ...draft, "policy:Ver3_bool": true };
     delete updated.UsePolicy_bool;
     onSave(updated);
   };
@@ -81,7 +81,7 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
                 id="policy-enabled"
                 label="Apply a security policy to this object"
                 isChecked={usePolicy}
-                onChange={(_event, checked) => setField('UsePolicy_bool', checked)}
+                onChange={(_event, checked) => setField("UsePolicy_bool", checked)}
               />
             </StackItem>
           )}
@@ -90,11 +90,11 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
             const fields = POLICY_FIELDS.filter((f) => f.group === group.id);
             return (
               <StackItem key={group.id}>
-                <Divider style={{ marginBlockEnd: 'var(--pf-t--global--spacer--sm)' }} />
+                <Divider style={{ marginBlockEnd: "var(--pf-t--global--spacer--sm)" }} />
                 <Content component="h3">{group.title}</Content>
                 <Form>
                   {fields.map((field) =>
-                    field.kind === 'bool' ? (
+                    field.kind === "bool" ? (
                       <Switch
                         key={field.key}
                         id={field.key}
@@ -109,10 +109,17 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
                           id={field.key}
                           value={policyInt(draft, field.key)}
                           min={0}
-                          onMinus={() => setField(field.key, clampInt(policyInt(draft, field.key) - 1))}
-                          onPlus={() => setField(field.key, clampInt(policyInt(draft, field.key) + 1))}
+                          onMinus={() =>
+                            setField(field.key, clampInt(policyInt(draft, field.key) - 1))
+                          }
+                          onPlus={() =>
+                            setField(field.key, clampInt(policyInt(draft, field.key) + 1))
+                          }
                           onChange={(event) =>
-                            setField(field.key, clampInt(Number((event.target as HTMLInputElement).value)))
+                            setField(
+                              field.key,
+                              clampInt(Number((event.target as HTMLInputElement).value)),
+                            )
                           }
                           inputName={field.key}
                           inputAriaLabel={field.label}

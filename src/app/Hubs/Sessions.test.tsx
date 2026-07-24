@@ -1,11 +1,11 @@
-import * as React from 'react';
-import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Sessions } from './Sessions';
-import { api } from '@app/utils/vpnrpc_settings';
+import * as React from "react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import { Sessions } from "./Sessions";
+import { api } from "@app/utils/vpnrpc_settings";
 
-vi.mock('@app/utils/vpnrpc_settings', () => ({
+vi.mock("@app/utils/vpnrpc_settings", () => ({
   api: {
     EnumSession: vi.fn(),
     GetSessionStatus: vi.fn(),
@@ -22,12 +22,12 @@ const enumIpTable = api.EnumIpTable as unknown as Mock;
 const deleteSession = api.DeleteSession as unknown as Mock;
 
 const sid = {
-  Name_str: 'SID-ALICE-1',
+  Name_str: "SID-ALICE-1",
   RemoteSession_bool: false,
-  RemoteHostname_str: '',
-  Username_str: 'alice',
-  ClientIP_ip: '10.0.0.5',
-  Hostname_str: 'alice-pc',
+  RemoteHostname_str: "",
+  Username_str: "alice",
+  ClientIP_ip: "10.0.0.5",
+  Hostname_str: "alice-pc",
   MaxNumTcp_u32: 8,
   CurrentNumTcp_u32: 1,
   PacketSize_u64: 123456,
@@ -39,133 +39,139 @@ const sid = {
   VLanId_u32: 0,
 };
 
-describe('Sessions', () => {
+describe("Sessions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('lists sessions with location, user and transfer', async () => {
+  it("lists sessions with location, user and transfer", async () => {
     enumSession.mockResolvedValue({ SessionList: [sid] });
 
     render(<Sessions hub="DEFAULT" />);
 
-    expect(await screen.findByText('SID-ALICE-1')).toBeInTheDocument();
-    expect(screen.getByText('alice')).toBeInTheDocument();
-    expect(screen.getByText('Local')).toBeInTheDocument();
-    expect(screen.getByText('1 / 8')).toBeInTheDocument();
+    expect(await screen.findByText("SID-ALICE-1")).toBeInTheDocument();
+    expect(screen.getByText("alice")).toBeInTheDocument();
+    expect(screen.getByText("Local")).toBeInTheDocument();
+    expect(screen.getByText("1 / 8")).toBeInTheDocument();
     expect(screen.getByText(/123,456 bytes \/ 789 packets/)).toBeInTheDocument();
-    expect(enumSession.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+    expect(enumSession.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT" });
   });
 
-  it('shows an empty state when the hub has no sessions', async () => {
+  it("shows an empty state when the hub has no sessions", async () => {
     enumSession.mockResolvedValue({ SessionList: [] });
 
     render(<Sessions hub="DEFAULT" />);
 
-    expect(await screen.findByText('No active sessions')).toBeInTheDocument();
+    expect(await screen.findByText("No active sessions")).toBeInTheDocument();
   });
 
-  it('shows an error when enumeration fails', async () => {
-    enumSession.mockRejectedValue(new Error('boom'));
+  it("shows an error when enumeration fails", async () => {
+    enumSession.mockRejectedValue(new Error("boom"));
 
     render(<Sessions hub="DEFAULT" />);
 
-    expect(await screen.findByText('Session operation failed')).toBeInTheDocument();
+    expect(await screen.findByText("Session operation failed")).toBeInTheDocument();
   });
 
-  it('opens the detail modal with session status only', async () => {
+  it("opens the detail modal with session status only", async () => {
     enumSession.mockResolvedValue({ SessionList: [sid] });
-    getSessionStatus.mockResolvedValue({ Username_str: 'alice', Connected_bool: true });
+    getSessionStatus.mockResolvedValue({ Username_str: "alice", Connected_bool: true });
     enumMacTable.mockResolvedValue({ MacTable: [] });
     enumIpTable.mockResolvedValue({ IpTable: [] });
     const user = userEvent.setup();
 
     render(<Sessions hub="DEFAULT" />);
-    await screen.findByText('SID-ALICE-1');
-    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Session details' }));
+    await screen.findByText("SID-ALICE-1");
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Session details" }));
 
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('alice')).toBeInTheDocument();
-    expect(within(dialog).queryByText('MAC address table')).not.toBeInTheDocument();
-    expect(within(dialog).queryByText('IP address table')).not.toBeInTheDocument();
-    expect(getSessionStatus.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Name_str: 'SID-ALICE-1' });
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("alice")).toBeInTheDocument();
+    expect(within(dialog).queryByText("MAC address table")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("IP address table")).not.toBeInTheDocument();
+    expect(getSessionStatus.mock.calls[0][0]).toMatchObject({
+      HubName_str: "DEFAULT",
+      Name_str: "SID-ALICE-1",
+    });
     expect(enumMacTable).not.toHaveBeenCalled();
     expect(enumIpTable).not.toHaveBeenCalled();
   });
 
-  it('opens the selected session MAC address table', async () => {
+  it("opens the selected session MAC address table", async () => {
     enumSession.mockResolvedValue({ SessionList: [sid] });
     enumMacTable.mockResolvedValue({
       MacTable: [
         {
           Key_u32: 1,
-          SessionName_str: 'SID-ALICE-1',
-          MacAddress_bin: 'qrvM3e7/', // AA:BB:CC:DD:EE:FF
+          SessionName_str: "SID-ALICE-1",
+          MacAddress_bin: "qrvM3e7/", // AA:BB:CC:DD:EE:FF
           VlanId_u32: 0,
-          CreatedTime_dt: '2026-07-04T10:00:00.000Z',
-          UpdatedTime_dt: '2026-07-04T10:05:00.000Z',
+          CreatedTime_dt: "2026-07-04T10:00:00.000Z",
+          UpdatedTime_dt: "2026-07-04T10:05:00.000Z",
         },
-        { Key_u32: 2, SessionName_str: 'SID-OTHER', MacAddress_bin: '', VlanId_u32: 0 },
+        { Key_u32: 2, SessionName_str: "SID-OTHER", MacAddress_bin: "", VlanId_u32: 0 },
       ],
     });
     enumIpTable.mockResolvedValue({ IpTable: [] });
     const user = userEvent.setup();
 
     render(<Sessions hub="DEFAULT" />);
-    await screen.findByText('SID-ALICE-1');
-    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
-    await user.click(await screen.findByRole('menuitem', { name: 'MAC address table' }));
+    await screen.findByText("SID-ALICE-1");
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "MAC address table" }));
 
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('AA:BB:CC:DD:EE:FF')).toBeInTheDocument();
-    expect(within(dialog).queryByText('SID-OTHER')).not.toBeInTheDocument();
-    expect(enumMacTable.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("AA:BB:CC:DD:EE:FF")).toBeInTheDocument();
+    expect(within(dialog).queryByText("SID-OTHER")).not.toBeInTheDocument();
+    expect(enumMacTable.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT" });
   });
 
-  it('opens the selected session IP address table', async () => {
+  it("opens the selected session IP address table", async () => {
     enumSession.mockResolvedValue({ SessionList: [sid] });
     enumMacTable.mockResolvedValue({ MacTable: [] });
     enumIpTable.mockResolvedValue({
       IpTable: [
         {
           Key_u32: 1,
-          SessionName_str: 'SID-ALICE-1',
-          IpAddress_ip: '192.168.30.10',
+          SessionName_str: "SID-ALICE-1",
+          IpAddress_ip: "192.168.30.10",
           DhcpAllocated_bool: true,
-          CreatedTime_dt: '2026-07-04T10:00:00.000Z',
-          UpdatedTime_dt: '2026-07-04T10:05:00.000Z',
+          CreatedTime_dt: "2026-07-04T10:00:00.000Z",
+          UpdatedTime_dt: "2026-07-04T10:05:00.000Z",
         },
-        { Key_u32: 2, SessionName_str: 'SID-OTHER', IpAddress_ip: '192.168.30.11' },
+        { Key_u32: 2, SessionName_str: "SID-OTHER", IpAddress_ip: "192.168.30.11" },
       ],
     });
     const user = userEvent.setup();
 
     render(<Sessions hub="DEFAULT" />);
-    await screen.findByText('SID-ALICE-1');
-    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
-    await user.click(await screen.findByRole('menuitem', { name: 'IP address table' }));
+    await screen.findByText("SID-ALICE-1");
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "IP address table" }));
 
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('192.168.30.10')).toBeInTheDocument();
-    expect(within(dialog).queryByText('SID-OTHER')).not.toBeInTheDocument();
-    expect(enumIpTable.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT' });
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("192.168.30.10")).toBeInTheDocument();
+    expect(within(dialog).queryByText("SID-OTHER")).not.toBeInTheDocument();
+    expect(enumIpTable.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT" });
   });
 
-  it('disconnects a session after confirmation', async () => {
+  it("disconnects a session after confirmation", async () => {
     enumSession.mockResolvedValue({ SessionList: [sid] });
     deleteSession.mockResolvedValue({});
     const user = userEvent.setup();
 
     render(<Sessions hub="DEFAULT" />);
-    await screen.findByText('SID-ALICE-1');
-    await user.click(await screen.findByRole('button', { name: /kebab toggle/i }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Disconnect' }));
+    await screen.findByText("SID-ALICE-1");
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Disconnect" }));
 
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Disconnect' }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Disconnect" }));
 
     expect(deleteSession).toHaveBeenCalledOnce();
-    expect(deleteSession.mock.calls[0][0]).toMatchObject({ HubName_str: 'DEFAULT', Name_str: 'SID-ALICE-1' });
+    expect(deleteSession.mock.calls[0][0]).toMatchObject({
+      HubName_str: "DEFAULT",
+      Name_str: "SID-ALICE-1",
+    });
   });
 });

@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -14,14 +14,14 @@ import {
   HelperTextItem,
   Spinner,
   TextInput,
-} from '@patternfly/react-core';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { ActionCard } from '@app/components/ActionCard';
-import { api } from '@app/utils/vpnrpc_settings';
-import { HubAdminOptions } from '@app/Hubs/HubAdminOptions';
-import { HubExtendedOptions } from '@app/Hubs/HubExtendedOptions';
-import { HubMessage } from '@app/Hubs/HubMessage';
-import { HubSourceAccessControl } from '@app/Hubs/HubSourceAccessControl';
+} from "@patternfly/react-core";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { ActionCard } from "@app/components/ActionCard";
+import { api } from "@app/utils/vpnrpc_settings";
+import { HubAdminOptions } from "@app/Hubs/HubAdminOptions";
+import { HubExtendedOptions } from "@app/Hubs/HubExtendedOptions";
+import { HubMessage } from "@app/Hubs/HubMessage";
+import { HubSourceAccessControl } from "@app/Hubs/HubSourceAccessControl";
 
 const settingsTrigger = (title: string, description: string) => {
   const SettingsTrigger = (open: () => void) => (
@@ -36,11 +36,11 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [config, setConfig] = React.useState<Record<string, unknown> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
-  const [newPassword, setNewPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState("");
 
   const load = React.useCallback(() => {
     setError(null);
-    setNewPassword('');
+    setNewPassword("");
     api
       .GetHub(new VPN.VpnRpcCreateHub({ HubName_str: hub }))
       .then((response) => setConfig(response as unknown as Record<string, unknown>))
@@ -51,7 +51,8 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     load();
   }, [load]);
 
-  const setField = (key: string, value: unknown) => setConfig((prev) => (prev ? { ...prev, [key]: value } : prev));
+  const setField = (key: string, value: unknown) =>
+    setConfig((prev) => (prev ? { ...prev, [key]: value } : prev));
 
   const save = () => {
     if (!config) {
@@ -83,13 +84,18 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <Flex
-      direction={{ default: 'column' }}
-      gap={{ default: 'gapMd' }}
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
+      <Flex justifyContent={{ default: "justifyContentFlexEnd" }} gap={{ default: "gapSm" }}>
         <FlexItem>
-          <Button variant="primary" onClick={save} isDisabled={config === null || saving} isLoading={saving}>
+          <Button
+            variant="primary"
+            onClick={save}
+            isDisabled={config === null || saving}
+            isLoading={saving}
+          >
             Save
           </Button>
         </FlexItem>
@@ -107,14 +113,14 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </Bullseye>
       ) : config !== null ? (
         <>
-          <Form style={{ maxWidth: '32rem' }}>
+          <Form style={{ maxWidth: "32rem" }}>
             <FormGroup label="Max sessions" fieldId="hub-maxsession">
               <TextInput
                 type="number"
                 id="hub-maxsession"
                 min={0}
                 value={String(config.MaxSession_u32 ?? 0)}
-                onChange={(_event, value) => setField('MaxSession_u32', Number(value) || 0)}
+                onChange={(_event, value) => setField("MaxSession_u32", Number(value) || 0)}
                 aria-label="Max sessions"
               />
               <FormHelperText>
@@ -128,7 +134,7 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 id="hub-noenum"
                 label="Hide this hub from anonymous enumeration"
                 isChecked={Boolean(config.NoEnum_bool)}
-                onChange={(_event, checked) => setField('NoEnum_bool', checked)}
+                onChange={(_event, checked) => setField("NoEnum_bool", checked)}
               />
             </FormGroup>
             <FormGroup label="New admin password" fieldId="hub-password">
@@ -145,31 +151,44 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <section>
             <Content component="h2">Related hub settings</Content>
             <Content component="p">
-              Open focused tools for settings that are related to this hub but managed in their own dialogs.
+              Open focused tools for settings that are related to this hub but managed in their own
+              dialogs.
             </Content>
             <div
               style={{
-                display: 'grid',
-                gap: 'var(--pf-t--global--spacer--md)',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))',
-                marginBlockStart: 'var(--pf-t--global--spacer--md)',
+                display: "grid",
+                gap: "var(--pf-t--global--spacer--md)",
+                gridTemplateColumns: "repeat(auto-fit, minmax(16rem, 1fr))",
+                marginBlockStart: "var(--pf-t--global--spacer--md)",
               }}
             >
               <HubMessage
                 hub={hub}
-                trigger={settingsTrigger('Set the Message', 'Show a short notice to clients when they connect.')}
+                trigger={settingsTrigger(
+                  "Set the Message",
+                  "Show a short notice to clients when they connect.",
+                )}
               />
               <HubAdminOptions
                 hub={hub}
-                trigger={settingsTrigger('Administration Options', 'Configure limits and permissions for hub administrators.')}
+                trigger={settingsTrigger(
+                  "Administration Options",
+                  "Configure limits and permissions for hub administrators.",
+                )}
               />
               <HubExtendedOptions
                 hub={hub}
-                trigger={settingsTrigger('Extended Options', 'Tune low-level hub behavior and compatibility switches.')}
+                trigger={settingsTrigger(
+                  "Extended Options",
+                  "Tune low-level hub behavior and compatibility switches.",
+                )}
               />
               <HubSourceAccessControl
                 hub={hub}
-                trigger={settingsTrigger('Source IP Access Control', 'Restrict access to this hub by source address.')}
+                trigger={settingsTrigger(
+                  "Source IP Access Control",
+                  "Restrict access to this hub by source address.",
+                )}
               />
             </div>
           </section>

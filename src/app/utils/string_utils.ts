@@ -1,5 +1,5 @@
 export function split_string_by_capitalization(input_string: string): string {
-  let newstring = '';
+  let newstring = "";
   let last_index_allowed = 0;
   const caps: number[] = [];
 
@@ -8,7 +8,7 @@ export function split_string_by_capitalization(input_string: string): string {
       caps.push(c);
     }
 
-    if (input_string[c] == '_') {
+    if (input_string[c] == "_") {
       last_index_allowed = c;
     }
   }
@@ -16,7 +16,7 @@ export function split_string_by_capitalization(input_string: string): string {
   for (let i = 0; i < caps.length; i++) {
     if (i < caps.length - 1) {
       newstring = newstring + input_string.slice(caps[i], caps[i + 1]);
-      newstring = newstring + ' ';
+      newstring = newstring + " ";
     }
   }
 
@@ -29,26 +29,26 @@ export function split_string_by_capitalization(input_string: string): string {
 
 export function mode_to_string(mode: number): string {
   if (mode == 0) {
-    return 'Standalone Mode';
+    return "Standalone Mode";
   }
 
   if (mode == 1) {
-    return 'Cluster Controller';
+    return "Cluster Controller";
   }
 
   if (mode == 2) {
-    return 'Cluster Member Server';
+    return "Cluster Member Server";
   }
 
-  return '';
+  return "";
 }
 
 export function crt_field2object(asn_string: string): Record<string, string> {
-  const splitted = asn_string.split(', ');
+  const splitted = asn_string.split(", ");
   const object: Record<string, string> = {};
 
   splitted.forEach((element) => {
-    const tmp = element.split('=');
+    const tmp = element.split("=");
     object[tmp[0]] = tmp[1];
   });
   return object;
@@ -56,7 +56,7 @@ export function crt_field2object(asn_string: string): Record<string, string> {
 
 export function truncate_qm(location: string): string {
   let result = location;
-  const qm_index = location.indexOf('?');
+  const qm_index = location.indexOf("?");
   if (qm_index != -1) {
     result = location.slice(0, qm_index);
   }

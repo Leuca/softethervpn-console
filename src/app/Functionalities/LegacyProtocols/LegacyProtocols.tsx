@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -18,12 +18,12 @@ import {
   StackItem,
   Switch,
   TextInput,
-} from '@patternfly/react-core';
-import { useNavigate } from 'react-router-dom';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { AppPage } from '@app/components/AppPage';
-import { binToBytes, downloadBlob } from '@app/utils/blob_utils';
+} from "@patternfly/react-core";
+import { useNavigate } from "react-router-dom";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { AppPage } from "@app/components/AppPage";
+import { binToBytes, downloadBlob } from "@app/utils/blob_utils";
 
 type Config = Record<string, unknown>;
 
@@ -51,8 +51,10 @@ const LegacyProtocols: React.FunctionComponent = () => {
     load();
   }, [load]);
 
-  const setIpsecField = (key: string, value: unknown) => setIpsec((prev) => (prev ? { ...prev, [key]: value } : prev));
-  const setOvpnField = (key: string, value: unknown) => setOvpn((prev) => (prev ? { ...prev, [key]: value } : prev));
+  const setIpsecField = (key: string, value: unknown) =>
+    setIpsec((prev) => (prev ? { ...prev, [key]: value } : prev));
+  const setOvpnField = (key: string, value: unknown) =>
+    setOvpn((prev) => (prev ? { ...prev, [key]: value } : prev));
 
   const save = () => {
     if (!ipsec || !ovpn) {
@@ -62,7 +64,11 @@ const LegacyProtocols: React.FunctionComponent = () => {
     setError(null);
     api
       .SetIPsecServices(new VPN.VpnIPsecServices(ipsec as Partial<VPN.VpnIPsecServices>))
-      .then(() => api.SetOpenVpnSstpConfig(new VPN.VpnOpenVpnSstpConfig(ovpn as Partial<VPN.VpnOpenVpnSstpConfig>)))
+      .then(() =>
+        api.SetOpenVpnSstpConfig(
+          new VPN.VpnOpenVpnSstpConfig(ovpn as Partial<VPN.VpnOpenVpnSstpConfig>),
+        ),
+      )
       .then(() => {
         setSaving(false);
         load();
@@ -79,7 +85,7 @@ const LegacyProtocols: React.FunctionComponent = () => {
       .then((response) => {
         const bytes = binToBytes(response.Buffer_bin);
         if (bytes) {
-          downloadBlob(new Blob([bytes], { type: 'application/zip' }), 'OpenVPN_Sample_Config.zip');
+          downloadBlob(new Blob([bytes], { type: "application/zip" }), "OpenVPN_Sample_Config.zip");
         }
       })
       .catch((e) => setError(String(e)));
@@ -120,25 +126,25 @@ const LegacyProtocols: React.FunctionComponent = () => {
                     id="l2tp-ipsec"
                     label="Enable L2TP over IPsec"
                     isChecked={ipsec.L2TP_IPsec_bool === true}
-                    onChange={(_event, checked) => setIpsecField('L2TP_IPsec_bool', checked)}
+                    onChange={(_event, checked) => setIpsecField("L2TP_IPsec_bool", checked)}
                   />
                   <Switch
                     id="l2tp-raw"
                     label="Enable L2TP without IPsec (raw, no encryption)"
                     isChecked={ipsec.L2TP_Raw_bool === true}
-                    onChange={(_event, checked) => setIpsecField('L2TP_Raw_bool', checked)}
+                    onChange={(_event, checked) => setIpsecField("L2TP_Raw_bool", checked)}
                   />
                   <Switch
                     id="etherip-ipsec"
                     label="Enable EtherIP / L2TPv3 over IPsec"
                     isChecked={ipsec.EtherIP_IPsec_bool === true}
-                    onChange={(_event, checked) => setIpsecField('EtherIP_IPsec_bool', checked)}
+                    onChange={(_event, checked) => setIpsecField("EtherIP_IPsec_bool", checked)}
                   />
                   <FormGroup label="IPsec pre-shared key" fieldId="ipsec-secret">
                     <TextInput
                       id="ipsec-secret"
-                      value={String(ipsec.IPsec_Secret_str ?? '')}
-                      onChange={(_event, value) => setIpsecField('IPsec_Secret_str', value)}
+                      value={String(ipsec.IPsec_Secret_str ?? "")}
+                      onChange={(_event, value) => setIpsecField("IPsec_Secret_str", value)}
                       aria-label="IPsec pre-shared key"
                     />
                     <HelperText>
@@ -150,8 +156,8 @@ const LegacyProtocols: React.FunctionComponent = () => {
                   <FormGroup label="Default Virtual Hub for L2TP" fieldId="l2tp-hub">
                     <FormSelect
                       id="l2tp-hub"
-                      value={String(ipsec.L2TP_DefaultHub_str ?? '')}
-                      onChange={(_event, value) => setIpsecField('L2TP_DefaultHub_str', value)}
+                      value={String(ipsec.L2TP_DefaultHub_str ?? "")}
+                      onChange={(_event, value) => setIpsecField("L2TP_DefaultHub_str", value)}
                       aria-label="Default Virtual Hub for L2TP"
                     >
                       {hubs.map((h) => (
@@ -168,11 +174,17 @@ const LegacyProtocols: React.FunctionComponent = () => {
             <Card>
               <CardTitle>EtherIP / L2TPv3 server (site-to-site)</CardTitle>
               <CardBody>
-                <Content component="p" style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}>
-                  Routers that support EtherIP / L2TPv3 over IPsec can bridge a remote site into a Virtual Hub. Each
-                  client router is identified by its IPsec Phase 1 ID.
+                <Content
+                  component="p"
+                  style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}
+                >
+                  Routers that support EtherIP / L2TPv3 over IPsec can bridge a remote site into a
+                  Virtual Hub. Each client router is identified by its IPsec Phase 1 ID.
                 </Content>
-                <Button variant="secondary" onClick={() => navigate('/functionalities/legacyprotocols/etherip')}>
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate("/functionalities/legacyprotocols/etherip")}
+                >
                   EtherIP / L2TPv3 detailed settings
                 </Button>
               </CardBody>
@@ -188,24 +200,26 @@ const LegacyProtocols: React.FunctionComponent = () => {
                     id="openvpn"
                     label="Enable OpenVPN clone server function"
                     isChecked={ovpn.EnableOpenVPN_bool === true}
-                    onChange={(_event, checked) => setOvpnField('EnableOpenVPN_bool', checked)}
+                    onChange={(_event, checked) => setOvpnField("EnableOpenVPN_bool", checked)}
                   />
                   <FormGroup label="OpenVPN UDP ports" fieldId="openvpn-ports">
                     <TextInput
                       id="openvpn-ports"
-                      value={String(ovpn.OpenVPNPortList_str ?? '')}
-                      onChange={(_event, value) => setOvpnField('OpenVPNPortList_str', value)}
+                      value={String(ovpn.OpenVPNPortList_str ?? "")}
+                      onChange={(_event, value) => setOvpnField("OpenVPNPortList_str", value)}
                       aria-label="OpenVPN UDP ports"
                     />
                     <HelperText>
-                      <HelperTextItem>Comma-separated UDP port numbers (for example 1194).</HelperTextItem>
+                      <HelperTextItem>
+                        Comma-separated UDP port numbers (for example 1194).
+                      </HelperTextItem>
                     </HelperText>
                   </FormGroup>
                   <Switch
                     id="sstp"
                     label="Enable Microsoft SSTP VPN clone server function"
                     isChecked={ovpn.EnableSSTP_bool === true}
-                    onChange={(_event, checked) => setOvpnField('EnableSSTP_bool', checked)}
+                    onChange={(_event, checked) => setOvpnField("EnableSSTP_bool", checked)}
                   />
                   <FormGroup label="OpenVPN sample configuration" fieldId="openvpn-config">
                     <Button variant="secondary" onClick={downloadConfig}>

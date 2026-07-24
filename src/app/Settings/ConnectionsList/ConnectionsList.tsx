@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -13,15 +13,15 @@ import {
   ModalHeader,
   ModalVariant,
   Spinner,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { AppPage } from '@app/components/AppPage';
-import { KeyValueTable } from '@app/components/KeyValueTable';
-import { connectionTypeLabel, formatRpcValue } from '@app/utils/format';
-import { useAutoRefresh } from '@app/utils/useAutoRefresh';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { AppPage } from "@app/components/AppPage";
+import { KeyValueTable } from "@app/components/KeyValueTable";
+import { connectionTypeLabel, formatRpcValue } from "@app/utils/format";
+import { useAutoRefresh } from "@app/utils/useAutoRefresh";
 
 interface DetailState {
   name: string;
@@ -41,7 +41,13 @@ const ConnectionsList: React.FunctionComponent = () => {
     () => api.EnumConnection().then((response) => response.ConnectionList ?? []),
     [],
   );
-  const { data: connections, error, refreshing, lastUpdated, load } = useAutoRefresh(fetchConnections);
+  const {
+    data: connections,
+    error,
+    refreshing,
+    lastUpdated,
+    load,
+  } = useAutoRefresh(fetchConnections);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<DetailState | null>(null);
   const [pendingDisconnect, setPendingDisconnect] = React.useState<string | null>(null);
@@ -51,7 +57,9 @@ const ConnectionsList: React.FunctionComponent = () => {
     setDetail({ name, info: null, error: null });
     api
       .GetConnectionInfo(new VPN.VpnRpcConnectionInfo({ Name_str: name }))
-      .then((response) => setDetail({ name, info: response as unknown as Record<string, unknown>, error: null }))
+      .then((response) =>
+        setDetail({ name, info: response as unknown as Record<string, unknown>, error: null }),
+      )
       .catch((e) => setDetail({ name, info: null, error: String(e) }));
   };
 
@@ -83,15 +91,18 @@ const ConnectionsList: React.FunctionComponent = () => {
       title="TCP/IP Connections"
       description="Connections currently established to this VPN server's management and tunneling ports."
     >
-      <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
-        <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
+      <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
+        <Flex
+          justifyContent={{ default: "justifyContentFlexEnd" }}
+          alignItems={{ default: "alignItemsCenter" }}
+        >
           <FlexItem>
-            <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+            <span style={{ color: "var(--pf-t--global--text--color--subtle)" }}>
               {refreshing && connections !== null
-                ? 'Refreshing...'
+                ? "Refreshing..."
                 : lastUpdated
                   ? `Updated ${lastUpdated.toLocaleTimeString()}`
-                  : 'Auto-refreshes every 10s'}
+                  : "Auto-refreshes every 10s"}
             </span>
           </FlexItem>
         </Flex>
@@ -106,50 +117,54 @@ const ConnectionsList: React.FunctionComponent = () => {
           </Bullseye>
         ) : connections !== null && connections.length === 0 ? (
           <EmptyState titleText="No active connections" headingLevel="h2">
-            <EmptyStateBody>There are currently no TCP/IP connections to this server.</EmptyStateBody>
+            <EmptyStateBody>
+              There are currently no TCP/IP connections to this server.
+            </EmptyStateBody>
           </EmptyState>
         ) : connections !== null ? (
           <ScrollableTable aria-label="TCP/IP connections" variant="compact">
-          <Thead>
-            <Tr>
-              <Th>Connection name</Th>
-              <Th>Source</Th>
-              <Th>Connected since</Th>
-              <Th>Type</Th>
-              <Th screenReaderText="Actions" />
-            </Tr>
-          </Thead>
-          <Tbody>
-            {connections.map((conn) => (
-              <Tr key={conn.Name_str}>
-                <Td dataLabel="Connection name">{conn.Name_str}</Td>
-                <Td dataLabel="Source">{`${conn.Hostname_str}:${conn.Port_u32}`}</Td>
-                <Td dataLabel="Connected since">{formatRpcValue('ConnectedTime_dt', conn.ConnectedTime_dt)}</Td>
-                <Td dataLabel="Type">{connectionTypeLabel(conn.Type_u32)}</Td>
-                <Td isActionCell>
-                  <ActionsColumn
-                    items={[
-                      { title: 'Connection details', onClick: () => openDetail(conn.Name_str) },
-                      { isSeparator: true },
-                      { title: 'Disconnect', onClick: () => setPendingDisconnect(conn.Name_str) },
-                    ]}
-                  />
-                </Td>
+            <Thead>
+              <Tr>
+                <Th>Connection name</Th>
+                <Th>Source</Th>
+                <Th>Connected since</Th>
+                <Th>Type</Th>
+                <Th screenReaderText="Actions" />
               </Tr>
-            ))}
-          </Tbody>
+            </Thead>
+            <Tbody>
+              {connections.map((conn) => (
+                <Tr key={conn.Name_str}>
+                  <Td dataLabel="Connection name">{conn.Name_str}</Td>
+                  <Td dataLabel="Source">{`${conn.Hostname_str}:${conn.Port_u32}`}</Td>
+                  <Td dataLabel="Connected since">
+                    {formatRpcValue("ConnectedTime_dt", conn.ConnectedTime_dt)}
+                  </Td>
+                  <Td dataLabel="Type">{connectionTypeLabel(conn.Type_u32)}</Td>
+                  <Td isActionCell>
+                    <ActionsColumn
+                      items={[
+                        { title: "Connection details", onClick: () => openDetail(conn.Name_str) },
+                        { isSeparator: true },
+                        { title: "Disconnect", onClick: () => setPendingDisconnect(conn.Name_str) },
+                      ]}
+                    />
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
           </ScrollableTable>
         ) : null}
       </Flex>
 
       <Modal variant={ModalVariant.medium} isOpen={detail !== null} onClose={() => setDetail(null)}>
-        <ModalHeader title={detail ? `Connection: ${detail.name}` : ''} />
+        <ModalHeader title={detail ? `Connection: ${detail.name}` : ""} />
         <ModalBody>
           {detail?.error ? (
             isConnectionGoneError(detail.error) ? (
               <Alert variant="info" title="Connection no longer active" isInline>
-                This connection has already closed, so its details are no longer available. Short-lived management
-                connections close as soon as their request completes.
+                This connection has already closed, so its details are no longer available.
+                Short-lived management connections close as soon as their request completes.
               </Alert>
             ) : (
               <Alert variant="danger" title="Could not load connection details" isInline>
@@ -178,13 +193,23 @@ const ConnectionsList: React.FunctionComponent = () => {
       >
         <ModalHeader title="Disconnect connection" titleIconVariant="warning" />
         <ModalBody>
-          Disconnect <strong>{pendingDisconnect}</strong>? The remote endpoint may reconnect automatically.
+          Disconnect <strong>{pendingDisconnect}</strong>? The remote endpoint may reconnect
+          automatically.
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDisconnect} isLoading={disconnecting} isDisabled={disconnecting}>
+          <Button
+            variant="danger"
+            onClick={confirmDisconnect}
+            isLoading={disconnecting}
+            isDisabled={disconnecting}
+          >
             Disconnect
           </Button>
-          <Button variant="link" onClick={() => setPendingDisconnect(null)} isDisabled={disconnecting}>
+          <Button
+            variant="link"
+            onClick={() => setPendingDisconnect(null)}
+            isDisabled={disconnecting}
+          >
             Cancel
           </Button>
         </ModalFooter>

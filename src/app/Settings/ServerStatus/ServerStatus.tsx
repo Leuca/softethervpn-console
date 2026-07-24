@@ -1,9 +1,9 @@
-import * as React from 'react';
-import { Alert, Bullseye, Flex, FlexItem, Spinner } from '@patternfly/react-core';
-import { api } from '@app/utils/vpnrpc_settings';
-import { AppPage } from '@app/components/AppPage';
-import { KeyValueTable } from '@app/components/KeyValueTable';
-import { useAutoRefresh } from '@app/utils/useAutoRefresh';
+import * as React from "react";
+import { Alert, Bullseye, Flex, FlexItem, Spinner } from "@patternfly/react-core";
+import { api } from "@app/utils/vpnrpc_settings";
+import { AppPage } from "@app/components/AppPage";
+import { KeyValueTable } from "@app/components/KeyValueTable";
+import { useAutoRefresh } from "@app/utils/useAutoRefresh";
 
 const ServerStatus: React.FunctionComponent = () => {
   const fetchStatus = React.useCallback(
@@ -15,16 +15,22 @@ const ServerStatus: React.FunctionComponent = () => {
   const isInitialLoading = status === null && error === null;
 
   return (
-    <AppPage title="Server Status" description="Live runtime statistics reported by the VPN server.">
-      <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
-        <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
+    <AppPage
+      title="Server Status"
+      description="Live runtime statistics reported by the VPN server."
+    >
+      <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
+        <Flex
+          justifyContent={{ default: "justifyContentFlexEnd" }}
+          alignItems={{ default: "alignItemsCenter" }}
+        >
           <FlexItem>
-            <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+            <span style={{ color: "var(--pf-t--global--text--color--subtle)" }}>
               {refreshing && status !== null
-                ? 'Refreshing...'
+                ? "Refreshing..."
                 : lastUpdated
                   ? `Updated ${lastUpdated.toLocaleTimeString()}`
-                  : 'Auto-refreshes every 10s'}
+                  : "Auto-refreshes every 10s"}
             </span>
           </FlexItem>
         </Flex>

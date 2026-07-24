@@ -1,25 +1,25 @@
-import * as React from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { Dashboard } from '@app/Dashboard/Dashboard';
-import { Hubs } from '@app/Hubs/Hubs';
-import { LocalBridge } from '@app/Functionalities/LocalBridge/LocalBridge';
-import { Layer3Switch } from '@app/Functionalities/Layer3Switch/Layer3Switch';
-import { LegacyProtocols } from '@app/Functionalities/LegacyProtocols/LegacyProtocols';
-import { EtherIPDetailed } from '@app/Functionalities/LegacyProtocols/EtherIP';
-import { DynDNS } from '@app/Functionalities/DDNS/DDNS';
-import { VpnAzure } from '@app/Functionalities/VPNAzure/VPNAzure';
-import { Listeners } from '@app/Settings/Listeners/Listeners';
-import { EncryptionNetwork } from '@app/Settings/EncryptionAndNetwork/EncryptionAndNetwork';
-import { ClusterConfig } from '@app/Settings/ClusterConfiguration/ClusterConfiguration';
-import { ClusteringStatus } from '@app/Settings/ClusteringStatus/ClusteringStatus';
-import { EditConfig } from '@app/Settings/EditConfig/EditConfig';
-import { ConnectionsList } from '@app/Settings/ConnectionsList/ConnectionsList';
-import { ServerStatus } from '@app/Settings/ServerStatus/ServerStatus';
-import { About } from '@app/Settings/About/AboutThisServer';
-import { PermissionNotice } from '@app/PermissionNotice/PermissionNotice';
-import { NotFound } from '@app/NotFound/NotFound';
-import { useServer } from '@app/ServerContext';
-import { useDocumentTitle } from '@app/utils/useDocumentTitle';
+import * as React from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Dashboard } from "@app/Dashboard/Dashboard";
+import { Hubs } from "@app/Hubs/Hubs";
+import { LocalBridge } from "@app/Functionalities/LocalBridge/LocalBridge";
+import { Layer3Switch } from "@app/Functionalities/Layer3Switch/Layer3Switch";
+import { LegacyProtocols } from "@app/Functionalities/LegacyProtocols/LegacyProtocols";
+import { EtherIPDetailed } from "@app/Functionalities/LegacyProtocols/EtherIP";
+import { DynDNS } from "@app/Functionalities/DDNS/DDNS";
+import { VpnAzure } from "@app/Functionalities/VPNAzure/VPNAzure";
+import { Listeners } from "@app/Settings/Listeners/Listeners";
+import { EncryptionNetwork } from "@app/Settings/EncryptionAndNetwork/EncryptionAndNetwork";
+import { ClusterConfig } from "@app/Settings/ClusterConfiguration/ClusterConfiguration";
+import { ClusteringStatus } from "@app/Settings/ClusteringStatus/ClusteringStatus";
+import { EditConfig } from "@app/Settings/EditConfig/EditConfig";
+import { ConnectionsList } from "@app/Settings/ConnectionsList/ConnectionsList";
+import { ServerStatus } from "@app/Settings/ServerStatus/ServerStatus";
+import { About } from "@app/Settings/About/AboutThisServer";
+import { PermissionNotice } from "@app/PermissionNotice/PermissionNotice";
+import { NotFound } from "@app/NotFound/NotFound";
+import { useServer } from "@app/ServerContext";
+import { useDocumentTitle } from "@app/utils/useDocumentTitle";
 
 export interface IAppRoute {
   label?: string; // Excluding the label will exclude the route from the nav sidebar in AppLayout
@@ -72,18 +72,21 @@ export const routePermissionReason = (
     return `${capabilityLabel} is not available with this server's capabilities`;
   }
   if (hideAdminOnly && route.isAdmin) {
-    return 'This page requires server administrator privileges';
+    return "This page requires server administrator privileges";
   }
   if (hideNonCluster && route.isCluster === false) {
-    return 'This page is unavailable in cluster mode';
+    return "This page is unavailable in cluster mode";
   }
   if (hideNonBridge && route.isBridge === false) {
-    return 'This page is unavailable in bridge mode';
+    return "This page is unavailable in bridge mode";
   }
   return null;
 };
 
-const RouteGate: React.FunctionComponent<{ route: IAppRoute; children: React.ReactElement }> = ({ route, children }) => {
+const RouteGate: React.FunctionComponent<{ route: IAppRoute; children: React.ReactElement }> = ({
+  route,
+  children,
+}) => {
   const { hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels } = useServer();
   const location = useLocation();
 
@@ -118,137 +121,140 @@ const RouteGate: React.FunctionComponent<{ route: IAppRoute; children: React.Rea
 const routes: AppRouteConfig[] = [
   {
     element: <Dashboard />,
-    path: '/',
-    title: 'SoftEther VPN Console | Main Dashboard',
+    path: "/",
+    title: "SoftEther VPN Console | Main Dashboard",
   },
   {
     element: <Hubs />,
-    label: 'Hubs',
-    path: '/hubs',
-    title: 'SoftEther VPN Console | Hubs',
+    label: "Hubs",
+    path: "/hubs",
+    title: "SoftEther VPN Console | Hubs",
   },
   // The Hubs component is mounted a second time for hub subpaths, so a
   // selected hub resolves without a dedicated route per subsection.
   {
-    capabilityLabel: 'Hubs',
+    capabilityLabel: "Hubs",
     element: <Hubs />,
-    path: '/hubs/:hub',
-    title: 'SoftEther VPN Console | Hubs',
+    path: "/hubs/:hub",
+    title: "SoftEther VPN Console | Hubs",
   },
   {
-    label: 'Functionalities',
+    label: "Functionalities",
     isAdmin: true,
     routes: [
       {
         element: <LocalBridge />,
-        label: 'Local Bridge',
-        path: '/functionalities/localbridge',
-        title: 'SoftEther VPN Console | Local Bridge',
+        label: "Local Bridge",
+        path: "/functionalities/localbridge",
+        title: "SoftEther VPN Console | Local Bridge",
       },
       {
         element: <Layer3Switch />,
-        label: 'Layer 3 Switch',
-        path: '/functionalities/layer3switch',
-        title: 'SoftEther VPN Console | Layer 3 Switch',
+        label: "Layer 3 Switch",
+        path: "/functionalities/layer3switch",
+        title: "SoftEther VPN Console | Layer 3 Switch",
         isBridge: false,
       },
       {
         element: <LegacyProtocols />,
-        label: 'Legacy Protocols',
-        path: '/functionalities/legacyprotocols',
-        title: 'SoftEther VPN Console | Legacy Protocols',
+        label: "Legacy Protocols",
+        path: "/functionalities/legacyprotocols",
+        title: "SoftEther VPN Console | Legacy Protocols",
         isBridge: false,
       },
       {
-        capabilityLabel: 'Legacy Protocols',
+        capabilityLabel: "Legacy Protocols",
         element: <EtherIPDetailed />,
-        path: '/functionalities/legacyprotocols/etherip',
-        title: 'SoftEther VPN Console | EtherIP / L2TPv3 detailed settings',
+        path: "/functionalities/legacyprotocols/etherip",
+        title: "SoftEther VPN Console | EtherIP / L2TPv3 detailed settings",
         isBridge: false,
       },
       {
         element: <DynDNS />,
-        label: 'Dynamic DNS',
-        path: '/functionalities/ddns',
-        title: 'SoftEther VPN Console | Dynamic DNS',
+        label: "Dynamic DNS",
+        path: "/functionalities/ddns",
+        title: "SoftEther VPN Console | Dynamic DNS",
         isBridge: false,
       },
       {
         element: <VpnAzure />,
-        label: 'VPN Azure',
-        path: '/functionalities/vpnazure',
-        title: 'SoftEther VPN Console | VPN Azure',
+        label: "VPN Azure",
+        path: "/functionalities/vpnazure",
+        title: "SoftEther VPN Console | VPN Azure",
         isBridge: false,
       },
     ],
   },
   {
-    label: 'Settings',
+    label: "Settings",
     routes: [
       {
         element: <Listeners />,
-        label: 'Listeners',
-        path: '/settings/listeners',
-        title: 'SoftEther VPN Console | Listeners',
+        label: "Listeners",
+        path: "/settings/listeners",
+        title: "SoftEther VPN Console | Listeners",
         isAdmin: true,
       },
       {
         element: <EncryptionNetwork />,
-        label: 'Encryption And Network',
-        path: '/settings/encryptionandnetwork',
-        title: 'SoftEther VPN Console | Encryption And Network',
+        label: "Encryption And Network",
+        path: "/settings/encryptionandnetwork",
+        title: "SoftEther VPN Console | Encryption And Network",
         isAdmin: true,
       },
       {
         element: <ClusterConfig />,
-        label: 'Clustering Configuration',
-        path: '/settings/clusterconfig',
-        title: 'SoftEther VPN Console | Clustering Configuration',
+        label: "Clustering Configuration",
+        path: "/settings/clusterconfig",
+        title: "SoftEther VPN Console | Clustering Configuration",
         isAdmin: true,
         isBridge: false,
       },
       {
         element: <ClusteringStatus />,
-        label: 'Clustering Status',
-        path: '/settings/clusterstatus',
-        title: 'SoftEther VPN Console | Clustering Status',
+        label: "Clustering Status",
+        path: "/settings/clusterstatus",
+        title: "SoftEther VPN Console | Clustering Status",
       },
       {
         element: <EditConfig />,
-        label: 'Edit Configuration',
-        path: '/settings/editconfig',
-        title: 'SoftEther VPN Console | Edit Config File',
+        label: "Edit Configuration",
+        path: "/settings/editconfig",
+        title: "SoftEther VPN Console | Edit Config File",
         isAdmin: true,
       },
       {
         element: <ConnectionsList />,
-        label: 'Connections List',
-        path: '/settings/connections',
-        title: 'SoftEther VPN Console | Connections List',
+        label: "Connections List",
+        path: "/settings/connections",
+        title: "SoftEther VPN Console | Connections List",
         isAdmin: true,
       },
       {
         element: <ServerStatus />,
-        label: 'Server Status',
-        path: '/settings/serverstatus',
-        title: 'SoftEther VPN Console | Server Status',
+        label: "Server Status",
+        path: "/settings/serverstatus",
+        title: "SoftEther VPN Console | Server Status",
       },
       {
         element: <About />,
-        label: 'About This VPN Server',
-        path: '/settings/about',
-        title: 'SoftEther VPN Console | About This VPN Server',
+        label: "About This VPN Server",
+        path: "/settings/about",
+        title: "SoftEther VPN Console | About This VPN Server",
       },
     ],
   },
   {
     element: <PermissionNotice />,
-    path: '/permission-required',
-    title: 'SoftEther VPN Console | Permission Required',
+    path: "/permission-required",
+    title: "SoftEther VPN Console | Permission Required",
   },
 ];
 
-const TitledRoute: React.FunctionComponent<{ title: string; children: React.ReactElement }> = ({ title, children }) => {
+const TitledRoute: React.FunctionComponent<{ title: string; children: React.ReactElement }> = ({
+  title,
+  children,
+}) => {
   useDocumentTitle(title);
   return children;
 };
@@ -258,7 +264,9 @@ const TitledRoute: React.FunctionComponent<{ title: string; children: React.Reac
 const flattenedRoutes: IAppRoute[] = routes.reduce(
   (flattened, route) => [
     ...flattened,
-    ...(route.routes ? route.routes.map((child) => ({ ...child, isAdmin: child.isAdmin ?? route.isAdmin })) : [route]),
+    ...(route.routes
+      ? route.routes.map((child) => ({ ...child, isAdmin: child.isAdmin ?? route.isAdmin }))
+      : [route]),
   ],
   [] as IAppRoute[],
 );

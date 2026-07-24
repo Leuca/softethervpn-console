@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -26,20 +26,26 @@ import {
   Spinner,
   Switch,
   TextInput,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { PlusCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { binToBytes } from '@app/utils/blob_utils';
-import { capBool, capValue } from '@app/utils/caps';
-import { useServer } from '@app/ServerContext';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { PlusCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { binToBytes } from "@app/utils/blob_utils";
+import { capBool, capValue } from "@app/utils/caps";
+import { useServer } from "@app/ServerContext";
 
-const PROTOCOLS: Record<number, string> = { 0: 'Any', 1: 'ICMPv4', 6: 'TCP', 17: 'UDP', 58: 'ICMPv6' };
+const PROTOCOLS: Record<number, string> = {
+  0: "Any",
+  1: "ICMPv4",
+  6: "TCP",
+  17: "UDP",
+  58: "ICMPv6",
+};
 const KNOWN_PROTOCOLS = new Set([0, 1, 6, 17, 58]);
-const ZERO4 = '0.0.0.0';
-const FULL4 = '255.255.255.255';
+const ZERO4 = "0.0.0.0";
+const FULL4 = "255.255.255.255";
 const MAX_NOTE_LENGTH = 255;
 const MAX_REDIRECT_URL_LENGTH = 255;
 const MAX_DELAY = 10000;
@@ -53,7 +59,7 @@ type RuleDraft = {
   active: boolean;
   priority: string;
   discard: boolean;
-  ipVersion: 'ipv4' | 'ipv6';
+  ipVersion: "ipv4" | "ipv6";
   srcAny: boolean;
   srcIp: string;
   srcMask: string;
@@ -84,7 +90,7 @@ type RuleDraft = {
 };
 
 type EditorState = {
-  mode: 'create' | 'edit' | 'clone';
+  mode: "create" | "edit" | "clone";
   draft: RuleDraft;
 };
 
@@ -99,14 +105,14 @@ type AccessCaps = {
 };
 
 const accessCapsFromServer = (capsList: unknown[]): AccessCaps => ({
-  supportIpv6: capBool(capsList, 'b_support_ipv6_acl'),
-  supportMac: capBool(capsList, 'b_support_check_mac'),
-  supportTcpState: capBool(capsList, 'b_support_check_tcp_state'),
-  supportSimulation: capBool(capsList, 'b_support_ex_acl'),
-  supportRedirect: capBool(capsList, 'b_support_redirect_url_acl'),
-  supportGroups: capBool(capsList, 'b_support_acl_group'),
+  supportIpv6: capBool(capsList, "b_support_ipv6_acl"),
+  supportMac: capBool(capsList, "b_support_check_mac"),
+  supportTcpState: capBool(capsList, "b_support_check_tcp_state"),
+  supportSimulation: capBool(capsList, "b_support_ex_acl"),
+  supportRedirect: capBool(capsList, "b_support_redirect_url_acl"),
+  supportGroups: capBool(capsList, "b_support_acl_group"),
   // Native parity (SmAccessListDlgUpdate): 0 means no rules can be created.
-  maxRules: capValue(capsList, 'i_max_access_lists'),
+  maxRules: capValue(capsList, "i_max_access_lists"),
 });
 
 const parseInteger = (value: string): number | null => {
@@ -120,7 +126,7 @@ const parseInteger = (value: string): number | null => {
 const parseOptionalInteger = (value: string): number => parseInteger(value) ?? 0;
 
 const parseIpv4 = (value: string): number[] | null => {
-  const parts = value.trim().split('.');
+  const parts = value.trim().split(".");
   if (parts.length !== 4) {
     return null;
   }
@@ -144,14 +150,14 @@ const parseIpv4Tail = (value: string): number[] | null => {
 };
 
 const parseIpv6Part = (value: string): number[] | null => {
-  if (value === '') {
+  if (value === "") {
     return [];
   }
-  const pieces = value.split(':');
+  const pieces = value.split(":");
   const groups: number[] = [];
   for (let i = 0; i < pieces.length; i++) {
     const piece = pieces[i];
-    if (piece.includes('.')) {
+    if (piece.includes(".")) {
       if (i !== pieces.length - 1) {
         return null;
       }
@@ -175,7 +181,7 @@ const parseIpv6 = (value: string): Uint8Array | null => {
   if (!text) {
     return null;
   }
-  const split = text.split('::');
+  const split = text.split("::");
   if (split.length > 2) {
     return null;
   }
@@ -202,13 +208,13 @@ const parseIpv6 = (value: string): Uint8Array | null => {
 
 const ipv6ToString = (bytes: Uint8Array | null): string => {
   if (!bytes || bytes.length !== 16) {
-    return '';
+    return "";
   }
   const groups: string[] = [];
   for (let i = 0; i < 16; i += 2) {
     groups.push(((bytes[i] << 8) | bytes[i + 1]).toString(16));
   }
-  return groups.join(':');
+  return groups.join(":");
 };
 
 const ipv6MaskFromPrefix = (prefix: number): Uint8Array => {
@@ -221,7 +227,7 @@ const ipv6MaskFromPrefix = (prefix: number): Uint8Array => {
 
 const parseIpv6Mask = (value: string): Uint8Array | null => {
   const text = value.trim();
-  if (text.startsWith('/')) {
+  if (text.startsWith("/")) {
     const prefix = parseInteger(text.slice(1));
     if (prefix === null || prefix < 0 || prefix > 128) {
       return null;
@@ -264,16 +270,16 @@ const bytesOrZero = (value: unknown, length: number): Uint8Array => {
 
 const macToString = (bytes: Uint8Array | null): string => {
   if (!bytes || bytes.length !== 6) {
-    return '';
+    return "";
   }
   return Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join(':');
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join(":");
 };
 
 const parseMac = (value: string): Uint8Array | null => {
   const text = value.trim();
-  const hex = text.includes(':') || text.includes('-') ? text.split(/[:-]/).join('') : text;
+  const hex = text.includes(":") || text.includes("-") ? text.split(/[:-]/).join("") : text;
   if (!/^[0-9a-fA-F]{12}$/.test(hex)) {
     return null;
   }
@@ -289,38 +295,41 @@ const formatIpv6Mask = (bytes: Uint8Array | null): string => {
   return prefix !== null ? `/${prefix}` : ipv6ToString(bytes);
 };
 
-function endpoint(rule: VPN.VpnAccess, side: 'src' | 'dest'): string {
+function endpoint(rule: VPN.VpnAccess, side: "src" | "dest"): string {
   if (rule.IsIPv6_bool) {
     const record = rule as unknown as Record<string, unknown>;
-    const ip = bytesOrZero(record[side === 'src' ? 'SrcIpAddress6_bin' : 'DestIpAddress6_bin'], 16);
-    const mask = bytesOrZero(record[side === 'src' ? 'SrcSubnetMask6_bin' : 'DestSubnetMask6_bin'], 16);
+    const ip = bytesOrZero(record[side === "src" ? "SrcIpAddress6_bin" : "DestIpAddress6_bin"], 16);
+    const mask = bytesOrZero(
+      record[side === "src" ? "SrcSubnetMask6_bin" : "DestSubnetMask6_bin"],
+      16,
+    );
     if (isZeroBytes(ip, 16) && isZeroBytes(mask, 16)) {
-      return 'any';
+      return "any";
     }
     return `${ipv6ToString(ip)}${formatIpv6Mask(mask)}`;
   }
 
-  const ip = side === 'src' ? rule.SrcIpAddress_ip : rule.DestIpAddress_ip;
-  const mask = side === 'src' ? rule.SrcSubnetMask_ip : rule.DestSubnetMask_ip;
+  const ip = side === "src" ? rule.SrcIpAddress_ip : rule.DestIpAddress_ip;
+  const mask = side === "src" ? rule.SrcSubnetMask_ip : rule.DestSubnetMask_ip;
   if (!ip || ipv4Any(ip, mask)) {
-    return 'any';
+    return "any";
   }
   return mask === FULL4 ? ip : `${ip}/${mask}`;
 }
 
 const portSummary = (rule: VPN.VpnAccess): string => {
   if (rule.Protocol_u32 !== 6 && rule.Protocol_u32 !== 17) {
-    return '-';
+    return "-";
   }
   const source =
     rule.SrcPortStart_u32 === 0
-      ? 'any'
+      ? "any"
       : rule.SrcPortEnd_u32 && rule.SrcPortEnd_u32 !== rule.SrcPortStart_u32
         ? `${rule.SrcPortStart_u32}-${rule.SrcPortEnd_u32}`
         : String(rule.SrcPortStart_u32);
   const destination =
     rule.DestPortStart_u32 === 0
-      ? 'any'
+      ? "any"
       : rule.DestPortEnd_u32 && rule.DestPortEnd_u32 !== rule.DestPortStart_u32
         ? `${rule.DestPortStart_u32}-${rule.DestPortEnd_u32}`
         : String(rule.DestPortStart_u32);
@@ -334,7 +343,7 @@ const nextPriority = (rules: VPN.VpnAccess[] | null): number => {
 
 const defaultRule = (rules: VPN.VpnAccess[] | null, ipv6: boolean): VPN.VpnAccess =>
   new VPN.VpnAccess({
-    Note_utf: '',
+    Note_utf: "",
     Active_bool: true,
     Priority_u32: nextPriority(rules),
     Discard_bool: false,
@@ -352,8 +361,8 @@ const defaultRule = (rules: VPN.VpnAccess[] | null, ipv6: boolean): VPN.VpnAcces
     SrcPortEnd_u32: 0,
     DestPortStart_u32: 0,
     DestPortEnd_u32: 0,
-    SrcUsername_str: '',
-    DestUsername_str: '',
+    SrcUsername_str: "",
+    DestUsername_str: "",
     CheckSrcMac_bool: false,
     SrcMacAddress_bin: new Uint8Array(6),
     SrcMacMask_bin: new Uint8Array(6),
@@ -365,7 +374,7 @@ const defaultRule = (rules: VPN.VpnAccess[] | null, ipv6: boolean): VPN.VpnAcces
     Delay_u32: 0,
     Jitter_u32: 0,
     Loss_u32: 0,
-    RedirectUrl_str: '',
+    RedirectUrl_str: "",
   });
 
 const draftFromRule = (rule: VPN.VpnAccess): RuleDraft => {
@@ -378,51 +387,55 @@ const draftFromRule = (rule: VPN.VpnAccess): RuleDraft => {
   const checkDstMac = Boolean(rule.CheckDstMac_bool);
   return {
     id: rule.Id_u32,
-    note: rule.Note_utf ?? '',
+    note: rule.Note_utf ?? "",
     active: rule.Active_bool,
-    priority: String(rule.Priority_u32 || ''),
+    priority: String(rule.Priority_u32 || ""),
     discard: rule.Discard_bool,
-    ipVersion: rule.IsIPv6_bool ? 'ipv6' : 'ipv4',
-    srcAny: rule.IsIPv6_bool ? isZeroBytes(src6, 16) && isZeroBytes(srcMask6, 16) : ipv4Any(rule.SrcIpAddress_ip, rule.SrcSubnetMask_ip),
+    ipVersion: rule.IsIPv6_bool ? "ipv6" : "ipv4",
+    srcAny: rule.IsIPv6_bool
+      ? isZeroBytes(src6, 16) && isZeroBytes(srcMask6, 16)
+      : ipv4Any(rule.SrcIpAddress_ip, rule.SrcSubnetMask_ip),
     srcIp: rule.IsIPv6_bool ? ipv6ToString(src6) : rule.SrcIpAddress_ip || ZERO4,
     srcMask: rule.IsIPv6_bool ? formatIpv6Mask(srcMask6) : rule.SrcSubnetMask_ip || ZERO4,
-    destAny: rule.IsIPv6_bool ? isZeroBytes(dest6, 16) && isZeroBytes(destMask6, 16) : ipv4Any(rule.DestIpAddress_ip, rule.DestSubnetMask_ip),
+    destAny: rule.IsIPv6_bool
+      ? isZeroBytes(dest6, 16) && isZeroBytes(destMask6, 16)
+      : ipv4Any(rule.DestIpAddress_ip, rule.DestSubnetMask_ip),
     destIp: rule.IsIPv6_bool ? ipv6ToString(dest6) : rule.DestIpAddress_ip || ZERO4,
     destMask: rule.IsIPv6_bool ? formatIpv6Mask(destMask6) : rule.DestSubnetMask_ip || ZERO4,
-    protocolKind: KNOWN_PROTOCOLS.has(rule.Protocol_u32) ? String(rule.Protocol_u32) : 'custom',
-    protocolNumber: String(rule.Protocol_u32 || ''),
-    srcPortStart: rule.SrcPortStart_u32 ? String(rule.SrcPortStart_u32) : '',
-    srcPortEnd: rule.SrcPortEnd_u32 ? String(rule.SrcPortEnd_u32) : '',
-    destPortStart: rule.DestPortStart_u32 ? String(rule.DestPortStart_u32) : '',
-    destPortEnd: rule.DestPortEnd_u32 ? String(rule.DestPortEnd_u32) : '',
-    srcUsername: rule.SrcUsername_str ?? '',
-    destUsername: rule.DestUsername_str ?? '',
+    protocolKind: KNOWN_PROTOCOLS.has(rule.Protocol_u32) ? String(rule.Protocol_u32) : "custom",
+    protocolNumber: String(rule.Protocol_u32 || ""),
+    srcPortStart: rule.SrcPortStart_u32 ? String(rule.SrcPortStart_u32) : "",
+    srcPortEnd: rule.SrcPortEnd_u32 ? String(rule.SrcPortEnd_u32) : "",
+    destPortStart: rule.DestPortStart_u32 ? String(rule.DestPortStart_u32) : "",
+    destPortEnd: rule.DestPortEnd_u32 ? String(rule.DestPortEnd_u32) : "",
+    srcUsername: rule.SrcUsername_str ?? "",
+    destUsername: rule.DestUsername_str ?? "",
     checkSrcMac,
-    srcMac: checkSrcMac ? macToString(bytesOrZero(record.SrcMacAddress_bin, 6)) : '',
-    srcMacMask: checkSrcMac ? macToString(bytesOrZero(record.SrcMacMask_bin, 6)) : '',
+    srcMac: checkSrcMac ? macToString(bytesOrZero(record.SrcMacAddress_bin, 6)) : "",
+    srcMacMask: checkSrcMac ? macToString(bytesOrZero(record.SrcMacMask_bin, 6)) : "",
     checkDstMac,
-    dstMac: checkDstMac ? macToString(bytesOrZero(record.DstMacAddress_bin, 6)) : '',
-    dstMacMask: checkDstMac ? macToString(bytesOrZero(record.DstMacMask_bin, 6)) : '',
+    dstMac: checkDstMac ? macToString(bytesOrZero(record.DstMacAddress_bin, 6)) : "",
+    dstMacMask: checkDstMac ? macToString(bytesOrZero(record.DstMacMask_bin, 6)) : "",
     checkTcpState: rule.CheckTcpState_bool,
     established: rule.Established_bool,
-    delay: rule.Delay_u32 ? String(rule.Delay_u32) : '',
-    jitter: rule.Jitter_u32 ? String(rule.Jitter_u32) : '',
-    loss: rule.Loss_u32 ? String(rule.Loss_u32) : '',
+    delay: rule.Delay_u32 ? String(rule.Delay_u32) : "",
+    jitter: rule.Jitter_u32 ? String(rule.Jitter_u32) : "",
+    loss: rule.Loss_u32 ? String(rule.Loss_u32) : "",
     redirectEnabled: Boolean(rule.RedirectUrl_str),
-    redirectUrl: rule.RedirectUrl_str ?? '',
+    redirectUrl: rule.RedirectUrl_str ?? "",
   };
 };
 
 const selectedProtocol = (draft: RuleDraft): number => {
-  if (draft.protocolKind === 'custom') {
+  if (draft.protocolKind === "custom") {
     return parseOptionalInteger(draft.protocolNumber);
   }
   return Number(draft.protocolKind);
 };
 
 const validatePortRange = (start: string, end: string, label: string, errors: string[]) => {
-  const startValue = start.trim() === '' ? 0 : parseInteger(start);
-  const endValue = end.trim() === '' ? 0 : parseInteger(end);
+  const startValue = start.trim() === "" ? 0 : parseInteger(start);
+  const endValue = end.trim() === "" ? 0 : parseInteger(end);
   if (startValue === null || endValue === null || startValue > 65535 || endValue > 65535) {
     errors.push(`${label} ports must be between 0 and 65535.`);
     return;
@@ -439,68 +452,82 @@ const validateDraft = (draft: RuleDraft, caps: AccessCaps): string[] => {
   const errors: string[] = [];
   const priority = parseInteger(draft.priority);
   if (priority === null || priority < 1) {
-    errors.push('Priority must be 1 or higher.');
+    errors.push("Priority must be 1 or higher.");
   }
   if (draft.note.length > MAX_NOTE_LENGTH) {
     errors.push(`Note must be ${MAX_NOTE_LENGTH} characters or fewer.`);
   }
-  if (draft.ipVersion === 'ipv6' && !caps.supportIpv6) {
-    errors.push('This server does not support IPv6 access list rules.');
-  } else if (draft.ipVersion === 'ipv4') {
+  if (draft.ipVersion === "ipv6" && !caps.supportIpv6) {
+    errors.push("This server does not support IPv6 access list rules.");
+  } else if (draft.ipVersion === "ipv4") {
     if (!draft.srcAny && (!isIpv4(draft.srcIp) || !isIpv4(draft.srcMask))) {
-      errors.push('Source IPv4 address and mask must be valid.');
+      errors.push("Source IPv4 address and mask must be valid.");
     }
     if (!draft.destAny && (!isIpv4(draft.destIp) || !isIpv4(draft.destMask))) {
-      errors.push('Destination IPv4 address and mask must be valid.');
+      errors.push("Destination IPv4 address and mask must be valid.");
     }
   } else {
     if (!draft.srcAny && (!parseIpv6(draft.srcIp) || !parseIpv6Mask(draft.srcMask))) {
-      errors.push('Source IPv6 address and mask must be valid.');
+      errors.push("Source IPv6 address and mask must be valid.");
     }
     if (!draft.destAny && (!parseIpv6(draft.destIp) || !parseIpv6Mask(draft.destMask))) {
-      errors.push('Destination IPv6 address and mask must be valid.');
+      errors.push("Destination IPv6 address and mask must be valid.");
     }
   }
 
-  if (draft.protocolKind === 'custom') {
+  if (draft.protocolKind === "custom") {
     const protocol = parseInteger(draft.protocolNumber);
     if (protocol === null || protocol < 0 || protocol > 255) {
-      errors.push('Protocol number must be between 0 and 255.');
+      errors.push("Protocol number must be between 0 and 255.");
     }
   }
 
   const protocol = selectedProtocol(draft);
   if (protocol === 6 || protocol === 17) {
-    validatePortRange(draft.srcPortStart, draft.srcPortEnd, 'Source', errors);
-    validatePortRange(draft.destPortStart, draft.destPortEnd, 'Destination', errors);
+    validatePortRange(draft.srcPortStart, draft.srcPortEnd, "Source", errors);
+    validatePortRange(draft.destPortStart, draft.destPortEnd, "Destination", errors);
   }
 
-  if (caps.supportMac && draft.checkSrcMac && (!parseMac(draft.srcMac) || !parseMac(draft.srcMacMask))) {
-    errors.push('Source MAC address and mask must be valid.');
+  if (
+    caps.supportMac &&
+    draft.checkSrcMac &&
+    (!parseMac(draft.srcMac) || !parseMac(draft.srcMacMask))
+  ) {
+    errors.push("Source MAC address and mask must be valid.");
   }
-  if (caps.supportMac && draft.checkDstMac && (!parseMac(draft.dstMac) || !parseMac(draft.dstMacMask))) {
-    errors.push('Destination MAC address and mask must be valid.');
+  if (
+    caps.supportMac &&
+    draft.checkDstMac &&
+    (!parseMac(draft.dstMac) || !parseMac(draft.dstMacMask))
+  ) {
+    errors.push("Destination MAC address and mask must be valid.");
   }
   if (caps.supportTcpState && draft.checkTcpState && protocol !== 6) {
-    errors.push('TCP state matching is only available for TCP rules.');
+    errors.push("TCP state matching is only available for TCP rules.");
   }
 
-  const delay = draft.delay.trim() === '' ? 0 : parseInteger(draft.delay);
-  const jitter = draft.jitter.trim() === '' ? 0 : parseInteger(draft.jitter);
-  const loss = draft.loss.trim() === '' ? 0 : parseInteger(draft.loss);
+  const delay = draft.delay.trim() === "" ? 0 : parseInteger(draft.delay);
+  const jitter = draft.jitter.trim() === "" ? 0 : parseInteger(draft.jitter);
+  const loss = draft.loss.trim() === "" ? 0 : parseInteger(draft.loss);
   if (caps.supportSimulation && (delay === null || delay < 0 || delay > MAX_DELAY)) {
     errors.push(`Delay must be between 0 and ${MAX_DELAY} ms.`);
   }
   if (caps.supportSimulation && (jitter === null || jitter < 0 || jitter > MAX_PERCENT)) {
-    errors.push('Jitter must be between 0 and 100 percent.');
+    errors.push("Jitter must be between 0 and 100 percent.");
   }
   if (caps.supportSimulation && (loss === null || loss < 0 || loss > MAX_PERCENT)) {
-    errors.push('Packet loss must be between 0 and 100 percent.');
+    errors.push("Packet loss must be between 0 and 100 percent.");
   }
   if (caps.supportRedirect && draft.redirectEnabled && !draft.discard) {
     const url = draft.redirectUrl.trim();
-    if (!url || (!url.startsWith('http://') && !url.startsWith('https://')) || url.length > MAX_REDIRECT_URL_LENGTH) {
-      errors.push('Redirect URL must start with http:// or https:// and fit within 255 characters.');
+    if (
+      !url ||
+      (!url.startsWith("http://") && !url.startsWith("https://")) ||
+      url.length > MAX_REDIRECT_URL_LENGTH
+    ) {
+      errors.push(
+        "Redirect URL must start with http:// or https:// and fit within 255 characters.",
+      );
     }
   }
   return errors;
@@ -510,10 +537,16 @@ const ruleFromDraft = (draft: RuleDraft, caps: AccessCaps): VPN.VpnAccess => {
   const protocol = selectedProtocol(draft);
   const tcpOrUdp = protocol === 6 || protocol === 17;
   const pass = !draft.discard;
-  const srcIp6 = draft.ipVersion === 'ipv6' && !draft.srcAny ? parseIpv6(draft.srcIp) : new Uint8Array(16);
-  const srcMask6 = draft.ipVersion === 'ipv6' && !draft.srcAny ? parseIpv6Mask(draft.srcMask) : new Uint8Array(16);
-  const destIp6 = draft.ipVersion === 'ipv6' && !draft.destAny ? parseIpv6(draft.destIp) : new Uint8Array(16);
-  const destMask6 = draft.ipVersion === 'ipv6' && !draft.destAny ? parseIpv6Mask(draft.destMask) : new Uint8Array(16);
+  const srcIp6 =
+    draft.ipVersion === "ipv6" && !draft.srcAny ? parseIpv6(draft.srcIp) : new Uint8Array(16);
+  const srcMask6 =
+    draft.ipVersion === "ipv6" && !draft.srcAny ? parseIpv6Mask(draft.srcMask) : new Uint8Array(16);
+  const destIp6 =
+    draft.ipVersion === "ipv6" && !draft.destAny ? parseIpv6(draft.destIp) : new Uint8Array(16);
+  const destMask6 =
+    draft.ipVersion === "ipv6" && !draft.destAny
+      ? parseIpv6Mask(draft.destMask)
+      : new Uint8Array(16);
 
   return new VPN.VpnAccess({
     Id_u32: draft.id,
@@ -521,11 +554,11 @@ const ruleFromDraft = (draft: RuleDraft, caps: AccessCaps): VPN.VpnAccess => {
     Active_bool: draft.active,
     Priority_u32: parseOptionalInteger(draft.priority),
     Discard_bool: draft.discard,
-    IsIPv6_bool: draft.ipVersion === 'ipv6',
-    SrcIpAddress_ip: draft.ipVersion === 'ipv4' && !draft.srcAny ? draft.srcIp.trim() : ZERO4,
-    SrcSubnetMask_ip: draft.ipVersion === 'ipv4' && !draft.srcAny ? draft.srcMask.trim() : ZERO4,
-    DestIpAddress_ip: draft.ipVersion === 'ipv4' && !draft.destAny ? draft.destIp.trim() : ZERO4,
-    DestSubnetMask_ip: draft.ipVersion === 'ipv4' && !draft.destAny ? draft.destMask.trim() : ZERO4,
+    IsIPv6_bool: draft.ipVersion === "ipv6",
+    SrcIpAddress_ip: draft.ipVersion === "ipv4" && !draft.srcAny ? draft.srcIp.trim() : ZERO4,
+    SrcSubnetMask_ip: draft.ipVersion === "ipv4" && !draft.srcAny ? draft.srcMask.trim() : ZERO4,
+    DestIpAddress_ip: draft.ipVersion === "ipv4" && !draft.destAny ? draft.destIp.trim() : ZERO4,
+    DestSubnetMask_ip: draft.ipVersion === "ipv4" && !draft.destAny ? draft.destMask.trim() : ZERO4,
     SrcIpAddress6_bin: srcIp6 ?? new Uint8Array(16),
     SrcSubnetMask6_bin: srcMask6 ?? new Uint8Array(16),
     DestIpAddress6_bin: destIp6 ?? new Uint8Array(16),
@@ -538,17 +571,31 @@ const ruleFromDraft = (draft: RuleDraft, caps: AccessCaps): VPN.VpnAccess => {
     SrcUsername_str: draft.srcUsername.trim(),
     DestUsername_str: draft.destUsername.trim(),
     CheckSrcMac_bool: caps.supportMac && draft.checkSrcMac,
-    SrcMacAddress_bin: caps.supportMac && draft.checkSrcMac ? (parseMac(draft.srcMac) ?? new Uint8Array(6)) : new Uint8Array(6),
-    SrcMacMask_bin: caps.supportMac && draft.checkSrcMac ? (parseMac(draft.srcMacMask) ?? new Uint8Array(6)) : new Uint8Array(6),
+    SrcMacAddress_bin:
+      caps.supportMac && draft.checkSrcMac
+        ? (parseMac(draft.srcMac) ?? new Uint8Array(6))
+        : new Uint8Array(6),
+    SrcMacMask_bin:
+      caps.supportMac && draft.checkSrcMac
+        ? (parseMac(draft.srcMacMask) ?? new Uint8Array(6))
+        : new Uint8Array(6),
     CheckDstMac_bool: caps.supportMac && draft.checkDstMac,
-    DstMacAddress_bin: caps.supportMac && draft.checkDstMac ? (parseMac(draft.dstMac) ?? new Uint8Array(6)) : new Uint8Array(6),
-    DstMacMask_bin: caps.supportMac && draft.checkDstMac ? (parseMac(draft.dstMacMask) ?? new Uint8Array(6)) : new Uint8Array(6),
+    DstMacAddress_bin:
+      caps.supportMac && draft.checkDstMac
+        ? (parseMac(draft.dstMac) ?? new Uint8Array(6))
+        : new Uint8Array(6),
+    DstMacMask_bin:
+      caps.supportMac && draft.checkDstMac
+        ? (parseMac(draft.dstMacMask) ?? new Uint8Array(6))
+        : new Uint8Array(6),
     CheckTcpState_bool: caps.supportTcpState && draft.checkTcpState && protocol === 6,
-    Established_bool: caps.supportTcpState && draft.checkTcpState && protocol === 6 ? draft.established : false,
+    Established_bool:
+      caps.supportTcpState && draft.checkTcpState && protocol === 6 ? draft.established : false,
     Delay_u32: caps.supportSimulation && pass ? parseOptionalInteger(draft.delay) : 0,
     Jitter_u32: caps.supportSimulation && pass ? parseOptionalInteger(draft.jitter) : 0,
     Loss_u32: caps.supportSimulation && pass ? parseOptionalInteger(draft.loss) : 0,
-    RedirectUrl_str: caps.supportRedirect && pass && draft.redirectEnabled ? draft.redirectUrl.trim() : '',
+    RedirectUrl_str:
+      caps.supportRedirect && pass && draft.redirectEnabled ? draft.redirectUrl.trim() : "",
   });
 };
 
@@ -602,7 +649,10 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // EnumAccess rather than from rows loaded earlier: a concurrent change by
   // another administrator is kept instead of silently overwritten. mutate
   // returns null when its target rule no longer exists on the server.
-  const replaceList = (mutate: (fresh: VPN.VpnAccess[]) => VPN.VpnAccess[] | null, onSaved?: () => void) => {
+  const replaceList = (
+    mutate: (fresh: VPN.VpnAccess[]) => VPN.VpnAccess[] | null,
+    onSaved?: () => void,
+  ) => {
     setBusy(true);
     setError(null);
     api
@@ -613,7 +663,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         if (next === null) {
           setRules(fresh);
           setBusy(false);
-          setError('The rule no longer exists on the server; the list has been refreshed.');
+          setError("The rule no longer exists on the server; the list has been refreshed.");
           return undefined;
         }
         return api
@@ -638,24 +688,30 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const toggleActive = (id: number, active: boolean) => {
     replaceList((fresh) =>
       fresh.some((r) => r.Id_u32 === id)
-        ? (fresh.map((r) => (r.Id_u32 === id ? { ...r, Active_bool: active } : r)) as VPN.VpnAccess[])
+        ? (fresh.map((r) =>
+            r.Id_u32 === id ? { ...r, Active_bool: active } : r,
+          ) as VPN.VpnAccess[])
         : null,
     );
   };
 
   const openCreate = (ipv6: boolean) => {
-    setEditor({ mode: 'create', draft: draftFromRule(defaultRule(rules, ipv6)) });
+    setEditor({ mode: "create", draft: draftFromRule(defaultRule(rules, ipv6)) });
   };
 
   const openEdit = (rule: VPN.VpnAccess) => {
-    setEditor({ mode: 'edit', draft: draftFromRule(rule) });
+    setEditor({ mode: "edit", draft: draftFromRule(rule) });
   };
 
   const openClone = (rule: VPN.VpnAccess) => {
     const clone = normalizeRuleForSave(
-      new VPN.VpnAccess({ ...rule, Id_u32: 0, Priority_u32: rules ? clonePriority(rules, rule) : rule.Priority_u32 }),
+      new VPN.VpnAccess({
+        ...rule,
+        Id_u32: 0,
+        Priority_u32: rules ? clonePriority(rules, rule) : rule.Priority_u32,
+      }),
     );
-    setEditor({ mode: 'clone', draft: draftFromRule(clone) });
+    setEditor({ mode: "clone", draft: draftFromRule(clone) });
   };
 
   const setDraft = (patch: Partial<RuleDraft>) =>
@@ -666,7 +722,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       return;
     }
     const rule = ruleFromDraft(editor.draft, caps);
-    if (editor.mode === 'create' || editor.mode === 'clone') {
+    if (editor.mode === "create" || editor.mode === "clone") {
       setBusy(true);
       api
         .AddAccess(new VPN.VpnRpcAddAccess({ HubName_str: hub, AccessListSingle: [rule] }))
@@ -720,13 +776,18 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <Flex
-      direction={{ default: 'column' }}
-      gap={{ default: 'gapMd' }}
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
+      <Flex justifyContent={{ default: "justifyContentFlexEnd" }} gap={{ default: "gapSm" }}>
         <FlexItem>
-          <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => openCreate(false)} isDisabled={isLoading || busy || !canAddRule}>
+          <Button
+            variant="primary"
+            icon={<PlusCircleIcon />}
+            onClick={() => openCreate(false)}
+            isDisabled={isLoading || busy || !canAddRule}
+          >
             New IPv4 rule
           </Button>
         </FlexItem>
@@ -754,10 +815,17 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </Bullseye>
       ) : rules !== null && rules.length === 0 ? (
         <EmptyState titleText="No access list rules" headingLevel="h2">
-          <EmptyStateBody>With no rules, all packets are passed. Rules are evaluated by priority.</EmptyStateBody>
+          <EmptyStateBody>
+            With no rules, all packets are passed. Rules are evaluated by priority.
+          </EmptyStateBody>
           <EmptyStateFooter>
             <EmptyStateActions>
-              <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => openCreate(false)} isDisabled={!canAddRule}>
+              <Button
+                variant="primary"
+                icon={<PlusCircleIcon />}
+                onClick={() => openCreate(false)}
+                isDisabled={!canAddRule}
+              >
                 New IPv4 rule
               </Button>
             </EmptyStateActions>
@@ -784,8 +852,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               <Tr key={rule.Id_u32}>
                 <Td dataLabel="ID">{rule.Id_u32}</Td>
                 <Td dataLabel="Action">
-                  <Label color={rule.Discard_bool ? 'red' : 'green'} isCompact>
-                    {rule.Discard_bool ? 'Discard' : 'Pass'}
+                  <Label color={rule.Discard_bool ? "red" : "green"} isCompact>
+                    {rule.Discard_bool ? "Discard" : "Pass"}
                   </Label>
                 </Td>
                 <Td dataLabel="Status">
@@ -799,17 +867,21 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 </Td>
                 <Td dataLabel="Priority">{rule.Priority_u32.toLocaleString()}</Td>
                 <Td dataLabel="Protocol">{protocolLabel(rule.Protocol_u32)}</Td>
-                <Td dataLabel="Source">{endpoint(rule, 'src')}</Td>
-                <Td dataLabel="Destination">{endpoint(rule, 'dest')}</Td>
+                <Td dataLabel="Source">{endpoint(rule, "src")}</Td>
+                <Td dataLabel="Destination">{endpoint(rule, "dest")}</Td>
                 <Td dataLabel="Ports">{portSummary(rule)}</Td>
-                <Td dataLabel="Memo">{rule.Note_utf || '-'}</Td>
+                <Td dataLabel="Memo">{rule.Note_utf || "-"}</Td>
                 <Td isActionCell>
                   <ActionsColumn
                     items={[
-                      { title: 'Edit', onClick: () => openEdit(rule) },
-                      { title: 'Clone', onClick: () => openClone(rule), isAriaDisabled: !canAddRule },
+                      { title: "Edit", onClick: () => openEdit(rule) },
+                      {
+                        title: "Clone",
+                        onClick: () => openClone(rule),
+                        isAriaDisabled: !canAddRule,
+                      },
                       { isSeparator: true },
-                      { title: 'Delete', onClick: () => setPendingDelete(rule.Id_u32) },
+                      { title: "Delete", onClick: () => setPendingDelete(rule.Id_u32) },
                     ]}
                     isDisabled={busy}
                   />
@@ -823,10 +895,10 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       <Modal variant={ModalVariant.large} isOpen={editor !== null} onClose={() => setEditor(null)}>
         <ModalHeader
           title={
-            editor?.mode === 'create'
-              ? 'New access list rule'
-              : editor?.mode === 'clone'
-                ? 'Clone access list rule'
+            editor?.mode === "create"
+              ? "New access list rule"
+              : editor?.mode === "clone"
+                ? "Clone access list rule"
                 : `Edit access list rule #${draft?.id}`
           }
         />
@@ -839,16 +911,16 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 </Alert>
               )}
               <Alert variant="info" title="Access list rule order" isInline>
-                Rules apply to IP packets passing through this Virtual Hub. Lower priority numbers are evaluated first;
-                packets that do not match any rule are passed.
+                Rules apply to IP packets passing through this Virtual Hub. Lower priority numbers
+                are evaluated first; packets that do not match any rule are passed.
               </Alert>
-              <Flex gap={{ default: 'gapMd' }}>
-                <FlexItem flex={{ default: 'flex_1' }}>
+              <Flex gap={{ default: "gapMd" }}>
+                <FlexItem flex={{ default: "flex_1" }}>
                   <FormGroup label="Action" fieldId="access-action">
                     <FormSelect
                       id="access-action"
-                      value={draft.discard ? 'discard' : 'pass'}
-                      onChange={(_event, value) => setDraft({ discard: value === 'discard' })}
+                      value={draft.discard ? "discard" : "pass"}
+                      onChange={(_event, value) => setDraft({ discard: value === "discard" })}
                       aria-label="Action"
                     >
                       <FormSelectOption value="pass" label="Pass" />
@@ -856,7 +928,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     </FormSelect>
                   </FormGroup>
                 </FlexItem>
-                <FlexItem flex={{ default: 'flex_1' }}>
+                <FlexItem flex={{ default: "flex_1" }}>
                   <FormGroup label="Priority" isRequired fieldId="access-priority">
                     <TextInput
                       id="access-priority"
@@ -873,13 +945,15 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     </FormHelperText>
                   </FormGroup>
                 </FlexItem>
-                <FlexItem flex={{ default: 'flex_1' }}>
+                <FlexItem flex={{ default: "flex_1" }}>
                   <FormGroup label="IP version" fieldId="access-ip-version">
                     <FormSelect
                       id="access-ip-version"
                       value={draft.ipVersion}
-                      onChange={(_event, value) => setDraft({ ipVersion: value as RuleDraft['ipVersion'] })}
-                      isDisabled={editor.mode !== 'create' || !caps.supportIpv6}
+                      onChange={(_event, value) =>
+                        setDraft({ ipVersion: value as RuleDraft["ipVersion"] })
+                      }
+                      isDisabled={editor.mode !== "create" || !caps.supportIpv6}
                       aria-label="IP version"
                     >
                       <FormSelectOption value="ipv4" label="IPv4" />
@@ -899,8 +973,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 />
               </FormGroup>
 
-              <Flex gap={{ default: 'gapLg' }}>
-                <FlexItem flex={{ default: 'flex_1' }}>
+              <Flex gap={{ default: "gapLg" }}>
+                <FlexItem flex={{ default: "flex_1" }}>
                   <FormGroup label="Source" fieldId="access-src-any">
                     <Checkbox
                       id="access-src-any"
@@ -909,8 +983,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                       onChange={(_event, checked) => setDraft({ srcAny: checked })}
                     />
                   </FormGroup>
-                  <Flex gap={{ default: 'gapSm' }}>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                  <Flex gap={{ default: "gapSm" }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <TextInput
                         id="access-src-ip"
                         value={draft.srcIp}
@@ -919,7 +993,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         aria-label="Source IP address"
                       />
                     </FlexItem>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <TextInput
                         id="access-src-mask"
                         value={draft.srcMask}
@@ -932,14 +1006,14 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   <FormHelperText>
                     <HelperText>
                       <HelperTextItem>
-                        {draft.ipVersion === 'ipv6'
-                          ? 'Use an IPv6 mask or /prefix; /128 matches one host.'
-                          : 'Use an IPv4 address and mask; 255.255.255.255 matches one host.'}
+                        {draft.ipVersion === "ipv6"
+                          ? "Use an IPv6 mask or /prefix; /128 matches one host."
+                          : "Use an IPv4 address and mask; 255.255.255.255 matches one host."}
                       </HelperTextItem>
                     </HelperText>
                   </FormHelperText>
                 </FlexItem>
-                <FlexItem flex={{ default: 'flex_1' }}>
+                <FlexItem flex={{ default: "flex_1" }}>
                   <FormGroup label="Destination" fieldId="access-dest-any">
                     <Checkbox
                       id="access-dest-any"
@@ -948,8 +1022,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                       onChange={(_event, checked) => setDraft({ destAny: checked })}
                     />
                   </FormGroup>
-                  <Flex gap={{ default: 'gapSm' }}>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                  <Flex gap={{ default: "gapSm" }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <TextInput
                         id="access-dest-ip"
                         value={draft.destIp}
@@ -958,7 +1032,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         aria-label="Destination IP address"
                       />
                     </FlexItem>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <TextInput
                         id="access-dest-mask"
                         value={draft.destMask}
@@ -971,17 +1045,17 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   <FormHelperText>
                     <HelperText>
                       <HelperTextItem>
-                        {draft.ipVersion === 'ipv6'
-                          ? 'Use an IPv6 mask or /prefix; /128 matches one host.'
-                          : 'Use an IPv4 address and mask; 255.255.255.255 matches one host.'}
+                        {draft.ipVersion === "ipv6"
+                          ? "Use an IPv6 mask or /prefix; /128 matches one host."
+                          : "Use an IPv4 address and mask; 255.255.255.255 matches one host."}
                       </HelperTextItem>
                     </HelperText>
                   </FormHelperText>
                 </FlexItem>
               </Flex>
 
-              <Flex gap={{ default: 'gapMd' }}>
-                <FlexItem flex={{ default: 'flex_1' }}>
+              <Flex gap={{ default: "gapMd" }}>
+                <FlexItem flex={{ default: "flex_1" }}>
                   <FormGroup label="Protocol" fieldId="access-protocol">
                     <FormSelect
                       id="access-protocol"
@@ -998,8 +1072,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     </FormSelect>
                   </FormGroup>
                 </FlexItem>
-                {draft.protocolKind === 'custom' && (
-                  <FlexItem flex={{ default: 'flex_1' }}>
+                {draft.protocolKind === "custom" && (
+                  <FlexItem flex={{ default: "flex_1" }}>
                     <FormGroup label="Protocol number" fieldId="access-protocol-number">
                       <TextInput
                         id="access-protocol-number"
@@ -1017,11 +1091,11 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
               {showPorts && (
                 <>
-                  <Flex gap={{ default: 'gapLg' }}>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                  <Flex gap={{ default: "gapLg" }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="Source ports" fieldId="access-src-port-start">
-                        <Flex gap={{ default: 'gapSm' }}>
-                          <FlexItem flex={{ default: 'flex_1' }}>
+                        <Flex gap={{ default: "gapSm" }}>
+                          <FlexItem flex={{ default: "flex_1" }}>
                             <TextInput
                               id="access-src-port-start"
                               type="number"
@@ -1032,7 +1106,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                               aria-label="Source port start"
                             />
                           </FlexItem>
-                          <FlexItem flex={{ default: 'flex_1' }}>
+                          <FlexItem flex={{ default: "flex_1" }}>
                             <TextInput
                               id="access-src-port-end"
                               type="number"
@@ -1046,10 +1120,10 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         </Flex>
                       </FormGroup>
                     </FlexItem>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="Destination ports" fieldId="access-dest-port-start">
-                        <Flex gap={{ default: 'gapSm' }}>
-                          <FlexItem flex={{ default: 'flex_1' }}>
+                        <Flex gap={{ default: "gapSm" }}>
+                          <FlexItem flex={{ default: "flex_1" }}>
                             <TextInput
                               id="access-dest-port-start"
                               type="number"
@@ -1060,7 +1134,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                               aria-label="Destination port start"
                             />
                           </FlexItem>
-                          <FlexItem flex={{ default: 'flex_1' }}>
+                          <FlexItem flex={{ default: "flex_1" }}>
                             <TextInput
                               id="access-dest-port-end"
                               type="number"
@@ -1077,30 +1151,41 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   </Flex>
                   <FormHelperText>
                     <HelperText>
-                      <HelperTextItem>Blank port fields match any port. To match a single port, set only the start value.</HelperTextItem>
+                      <HelperTextItem>
+                        Blank port fields match any port. To match a single port, set only the start
+                        value.
+                      </HelperTextItem>
                     </HelperText>
                   </FormHelperText>
                 </>
               )}
 
-              <Flex gap={{ default: 'gapLg' }}>
-                <FlexItem flex={{ default: 'flex_1' }}>
-                  <FormGroup label={caps.supportGroups ? 'Source user or group' : 'Source user'} fieldId="access-src-user">
+              <Flex gap={{ default: "gapLg" }}>
+                <FlexItem flex={{ default: "flex_1" }}>
+                  <FormGroup
+                    label={caps.supportGroups ? "Source user or group" : "Source user"}
+                    fieldId="access-src-user"
+                  >
                     <TextInput
                       id="access-src-user"
                       value={draft.srcUsername}
                       onChange={(_event, value) => setDraft({ srcUsername: value })}
-                      aria-label={caps.supportGroups ? 'Source user or group' : 'Source user'}
+                      aria-label={caps.supportGroups ? "Source user or group" : "Source user"}
                     />
                   </FormGroup>
                 </FlexItem>
-                <FlexItem flex={{ default: 'flex_1' }}>
-                  <FormGroup label={caps.supportGroups ? 'Destination user or group' : 'Destination user'} fieldId="access-dest-user">
+                <FlexItem flex={{ default: "flex_1" }}>
+                  <FormGroup
+                    label={caps.supportGroups ? "Destination user or group" : "Destination user"}
+                    fieldId="access-dest-user"
+                  >
                     <TextInput
                       id="access-dest-user"
                       value={draft.destUsername}
                       onChange={(_event, value) => setDraft({ destUsername: value })}
-                      aria-label={caps.supportGroups ? 'Destination user or group' : 'Destination user'}
+                      aria-label={
+                        caps.supportGroups ? "Destination user or group" : "Destination user"
+                      }
                     />
                   </FormGroup>
                 </FlexItem>
@@ -1109,16 +1194,16 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <HelperText>
                   <HelperTextItem>
                     {caps.supportGroups
-                      ? 'User and group filters are optional. Leave both fields blank to match all sessions.'
-                      : 'User filters are optional. Leave both fields blank to match all sessions.'}
+                      ? "User and group filters are optional. Leave both fields blank to match all sessions."
+                      : "User filters are optional. Leave both fields blank to match all sessions."}
                   </HelperTextItem>
                 </HelperText>
               </FormHelperText>
 
               {caps.supportMac && (
                 <>
-                  <Flex gap={{ default: 'gapLg' }}>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                  <Flex gap={{ default: "gapLg" }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="Source MAC" fieldId="access-src-mac-check">
                         <Checkbox
                           id="access-src-mac-check"
@@ -1127,8 +1212,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                           onChange={(_event, checked) => setDraft({ checkSrcMac: checked })}
                         />
                       </FormGroup>
-                      <Flex gap={{ default: 'gapSm' }}>
-                        <FlexItem flex={{ default: 'flex_1' }}>
+                      <Flex gap={{ default: "gapSm" }}>
+                        <FlexItem flex={{ default: "flex_1" }}>
                           <TextInput
                             id="access-src-mac"
                             value={draft.srcMac}
@@ -1137,7 +1222,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                             aria-label="Source MAC address"
                           />
                         </FlexItem>
-                        <FlexItem flex={{ default: 'flex_1' }}>
+                        <FlexItem flex={{ default: "flex_1" }}>
                           <TextInput
                             id="access-src-mac-mask"
                             value={draft.srcMacMask}
@@ -1148,7 +1233,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         </FlexItem>
                       </Flex>
                     </FlexItem>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="Destination MAC" fieldId="access-dst-mac-check">
                         <Checkbox
                           id="access-dst-mac-check"
@@ -1157,8 +1242,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                           onChange={(_event, checked) => setDraft({ checkDstMac: checked })}
                         />
                       </FormGroup>
-                      <Flex gap={{ default: 'gapSm' }}>
-                        <FlexItem flex={{ default: 'flex_1' }}>
+                      <Flex gap={{ default: "gapSm" }}>
+                        <FlexItem flex={{ default: "flex_1" }}>
                           <TextInput
                             id="access-dst-mac"
                             value={draft.dstMac}
@@ -1167,7 +1252,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                             aria-label="Destination MAC address"
                           />
                         </FlexItem>
-                        <FlexItem flex={{ default: 'flex_1' }}>
+                        <FlexItem flex={{ default: "flex_1" }}>
                           <TextInput
                             id="access-dst-mac-mask"
                             value={draft.dstMacMask}
@@ -1183,7 +1268,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     <FormHelperText>
                       <HelperText>
                         <HelperTextItem>
-                          MAC addresses can use FF-FF-FF-FF-FF-FF, FF:FF:FF:FF:FF:FF, or FFFFFFFFFFFF format.
+                          MAC addresses can use FF-FF-FF-FF-FF-FF, FF:FF:FF:FF:FF:FF, or
+                          FFFFFFFFFFFF format.
                         </HelperTextItem>
                       </HelperText>
                     </FormHelperText>
@@ -1192,9 +1278,9 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               )}
 
               {(caps.supportTcpState || caps.supportRedirect) && (
-                <Flex gap={{ default: 'gapLg' }}>
+                <Flex gap={{ default: "gapLg" }}>
                   {caps.supportTcpState && (
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="TCP state" fieldId="access-tcp-state">
                         <Checkbox
                           id="access-tcp-state"
@@ -1205,9 +1291,11 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         />
                         <FormSelect
                           id="access-tcp-state-value"
-                          value={draft.established ? 'established' : 'unestablished'}
+                          value={draft.established ? "established" : "unestablished"}
                           isDisabled={!draft.checkTcpState || !showTcpState}
-                          onChange={(_event, value) => setDraft({ established: value === 'established' })}
+                          onChange={(_event, value) =>
+                            setDraft({ established: value === "established" })
+                          }
                           aria-label="TCP connection state"
                         >
                           <FormSelectOption value="established" label="Established" />
@@ -1215,14 +1303,16 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         </FormSelect>
                         <FormHelperText>
                           <HelperText>
-                            <HelperTextItem>TCP state matching is available only for TCP rules.</HelperTextItem>
+                            <HelperTextItem>
+                              TCP state matching is available only for TCP rules.
+                            </HelperTextItem>
                           </HelperText>
                         </FormHelperText>
                       </FormGroup>
                     </FlexItem>
                   )}
                   {caps.supportRedirect && (
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="HTTP redirect URL" fieldId="access-redirect-enabled">
                         <Checkbox
                           id="access-redirect-enabled"
@@ -1241,8 +1331,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         <FormHelperText>
                           <HelperText>
                             <HelperTextItem>
-                              Redirects apply only to rules with the Pass action. The URL must start with http:// or
-                              https://.
+                              Redirects apply only to rules with the Pass action. The URL must start
+                              with http:// or https://.
                             </HelperTextItem>
                           </HelperText>
                         </FormHelperText>
@@ -1254,8 +1344,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
               {caps.supportSimulation && (
                 <>
-                  <Flex gap={{ default: 'gapMd' }}>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                  <Flex gap={{ default: "gapMd" }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="Delay (ms)" fieldId="access-delay">
                         <TextInput
                           id="access-delay"
@@ -1269,7 +1359,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         />
                       </FormGroup>
                     </FlexItem>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="Jitter (%)" fieldId="access-jitter">
                         <TextInput
                           id="access-jitter"
@@ -1283,7 +1373,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         />
                       </FormGroup>
                     </FlexItem>
-                    <FlexItem flex={{ default: 'flex_1' }}>
+                    <FlexItem flex={{ default: "flex_1" }}>
                       <FormGroup label="Packet loss (%)" fieldId="access-loss">
                         <TextInput
                           id="access-loss"
@@ -1301,8 +1391,9 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   <FormHelperText>
                     <HelperText>
                       <HelperTextItem>
-                        Delay, jitter, and packet loss apply only to matching rules with the Pass action. Delay must be
-                        0-10000 ms; jitter and packet loss must be 0-100 percent.
+                        Delay, jitter, and packet loss apply only to matching rules with the Pass
+                        action. Delay must be 0-10000 ms; jitter and packet loss must be 0-100
+                        percent.
                       </HelperTextItem>
                     </HelperText>
                   </FormHelperText>
@@ -1313,7 +1404,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ModalBody>
         <ModalFooter>
           <Button variant="primary" onClick={saveEditor} isDisabled={busy || validation.length > 0}>
-            {editor?.mode === 'edit' ? 'Save' : 'Create'}
+            {editor?.mode === "edit" ? "Save" : "Create"}
           </Button>
           <Button variant="link" onClick={() => setEditor(null)}>
             Cancel

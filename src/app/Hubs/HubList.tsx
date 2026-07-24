@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
+import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Bullseye,
@@ -20,16 +20,16 @@ import {
   Spinner,
   Switch,
   TextInput,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { PlusCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { useServer } from '@app/ServerContext';
-import { AppPage } from '@app/components/AppPage';
-import { FormErrorAlert } from '@app/components/FormErrorAlert';
-import { formatRpcValue, hubTypeLabel } from '@app/utils/format';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { PlusCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { useServer } from "@app/ServerContext";
+import { AppPage } from "@app/components/AppPage";
+import { FormErrorAlert } from "@app/components/FormErrorAlert";
+import { formatRpcValue, hubTypeLabel } from "@app/utils/format";
 
 const HubList: React.FunctionComponent = () => {
   const navigate = useNavigate();
@@ -40,9 +40,9 @@ const HubList: React.FunctionComponent = () => {
   const [busy, setBusy] = React.useState(false);
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [name, setName] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [confirm, setConfirm] = React.useState('');
+  const [name, setName] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [confirm, setConfirm] = React.useState("");
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
 
@@ -72,15 +72,17 @@ const HubList: React.FunctionComponent = () => {
   };
 
   const setOnline = (hubName: string, online: boolean) =>
-    run(api.SetHubOnline(new VPN.VpnRpcSetHubOnline({ HubName_str: hubName, Online_bool: online })));
+    run(
+      api.SetHubOnline(new VPN.VpnRpcSetHubOnline({ HubName_str: hubName, Online_bool: online })),
+    );
 
   const openCreate = () => {
     if (hideAdminOnly) {
       return;
     }
-    setName('');
-    setPassword('');
-    setConfirm('');
+    setName("");
+    setPassword("");
+    setConfirm("");
     setError(null);
     setCreateOpen(true);
   };
@@ -94,7 +96,7 @@ const HubList: React.FunctionComponent = () => {
     }
     // A standalone server (ServerType 0) only has standalone hubs; on a cluster
     // controller new hubs default to static.
-    const isCluster = Number(info['ServerType_u32'] ?? 0) !== 0;
+    const isCluster = Number(info["ServerType_u32"] ?? 0) !== 0;
     setBusy(true);
     setError(null);
     api
@@ -150,7 +152,7 @@ const HubList: React.FunctionComponent = () => {
           variant="danger"
           title="Hub operation failed"
           isInline
-          style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
+          style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}
         >
           {error}
         </Alert>
@@ -164,8 +166,8 @@ const HubList: React.FunctionComponent = () => {
         <EmptyState titleText="No Virtual Hubs" headingLevel="h2">
           <EmptyStateBody>
             {hideAdminOnly
-              ? 'No Virtual Hubs are visible for this administrator account.'
-              : 'Create a Virtual Hub to start accepting VPN connections.'}
+              ? "No Virtual Hubs are visible for this administrator account."
+              : "Create a Virtual Hub to start accepting VPN connections."}
           </EmptyStateBody>
           {!hideAdminOnly && (
             <EmptyStateFooter>
@@ -217,16 +219,28 @@ const HubList: React.FunctionComponent = () => {
                 <Td dataLabel="Users">{hub.NumUsers_u32.toLocaleString()}</Td>
                 <Td dataLabel="Groups">{hub.NumGroups_u32.toLocaleString()}</Td>
                 <Td dataLabel="Sessions">{hub.NumSessions_u32.toLocaleString()}</Td>
-                <Td dataLabel="Last login">{formatRpcValue('LastLoginTime_dt', hub.LastLoginTime_dt)}</Td>
+                <Td dataLabel="Last login">
+                  {formatRpcValue("LastLoginTime_dt", hub.LastLoginTime_dt)}
+                </Td>
                 <Td isActionCell>
                   <ActionsColumn
                     items={
                       hideAdminOnly
-                        ? [{ title: 'Manage', onClick: () => navigate(`/hubs/${encodeURIComponent(hub.HubName_str)}`) }]
+                        ? [
+                            {
+                              title: "Manage",
+                              onClick: () =>
+                                navigate(`/hubs/${encodeURIComponent(hub.HubName_str)}`),
+                            },
+                          ]
                         : [
-                            { title: 'Manage', onClick: () => navigate(`/hubs/${encodeURIComponent(hub.HubName_str)}`) },
+                            {
+                              title: "Manage",
+                              onClick: () =>
+                                navigate(`/hubs/${encodeURIComponent(hub.HubName_str)}`),
+                            },
                             { isSeparator: true },
-                            { title: 'Delete', onClick: () => setPendingDelete(hub.HubName_str) },
+                            { title: "Delete", onClick: () => setPendingDelete(hub.HubName_str) },
                           ]
                     }
                     isDisabled={busy}
@@ -272,7 +286,7 @@ const HubList: React.FunctionComponent = () => {
                 id="hub-confirm"
                 value={confirm}
                 onChange={(_event, value) => setConfirm(value)}
-                validated={passwordsMatch ? 'default' : 'error'}
+                validated={passwordsMatch ? "default" : "error"}
                 aria-label="Confirm password"
               />
               {!passwordsMatch && (
@@ -284,7 +298,12 @@ const HubList: React.FunctionComponent = () => {
           </Form>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={create} isDisabled={!canCreate || busy} isLoading={busy}>
+          <Button
+            variant="primary"
+            onClick={create}
+            isDisabled={!canCreate || busy}
+            isLoading={busy}
+          >
             Create
           </Button>
           <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={busy}>
@@ -294,11 +313,16 @@ const HubList: React.FunctionComponent = () => {
       </Modal>
 
       {/* Delete confirmation */}
-      <Modal variant={ModalVariant.small} isOpen={!hideAdminOnly && pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={!hideAdminOnly && pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+      >
         <ModalHeader title="Delete Virtual Hub" titleIconVariant="warning" />
         <ModalBody>
-          Delete <strong>{pendingDelete}</strong>? All sessions are terminated and every user, group, certificate and
-          cascade connection in this hub is permanently removed. This cannot be undone.
+          Delete <strong>{pendingDelete}</strong>? All sessions are terminated and every user,
+          group, certificate and cascade connection in this hub is permanently removed. This cannot
+          be undone.
         </ModalBody>
         <ModalFooter>
           <Button variant="danger" onClick={confirmDelete}>

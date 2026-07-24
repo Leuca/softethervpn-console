@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -10,17 +10,18 @@ import {
   ModalHeader,
   ModalVariant,
   Spinner,
-} from '@patternfly/react-core';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { AdminOptionEditor } from '@app/Hubs/AdminOptionEditor';
-import { useServer } from '@app/ServerContext';
-import { capBool } from '@app/utils/caps';
-import { api } from '@app/utils/vpnrpc_settings';
+} from "@patternfly/react-core";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { AdminOptionEditor } from "@app/Hubs/AdminOptionEditor";
+import { useServer } from "@app/ServerContext";
+import { capBool } from "@app/utils/caps";
+import { api } from "@app/utils/vpnrpc_settings";
 
 const canChangeAdminOptions = (user: string, options: VPN.VpnAdminOption[]): boolean =>
-  user === 'Administrator' ||
+  user === "Administrator" ||
   options.some(
-    (option) => option.Name_str.toLowerCase() === 'allow_hub_admin_change_option' && option.Value_u32 !== 0,
+    (option) =>
+      option.Name_str.toLowerCase() === "allow_hub_admin_change_option" && option.Value_u32 !== 0,
   );
 
 interface HubAdminOptionsProps {
@@ -30,7 +31,7 @@ interface HubAdminOptionsProps {
 
 const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, trigger }) => {
   const { capsList, user } = useServer();
-  const supported = capBool(capsList, 'b_support_hub_admin_option');
+  const supported = capBool(capsList, "b_support_hub_admin_option");
   const [open, setOpen] = React.useState(false);
   const [options, setOptions] = React.useState<VPN.VpnAdminOption[] | null>(null);
   const [defaultOptions, setDefaultOptions] = React.useState<VPN.VpnAdminOption[]>([]);
@@ -104,9 +105,13 @@ const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, t
       >
         <ModalHeader title="Virtual Hub Administration Options" />
         <ModalBody>
-          <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+          <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
             {error && (
-              <Alert variant="danger" title="Could not load or save hub administration options" isInline>
+              <Alert
+                variant="danger"
+                title="Could not load or save hub administration options"
+                isInline
+              >
                 {error}
               </Alert>
             )}

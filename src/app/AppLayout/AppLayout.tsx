@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import * as React from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Dropdown,
   DropdownItem,
@@ -20,19 +20,19 @@ import {
   PageSidebarBody,
   PageToggleButton,
   SkipToContent,
-} from '@patternfly/react-core';
-import { BarsIcon, UserIcon } from '@patternfly/react-icons';
-import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from '@app/routes';
-import { useServer } from '@app/ServerContext';
-import { useManagedSession } from '@app/managed/ManagedSessionGate';
-import { accessibleRouteChangeHandler } from '@app/utils/utils';
-import logo from '@app/bgimages/icons8-softether-vpn.svg';
+} from "@patternfly/react-core";
+import { BarsIcon, UserIcon } from "@patternfly/react-icons";
+import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from "@app/routes";
+import { useServer } from "@app/ServerContext";
+import { useManagedSession } from "@app/managed/ManagedSessionGate";
+import { accessibleRouteChangeHandler } from "@app/utils/utils";
+import logo from "@app/bgimages/icons8-softether-vpn.svg";
 
 interface IAppLayout {
   children: React.ReactNode;
 }
 
-const pageId = 'primary-app-container';
+const pageId = "primary-app-container";
 
 const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   // Keep the desktop sidebar user-controlled and stable while treating the
   // narrow sidebar as a dismissible overlay. PatternFly docks the sidebar at
   // its xl breakpoint (1200px).
-  const isMobileView = React.useRef(typeof window !== 'undefined' && window.innerWidth < 1200);
+  const isMobileView = React.useRef(typeof window !== "undefined" && window.innerWidth < 1200);
   const desktopSidebarOpen = React.useRef(true);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => !isMobileView.current);
 
@@ -56,16 +56,16 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   React.useEffect(() => {
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Element | null;
-      if (!isMobileView.current || target?.closest('#nav-toggle')) {
+      if (!isMobileView.current || target?.closest("#nav-toggle")) {
         return;
       }
-      if (target?.closest('#page-sidebar') && !target.closest('a')) {
+      if (target?.closest("#page-sidebar") && !target.closest("a")) {
         return;
       }
       setIsSidebarOpen(false);
     };
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
   }, []);
 
   const isRouteVisible = (route: IAppRoute): boolean =>
@@ -78,10 +78,12 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     });
   const isRouteActive = (route: IAppRoute): boolean =>
     route.path === location.pathname ||
-    (route.path !== '/' && location.pathname.startsWith(`${route.path}/`));
+    (route.path !== "/" && location.pathname.startsWith(`${route.path}/`));
 
   const isGroupVisible = (group: IAppRouteGroup): boolean =>
-    !hiddenLabels.has(group.label) && !(hideAdminOnly && group.isAdmin) && group.routes.some(isRouteVisible);
+    !hiddenLabels.has(group.label) &&
+    !(hideAdminOnly && group.isAdmin) &&
+    group.routes.some(isRouteVisible);
 
   const masthead = (
     <Masthead className="se-masthead">
@@ -109,7 +111,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             <button
               type="button"
               className="se-brand"
-              onClick={() => navigate('/')}
+              onClick={() => navigate("/")}
               aria-label="SoftEther VPN Console home"
             >
               <img src={logo} className="se-brand__logo" alt="" />
@@ -128,7 +130,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
               isOpen={isUserMenuOpen}
               onOpenChange={setIsUserMenuOpen}
               onSelect={() => setIsUserMenuOpen(false)}
-              popperProps={{ position: 'right' }}
+              popperProps={{ position: "right" }}
               toggle={(toggleRef) => (
                 <MenuToggle
                   ref={toggleRef}
@@ -165,7 +167,11 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   );
 
   const renderNavItem = (route: IAppRoute, index: number) => (
-    <NavItem key={`${route.label}-${index}`} id={`${route.label}-${index}`} isActive={isRouteActive(route)}>
+    <NavItem
+      key={`${route.label}-${index}`}
+      id={`${route.label}-${index}`}
+      isActive={isRouteActive(route)}
+    >
       <NavLink to={route.path}>{route.label}</NavLink>
     </NavItem>
   );

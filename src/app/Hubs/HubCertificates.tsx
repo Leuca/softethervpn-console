@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -19,16 +19,16 @@ import {
   ModalVariant,
   Spinner,
   TextInput,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
-import { api } from '@app/utils/vpnrpc_settings';
-import { formatOptionalDate } from '@app/utils/format';
-import { certificateBytesToDer, parseCertificate } from '@app/utils/x509';
-import { binToBytes } from '@app/utils/blob_utils';
-import { recordChanged } from '@app/utils/dirty';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { CertificateModal } from "@app/CertificateViewer/CertificateViewer";
+import { api } from "@app/utils/vpnrpc_settings";
+import { formatOptionalDate } from "@app/utils/format";
+import { certificateBytesToDer, parseCertificate } from "@app/utils/x509";
+import { binToBytes } from "@app/utils/blob_utils";
+import { recordChanged } from "@app/utils/dirty";
 
 interface CrlFormState {
   key: number | null;
@@ -46,21 +46,21 @@ interface CrlFormState {
 }
 
 type PendingDelete =
-  | { kind: 'ca'; item: VPN.VpnRpcHubEnumCAItem }
-  | { kind: 'crl'; item: VPN.VpnRpcEnumCrlItem };
+  | { kind: "ca"; item: VPN.VpnRpcHubEnumCAItem }
+  | { kind: "crl"; item: VPN.VpnRpcEnumCrlItem };
 
 const emptyCrlForm = (): CrlFormState => ({
   key: null,
-  commonName: '',
-  organization: '',
-  unit: '',
-  country: '',
-  state: '',
-  local: '',
-  serial: '',
-  md5: '',
-  sha1: '',
-  certificateFilename: '',
+  commonName: "",
+  organization: "",
+  unit: "",
+  country: "",
+  state: "",
+  local: "",
+  serial: "",
+  md5: "",
+  sha1: "",
+  certificateFilename: "",
   certificateError: null,
 });
 
@@ -68,14 +68,18 @@ const hexFromBytes = (value: unknown): string => {
   const bytes = binToBytes(value);
   return bytes
     ? Array.from(bytes)
-        .map((b) => b.toString(16).padStart(2, '0').toUpperCase())
-        .join(' ')
-    : '';
+        .map((b) => b.toString(16).padStart(2, "0").toUpperCase())
+        .join(" ")
+    : "";
 };
 
-const compactHex = (value: string): string => value.replace(/[\s:.-]/g, '');
+const compactHex = (value: string): string => value.replace(/[\s:.-]/g, "");
 
-const parseHexBytes = (value: string, label: string, expectedLength?: number): { bytes: Uint8Array; error: string | null } => {
+const parseHexBytes = (
+  value: string,
+  label: string,
+  expectedLength?: number,
+): { bytes: Uint8Array; error: string | null } => {
   const hex = compactHex(value);
   if (!hex) {
     return { bytes: new Uint8Array(), error: null };
@@ -93,7 +97,8 @@ const parseHexBytes = (value: string, label: string, expectedLength?: number): {
   return { bytes, error: null };
 };
 
-const rotl32 = (value: number, bits: number): number => ((value << bits) | (value >>> (32 - bits))) >>> 0;
+const rotl32 = (value: number, bits: number): number =>
+  ((value << bits) | (value >>> (32 - bits))) >>> 0;
 
 const sha1 = (data: Uint8Array): Uint8Array => {
   const bitLength = data.length * 8;
@@ -123,7 +128,10 @@ const sha1 = (data: Uint8Array): Uint8Array => {
     for (let i = 0; i < 16; i++) {
       const offset = chunk + i * 4;
       words[i] =
-        ((message[offset] << 24) | (message[offset + 1] << 16) | (message[offset + 2] << 8) | message[offset + 3]) >>>
+        ((message[offset] << 24) |
+          (message[offset + 1] << 16) |
+          (message[offset + 2] << 8) |
+          message[offset + 3]) >>>
         0;
     }
     for (let i = 16; i < 80; i++) {
@@ -177,31 +185,35 @@ const sha1 = (data: Uint8Array): Uint8Array => {
   return digest;
 };
 
-const readCertBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m: string) => void): void => {
+const readCertBytes = (
+  file: File,
+  onBytes: (b: Uint8Array) => void,
+  onError: (m: string) => void,
+): void => {
   const reader = new FileReader();
   reader.onload = () => {
     try {
       onBytes(certificateBytesToDer(new Uint8Array(reader.result as ArrayBuffer)));
     } catch {
-      onError('The file is not a valid certificate (PEM or DER).');
+      onError("The file is not a valid certificate (PEM or DER).");
     }
   };
-  reader.onerror = () => onError('The certificate file could not be read.');
+  reader.onerror = () => onError("The certificate file could not be read.");
   reader.readAsArrayBuffer(file);
 };
 
 const crlFormFromResponse = (response: VPN.VpnRpcCrl): CrlFormState => ({
   key: response.Key_u32,
-  commonName: response.CommonName_utf ?? '',
-  organization: response.Organization_utf ?? '',
-  unit: response.Unit_utf ?? '',
-  country: response.Country_utf ?? '',
-  state: response.State_utf ?? '',
-  local: response.Local_utf ?? '',
+  commonName: response.CommonName_utf ?? "",
+  organization: response.Organization_utf ?? "",
+  unit: response.Unit_utf ?? "",
+  country: response.Country_utf ?? "",
+  state: response.State_utf ?? "",
+  local: response.Local_utf ?? "",
   serial: hexFromBytes(response.Serial_bin),
   md5: hexFromBytes(response.DigestMD5_bin),
   sha1: hexFromBytes(response.DigestSHA1_bin),
-  certificateFilename: '',
+  certificateFilename: "",
   certificateError: null,
 });
 
@@ -224,7 +236,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [certs, setCerts] = React.useState<VPN.VpnRpcHubEnumCAItem[] | null>(null);
   const [crls, setCrls] = React.useState<VPN.VpnRpcEnumCrlItem[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [filename, setFilename] = React.useState('');
+  const [filename, setFilename] = React.useState("");
   const [fileError, setFileError] = React.useState<string | null>(null);
   const [viewCert, setViewCert] = React.useState<Uint8Array | string | null>(null);
   const [pendingDelete, setPendingDelete] = React.useState<PendingDelete | null>(null);
@@ -268,7 +280,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         api
           .AddCa(new VPN.VpnRpcHubAddCA({ HubName_str: hub, Cert_bin: bytes }))
           .then(() => {
-            setFilename('');
+            setFilename("");
             load();
           })
           .catch((e) => setFileError(String(e)))
@@ -297,8 +309,10 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     const pending = pendingDelete;
     setDeleting(true);
     const request =
-      pending.kind === 'ca'
-        ? api.DeleteCa(new VPN.VpnRpcHubDeleteCA({ HubName_str: hub, Key_u32: pending.item.Key_u32 }))
+      pending.kind === "ca"
+        ? api.DeleteCa(
+            new VPN.VpnRpcHubDeleteCA({ HubName_str: hub, Key_u32: pending.item.Key_u32 }),
+          )
         : api.DelCrl(new VPN.VpnRpcCrl({ HubName_str: hub, Key_u32: pending.item.Key_u32 }));
     request
       .then(() => {
@@ -328,7 +342,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   };
 
   const loadCrlCertificate = (_event: unknown, file: File) => {
-    setCrlField('certificateFilename', file.name);
+    setCrlField("certificateFilename", file.name);
     readCertBytes(
       file,
       (bytes) => {
@@ -352,18 +366,19 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               : current,
           );
         } catch {
-          setCrlField('certificateError', 'The file is not a valid certificate (PEM or DER).');
+          setCrlField("certificateError", "The file is not a valid certificate (PEM or DER).");
         }
       },
-      (message) => setCrlField('certificateError', message),
+      (message) => setCrlField("certificateError", message),
     );
   };
 
-  const serialResult = parseHexBytes(crlForm?.serial ?? '', 'Serial');
-  const md5Result = parseHexBytes(crlForm?.md5 ?? '', 'MD5 digest', 16);
-  const sha1Result = parseHexBytes(crlForm?.sha1 ?? '', 'SHA1 digest', 20);
+  const serialResult = parseHexBytes(crlForm?.serial ?? "", "Serial");
+  const md5Result = parseHexBytes(crlForm?.md5 ?? "", "MD5 digest", 16);
+  const sha1Result = parseHexBytes(crlForm?.sha1 ?? "", "SHA1 digest", 20);
   const crlValidationError = serialResult.error ?? md5Result.error ?? sha1Result.error;
-  const crlDirty = crlForm?.key === null || recordChanged(crlComparable(crlOriginal), crlComparable(crlForm));
+  const crlDirty =
+    crlForm?.key === null || recordChanged(crlComparable(crlOriginal), crlComparable(crlForm));
   const crlHasMatcher =
     crlForm !== null &&
     [
@@ -376,7 +391,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       compactHex(crlForm.serial),
       compactHex(crlForm.md5),
       compactHex(crlForm.sha1),
-    ].some((value) => value.trim() !== '');
+    ].some((value) => value.trim() !== "");
 
   const saveCrl = () => {
     if (!crlForm || crlValidationError || !crlHasMatcher) {
@@ -411,12 +426,12 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <Flex
-      direction={{ default: 'column' }}
-      gap={{ default: 'gapMd' }}
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} gap={{ default: 'gapMd' }}>
-        <FlexItem grow={{ default: 'grow' }}>
+      <Flex justifyContent={{ default: "justifyContentSpaceBetween" }} gap={{ default: "gapMd" }}>
+        <FlexItem grow={{ default: "grow" }}>
           <Form>
             <FormGroup label="Add trusted CA certificate" fieldId="trusted-ca-upload">
               <FileUpload
@@ -428,10 +443,12 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 hideDefaultPreview
                 onFileInputChange={addCert}
                 onClearClick={() => {
-                  setFilename('');
+                  setFilename("");
                   setFileError(null);
                 }}
-                dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
+                dropzoneProps={{
+                  accept: { "application/x-x509-ca-cert": [".cer", ".crt", ".cert", ".pem"] },
+                }}
                 filenameAriaLabel="CA certificate file name"
               />
               {fileError && (
@@ -456,7 +473,9 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </Bullseye>
       ) : certs !== null && certs.length === 0 ? (
         <EmptyState titleText="No trusted CA certificates" headingLevel="h2">
-          <EmptyStateBody>No hub-specific CA certificates are configured for this Virtual Hub.</EmptyStateBody>
+          <EmptyStateBody>
+            No hub-specific CA certificates are configured for this Virtual Hub.
+          </EmptyStateBody>
         </EmptyState>
       ) : certs !== null ? (
         <ScrollableTable aria-label="Trusted CA certificates" variant="compact">
@@ -471,14 +490,17 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <Tbody>
             {certs.map((cert) => (
               <Tr key={cert.Key_u32}>
-                <Td dataLabel="Subject">{cert.SubjectName_utf || '-'}</Td>
-                <Td dataLabel="Issuer">{cert.IssuerName_utf || '-'}</Td>
-                <Td dataLabel="Expires">{formatOptionalDate(cert.Expires_dt, '-')}</Td>
+                <Td dataLabel="Subject">{cert.SubjectName_utf || "-"}</Td>
+                <Td dataLabel="Issuer">{cert.IssuerName_utf || "-"}</Td>
+                <Td dataLabel="Expires">{formatOptionalDate(cert.Expires_dt, "-")}</Td>
                 <Td isActionCell>
                   <ActionsColumn
                     items={[
-                      { title: 'View certificate', onClick: () => view(cert.Key_u32) },
-                      { title: 'Delete', onClick: () => setPendingDelete({ kind: 'ca', item: cert }) },
+                      { title: "View certificate", onClick: () => view(cert.Key_u32) },
+                      {
+                        title: "Delete",
+                        onClick: () => setPendingDelete({ kind: "ca", item: cert }),
+                      },
                     ]}
                   />
                 </Td>
@@ -488,7 +510,10 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ScrollableTable>
       ) : null}
 
-      <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+      <Flex
+        justifyContent={{ default: "justifyContentSpaceBetween" }}
+        alignItems={{ default: "alignItemsCenter" }}
+      >
         <FlexItem>
           <strong>Certificate revocation list</strong>
         </FlexItem>
@@ -507,7 +532,9 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
       {isLoading ? null : crls !== null && crls.length === 0 ? (
         <EmptyState titleText="No revoked certificates" headingLevel="h2">
-          <EmptyStateBody>No revoked certificate definitions are configured for this Virtual Hub.</EmptyStateBody>
+          <EmptyStateBody>
+            No revoked certificate definitions are configured for this Virtual Hub.
+          </EmptyStateBody>
         </EmptyState>
       ) : crls !== null ? (
         <ScrollableTable aria-label="Certificate revocation list" variant="compact">
@@ -524,8 +551,11 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <Td isActionCell>
                   <ActionsColumn
                     items={[
-                      { title: 'Edit', onClick: () => editCrl(crl.Key_u32) },
-                      { title: 'Delete', onClick: () => setPendingDelete({ kind: 'crl', item: crl }) },
+                      { title: "Edit", onClick: () => editCrl(crl.Key_u32) },
+                      {
+                        title: "Delete",
+                        onClick: () => setPendingDelete({ kind: "crl", item: crl }),
+                      },
                     ]}
                   />
                 </Td>
@@ -541,23 +571,33 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         onClose={() => !deleting && setPendingDelete(null)}
       >
         <ModalHeader
-          title={pendingDelete?.kind === 'crl' ? 'Delete revoked certificate' : 'Delete trusted CA certificate'}
+          title={
+            pendingDelete?.kind === "crl"
+              ? "Delete revoked certificate"
+              : "Delete trusted CA certificate"
+          }
           titleIconVariant="warning"
         />
         <ModalBody>
-          {pendingDelete?.kind === 'crl' ? (
+          {pendingDelete?.kind === "crl" ? (
             <>
-              Delete revoked certificate <strong>{pendingDelete.item.CrlInfo_utf || pendingDelete.item.Key_u32}</strong>?
+              Delete revoked certificate{" "}
+              <strong>{pendingDelete.item.CrlInfo_utf || pendingDelete.item.Key_u32}</strong>?
             </>
           ) : (
             <>
-              Delete trusted CA certificate{' '}
+              Delete trusted CA certificate{" "}
               <strong>{pendingDelete?.item.SubjectName_utf || pendingDelete?.item.Key_u32}</strong>?
             </>
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete} isLoading={deleting} isDisabled={deleting}>
+          <Button
+            variant="danger"
+            onClick={confirmDelete}
+            isLoading={deleting}
+            isDisabled={deleting}
+          >
             Delete
           </Button>
           <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={deleting}>
@@ -574,7 +614,9 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           setCrlOriginal(null);
         }}
       >
-        <ModalHeader title={crlForm?.key === null ? 'Add revoked certificate' : 'Edit revoked certificate'} />
+        <ModalHeader
+          title={crlForm?.key === null ? "Add revoked certificate" : "Edit revoked certificate"}
+        />
         <ModalBody>
           {crlForm && (
             <Form>
@@ -588,10 +630,12 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   hideDefaultPreview
                   onFileInputChange={loadCrlCertificate}
                   onClearClick={() => {
-                    setCrlField('certificateFilename', '');
-                    setCrlField('certificateError', null);
+                    setCrlField("certificateFilename", "");
+                    setCrlField("certificateError", null);
                   }}
-                  dropzoneProps={{ accept: { 'application/x-x509-user-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
+                  dropzoneProps={{
+                    accept: { "application/x-x509-user-cert": [".cer", ".crt", ".cert", ".pem"] },
+                  }}
                   filenameAriaLabel="Revoked certificate file name"
                 />
                 {crlForm.certificateError && (
@@ -600,51 +644,63 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   </HelperText>
                 )}
               </FormGroup>
-              <Flex gap={{ default: 'gapMd' }} flexWrap={{ default: 'wrap' }}>
-                <FlexItem grow={{ default: 'grow' }}>
+              <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }}>
+                <FlexItem grow={{ default: "grow" }}>
                   <FormGroup label="Common name" fieldId="crl-cn">
                     <TextInput
                       id="crl-cn"
                       value={crlForm.commonName}
-                      onChange={(_event, value) => setCrlField('commonName', value)}
+                      onChange={(_event, value) => setCrlField("commonName", value)}
                     />
                   </FormGroup>
                 </FlexItem>
-                <FlexItem grow={{ default: 'grow' }}>
+                <FlexItem grow={{ default: "grow" }}>
                   <FormGroup label="Organization" fieldId="crl-o">
                     <TextInput
                       id="crl-o"
                       value={crlForm.organization}
-                      onChange={(_event, value) => setCrlField('organization', value)}
+                      onChange={(_event, value) => setCrlField("organization", value)}
                     />
                   </FormGroup>
                 </FlexItem>
               </Flex>
-              <Flex gap={{ default: 'gapMd' }} flexWrap={{ default: 'wrap' }}>
-                <FlexItem grow={{ default: 'grow' }}>
+              <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }}>
+                <FlexItem grow={{ default: "grow" }}>
                   <FormGroup label="Organizational unit" fieldId="crl-ou">
-                    <TextInput id="crl-ou" value={crlForm.unit} onChange={(_event, value) => setCrlField('unit', value)} />
+                    <TextInput
+                      id="crl-ou"
+                      value={crlForm.unit}
+                      onChange={(_event, value) => setCrlField("unit", value)}
+                    />
                   </FormGroup>
                 </FlexItem>
-                <FlexItem grow={{ default: 'grow' }}>
+                <FlexItem grow={{ default: "grow" }}>
                   <FormGroup label="Country" fieldId="crl-c">
                     <TextInput
                       id="crl-c"
                       value={crlForm.country}
-                      onChange={(_event, value) => setCrlField('country', value)}
+                      onChange={(_event, value) => setCrlField("country", value)}
                     />
                   </FormGroup>
                 </FlexItem>
               </Flex>
-              <Flex gap={{ default: 'gapMd' }} flexWrap={{ default: 'wrap' }}>
-                <FlexItem grow={{ default: 'grow' }}>
+              <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }}>
+                <FlexItem grow={{ default: "grow" }}>
                   <FormGroup label="State" fieldId="crl-st">
-                    <TextInput id="crl-st" value={crlForm.state} onChange={(_event, value) => setCrlField('state', value)} />
+                    <TextInput
+                      id="crl-st"
+                      value={crlForm.state}
+                      onChange={(_event, value) => setCrlField("state", value)}
+                    />
                   </FormGroup>
                 </FlexItem>
-                <FlexItem grow={{ default: 'grow' }}>
+                <FlexItem grow={{ default: "grow" }}>
                   <FormGroup label="Locality" fieldId="crl-l">
-                    <TextInput id="crl-l" value={crlForm.local} onChange={(_event, value) => setCrlField('local', value)} />
+                    <TextInput
+                      id="crl-l"
+                      value={crlForm.local}
+                      onChange={(_event, value) => setCrlField("local", value)}
+                    />
                   </FormGroup>
                 </FlexItem>
               </Flex>
@@ -652,8 +708,8 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <TextInput
                   id="crl-serial"
                   value={crlForm.serial}
-                  onChange={(_event, value) => setCrlField('serial', value)}
-                  validated={serialResult.error ? 'error' : 'default'}
+                  onChange={(_event, value) => setCrlField("serial", value)}
+                  validated={serialResult.error ? "error" : "default"}
                 />
                 {serialResult.error && (
                   <HelperText>
@@ -665,8 +721,8 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <TextInput
                   id="crl-md5"
                   value={crlForm.md5}
-                  onChange={(_event, value) => setCrlField('md5', value)}
-                  validated={md5Result.error ? 'error' : 'default'}
+                  onChange={(_event, value) => setCrlField("md5", value)}
+                  validated={md5Result.error ? "error" : "default"}
                 />
                 {md5Result.error && (
                   <HelperText>
@@ -678,8 +734,8 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <TextInput
                   id="crl-sha1"
                   value={crlForm.sha1}
-                  onChange={(_event, value) => setCrlField('sha1', value)}
-                  validated={sha1Result.error ? 'error' : 'default'}
+                  onChange={(_event, value) => setCrlField("sha1", value)}
+                  validated={sha1Result.error ? "error" : "default"}
                 />
                 {sha1Result.error && (
                   <HelperText>
@@ -718,7 +774,11 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ModalFooter>
       </Modal>
 
-      <CertificateModal certBin={viewCert} isOpen={viewCert !== null} onClose={() => setViewCert(null)} />
+      <CertificateModal
+        certBin={viewCert}
+        isOpen={viewCert !== null}
+        onClose={() => setViewCert(null)}
+      />
     </Flex>
   );
 };

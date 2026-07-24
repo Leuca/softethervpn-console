@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -23,46 +23,46 @@ import {
   Tab,
   TabTitleText,
   Tabs,
-} from '@patternfly/react-core';
-import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { useServer } from '@app/ServerContext';
-import { binToBytes, downloadBlob } from '@app/utils/blob_utils';
-import { capBool } from '@app/utils/caps';
-import { formatRpcValue } from '@app/utils/format';
+} from "@patternfly/react-core";
+import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { useServer } from "@app/ServerContext";
+import { binToBytes, downloadBlob } from "@app/utils/blob_utils";
+import { capBool } from "@app/utils/caps";
+import { formatRpcValue } from "@app/utils/format";
 
 const logSwitchOptions = [
-  { value: VPN.VpnRpcLogSwitchType.No, label: 'Do not switch' },
-  { value: VPN.VpnRpcLogSwitchType.Second, label: 'Every second' },
-  { value: VPN.VpnRpcLogSwitchType.Minute, label: 'Every minute' },
-  { value: VPN.VpnRpcLogSwitchType.Hour, label: 'Every hour' },
-  { value: VPN.VpnRpcLogSwitchType.Day, label: 'Every day' },
-  { value: VPN.VpnRpcLogSwitchType.Month, label: 'Every month' },
+  { value: VPN.VpnRpcLogSwitchType.No, label: "Do not switch" },
+  { value: VPN.VpnRpcLogSwitchType.Second, label: "Every second" },
+  { value: VPN.VpnRpcLogSwitchType.Minute, label: "Every minute" },
+  { value: VPN.VpnRpcLogSwitchType.Hour, label: "Every hour" },
+  { value: VPN.VpnRpcLogSwitchType.Day, label: "Every day" },
+  { value: VPN.VpnRpcLogSwitchType.Month, label: "Every month" },
 ];
 
 const packetLogOptions = [
-  { value: VPN.VpnRpcPacketLogSetting.None, label: 'None' },
-  { value: VPN.VpnRpcPacketLogSetting.Header, label: 'Headers only' },
-  { value: VPN.VpnRpcPacketLogSetting.All, label: 'Headers and data' },
+  { value: VPN.VpnRpcPacketLogSetting.None, label: "None" },
+  { value: VPN.VpnRpcPacketLogSetting.Header, label: "Headers only" },
+  { value: VPN.VpnRpcPacketLogSetting.All, label: "Headers and data" },
 ];
 
 const packetTypes = [
-  'TCP connection log',
-  'TCP packet log',
-  'DHCP packet log',
-  'UDP packet log',
-  'ICMP packet log',
-  'IP packet log',
-  'ARP packet log',
-  'Ethernet packet log',
+  "TCP connection log",
+  "TCP packet log",
+  "DHCP packet log",
+  "UDP packet log",
+  "ICMP packet log",
+  "IP packet log",
+  "ARP packet log",
+  "Ethernet packet log",
 ];
 
 const PREVIEW_MAX_BYTES = 128 * 1024;
 const logFilePageSizes = [
-  { title: '10', value: 10 },
-  { title: '25', value: 25 },
-  { title: '50', value: 50 },
+  { title: "10", value: 10 },
+  { title: "25", value: 25 },
+  { title: "50", value: 50 },
 ];
 
 const normalizeLogSettings = (response: VPN.VpnRpcHubLog): VPN.VpnRpcHubLog => {
@@ -75,7 +75,10 @@ const normalizeLogSettings = (response: VPN.VpnRpcHubLog): VPN.VpnRpcHubLog => {
 };
 
 const safeLogFileName = (file: VPN.VpnRpcEnumLogFileItem): string =>
-  `${file.ServerName_str || 'server'}_${file.FilePath_str || 'log.txt'}`.replace(/[^A-Za-z0-9_.-]+/g, '_');
+  `${file.ServerName_str || "server"}_${file.FilePath_str || "log.txt"}`.replace(
+    /[^A-Za-z0-9_.-]+/g,
+    "_",
+  );
 
 type LogReadChunkHandler = (chunk: Uint8Array) => void;
 
@@ -117,37 +120,42 @@ const readLogFile = async (
     if (!bytes || bytes.length === 0) {
       done = true;
     } else {
-      const remainingToEnd = endOffset === undefined ? bytes.length : Math.max(0, endOffset - offset);
+      const remainingToEnd =
+        endOffset === undefined ? bytes.length : Math.max(0, endOffset - offset);
       const chunk = bytes.slice(0, remainingToEnd);
       if (chunk.length === 0) {
         done = true;
         break;
       }
       if (maxBytes !== undefined && totalBytes + chunk.length > maxBytes) {
-      const remaining = maxBytes - totalBytes;
-      if (remaining > 0) {
+        const remaining = maxBytes - totalBytes;
+        if (remaining > 0) {
           onChunk(chunk.slice(0, remaining));
-        totalBytes += remaining;
-      }
-      truncated = true;
-      done = true;
-    } else {
+          totalBytes += remaining;
+        }
+        truncated = true;
+        done = true;
+      } else {
         onChunk(chunk);
         totalBytes += chunk.length;
         offset += chunk.length;
-        if (maxBytes !== undefined && totalBytes >= maxBytes && (endOffset === undefined || offset < endOffset)) {
+        if (
+          maxBytes !== undefined &&
+          totalBytes >= maxBytes &&
+          (endOffset === undefined || offset < endOffset)
+        ) {
           truncated = true;
           done = true;
         }
         if (endOffset !== undefined && offset >= endOffset) {
           done = true;
         }
-      // Offset_u32 cannot address past 4 GiB; stop instead of wrapping and
-      // re-reading the file from the start.
-      if (offset > 0xffffffff) {
-        truncated = true;
-        done = true;
-      }
+        // Offset_u32 cannot address past 4 GiB; stop instead of wrapping and
+        // re-reading the file from the start.
+        if (offset > 0xffffffff) {
+          truncated = true;
+          done = true;
+        }
       }
     }
   }
@@ -157,20 +165,36 @@ const readLogFile = async (
 
 const readLogFileText = async (
   file: VPN.VpnRpcEnumLogFileItem,
-): Promise<{ text: string; truncated: boolean; totalBytes: number; startOffset: number; fileSize: number | null }> => {
-  const decoder = new TextDecoder('utf-8');
-  let chunks = '';
+): Promise<{
+  text: string;
+  truncated: boolean;
+  totalBytes: number;
+  startOffset: number;
+  fileSize: number | null;
+}> => {
+  const decoder = new TextDecoder("utf-8");
+  let chunks = "";
   const fileSize = logFileSize(file);
   const isTailPreview = fileSize !== null && fileSize > PREVIEW_MAX_BYTES;
   const startOffset = isTailPreview ? fileSize - PREVIEW_MAX_BYTES : 0;
 
-  const result = await readLogFile(file, (chunk) => {
-    chunks += decoder.decode(chunk, { stream: true });
-  }, { maxBytes: PREVIEW_MAX_BYTES, startOffset, endOffset: isTailPreview ? fileSize : undefined });
+  const result = await readLogFile(
+    file,
+    (chunk) => {
+      chunks += decoder.decode(chunk, { stream: true });
+    },
+    { maxBytes: PREVIEW_MAX_BYTES, startOffset, endOffset: isTailPreview ? fileSize : undefined },
+  );
 
   chunks += decoder.decode();
 
-  return { text: chunks, truncated: result.truncated || startOffset > 0, totalBytes: result.totalBytes, startOffset, fileSize };
+  return {
+    text: chunks,
+    truncated: result.truncated || startOffset > 0,
+    totalBytes: result.totalBytes,
+    startOffset,
+    fileSize,
+  };
 };
 
 const readLogFileBlob = async (file: VPN.VpnRpcEnumLogFileItem): Promise<Blob> => {
@@ -178,10 +202,13 @@ const readLogFileBlob = async (file: VPN.VpnRpcEnumLogFileItem): Promise<Blob> =
   await readLogFile(file, (chunk) => {
     chunks.push(chunk);
   });
-  return new Blob(chunks, { type: 'text/plain' });
+  return new Blob(chunks, { type: "text/plain" });
 };
 
-const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean }> = ({ hub, supported }) => {
+const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean }> = ({
+  hub,
+  supported,
+}) => {
   const [config, setConfig] = React.useState<VPN.VpnRpcHubLog | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -247,10 +274,15 @@ const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean 
   }
 
   return (
-    <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
+    <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
+      <Flex justifyContent={{ default: "justifyContentFlexEnd" }} gap={{ default: "gapSm" }}>
         <FlexItem>
-          <Button variant="primary" onClick={save} isDisabled={config === null || saving} isLoading={saving}>
+          <Button
+            variant="primary"
+            onClick={save}
+            isDisabled={config === null || saving}
+            isLoading={saving}
+          >
             Save
           </Button>
         </FlexItem>
@@ -267,20 +299,20 @@ const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean 
           <Spinner size="xl" aria-label="Loading log settings" />
         </Bullseye>
       ) : config !== null ? (
-        <Form style={{ maxWidth: '48rem' }}>
+        <Form style={{ maxWidth: "48rem" }}>
           <FormGroup fieldId="security-log-enabled">
             <Switch
               id="security-log-enabled"
               label="Save security log"
               isChecked={config.SaveSecurityLog_bool}
-              onChange={(_event, checked) => setField('SaveSecurityLog_bool', checked)}
+              onChange={(_event, checked) => setField("SaveSecurityLog_bool", checked)}
             />
           </FormGroup>
           <FormGroup label="Security log file switch cycle" fieldId="security-log-switch">
             <FormSelect
               id="security-log-switch"
               value={config.SecurityLogSwitchType_u32}
-              onChange={(_event, value) => setField('SecurityLogSwitchType_u32', Number(value))}
+              onChange={(_event, value) => setField("SecurityLogSwitchType_u32", Number(value))}
               isDisabled={!config.SaveSecurityLog_bool}
               aria-label="Security log file switch cycle"
             >
@@ -295,14 +327,14 @@ const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean 
               id="packet-log-enabled"
               label="Save packet logs"
               isChecked={config.SavePacketLog_bool}
-              onChange={(_event, checked) => setField('SavePacketLog_bool', checked)}
+              onChange={(_event, checked) => setField("SavePacketLog_bool", checked)}
             />
           </FormGroup>
           <FormGroup label="Packet log file switch cycle" fieldId="packet-log-switch">
             <FormSelect
               id="packet-log-switch"
               value={config.PacketLogSwitchType_u32}
-              onChange={(_event, value) => setField('PacketLogSwitchType_u32', Number(value))}
+              onChange={(_event, value) => setField("PacketLogSwitchType_u32", Number(value))}
               isDisabled={!config.SavePacketLog_bool}
               aria-label="Packet log file switch cycle"
             >
@@ -400,7 +432,7 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
     setDownloading(file.FilePath_str);
     setError(null);
     const requestId = ++previewRequestRef.current;
-    setPreview({ file, isLoading: true, scrollToBottom: false, text: '' });
+    setPreview({ file, isLoading: true, scrollToBottom: false, text: "" });
     window.setTimeout(async () => {
       try {
         const refreshedFiles = await load();
@@ -410,14 +442,15 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
         const previewFile =
           refreshedFiles?.find(
             (candidate) =>
-              candidate.ServerName_str === file.ServerName_str && candidate.FilePath_str === file.FilePath_str,
+              candidate.ServerName_str === file.ServerName_str &&
+              candidate.FilePath_str === file.FilePath_str,
           ) ?? file;
-        setPreview({ file: previewFile, isLoading: true, scrollToBottom: false, text: '' });
+        setPreview({ file: previewFile, isLoading: true, scrollToBottom: false, text: "" });
         const result = await readLogFileText(previewFile);
         if (requestId !== previewRequestRef.current) {
           return;
         }
-        let notice = '';
+        let notice = "";
         if (result.fileSize !== null) {
           if (result.startOffset > 0) {
             notice = `\n\n[Preview: showing the last ${result.totalBytes} of ${result.fileSize} bytes.]`;
@@ -490,7 +523,7 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
   }
 
   return (
-    <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+    <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
       {error && (
         <Alert variant="danger" title="Log file operation failed" isInline>
           {error}
@@ -508,9 +541,9 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
       ) : files !== null && visibleFiles !== null ? (
         <>
           <Flex
-            alignItems={{ default: 'alignItemsCenter' }}
-            gap={{ default: 'gapSm' }}
-            justifyContent={{ default: 'justifyContentSpaceBetween' }}
+            alignItems={{ default: "alignItemsCenter" }}
+            gap={{ default: "gapSm" }}
+            justifyContent={{ default: "justifyContentSpaceBetween" }}
           >
             <FlexItem>
               <Pagination
@@ -524,7 +557,7 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
                   setPerPage(nextPerPage);
                   setPage(nextPage);
                 }}
-                titles={{ items: 'log files', perPageSuffix: 'log files' }}
+                titles={{ items: "log files", perPageSuffix: "log files" }}
               />
             </FlexItem>
             <FlexItem>
@@ -558,20 +591,27 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
                   <Td dataLabel="File path" modifier="truncate" tooltip={file.FilePath_str}>
                     {file.FilePath_str}
                   </Td>
-                  <Td dataLabel="Size">{formatRpcValue('FileSize_u32', file.FileSize_u32)} bytes</Td>
-                  <Td dataLabel="Updated">{formatRpcValue('UpdatedTime_dt', file.UpdatedTime_dt)}</Td>
-                  <Td dataLabel="Server">{file.ServerName_str || '-'}</Td>
+                  <Td dataLabel="Size">
+                    {formatRpcValue("FileSize_u32", file.FileSize_u32)} bytes
+                  </Td>
+                  <Td dataLabel="Updated">
+                    {formatRpcValue("UpdatedTime_dt", file.UpdatedTime_dt)}
+                  </Td>
+                  <Td dataLabel="Server">{file.ServerName_str || "-"}</Td>
                   <Td isActionCell>
                     <ActionsColumn
                       isDisabled={downloading !== null}
                       items={[
                         {
-                          title: 'View',
+                          title: "View",
                           onClick: () => openPreview(file),
                           isDisabled: downloading !== null,
                         },
                         {
-                          title: downloading === file.FilePath_str && activeFile === null ? 'Downloading' : 'Download',
+                          title:
+                            downloading === file.FilePath_str && activeFile === null
+                              ? "Downloading"
+                              : "Download",
                           onClick: () => downloadFile(file),
                           isDisabled: downloading !== null,
                         },
@@ -586,7 +626,7 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
       ) : null}
 
       <Modal variant={ModalVariant.large} isOpen={preview !== null} onClose={closePreview}>
-        <ModalHeader title={preview ? `Log file: ${preview.file.FilePath_str}` : 'Log file'} />
+        <ModalHeader title={preview ? `Log file: ${preview.file.FilePath_str}` : "Log file"} />
         <ModalBody>
           {preview?.isLoading ? (
             <Bullseye>
@@ -595,9 +635,9 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
           ) : (
             <pre
               ref={previewTextRef}
-              style={{ margin: 0, maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap' }}
+              style={{ margin: 0, maxHeight: "60vh", overflow: "auto", whiteSpace: "pre-wrap" }}
             >
-              {preview?.text ?? ''}
+              {preview?.text ?? ""}
             </pre>
           )}
         </ModalBody>
@@ -619,10 +659,10 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
 };
 
 const HubLogs: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
-  const [activeTab, setActiveTab] = React.useState<string>('settings');
+  const [activeTab, setActiveTab] = React.useState<string>("settings");
   const { capsList } = useServer();
-  const settingsSupported = capBool(capsList, 'b_support_config_log');
-  const filesSupported = capBool(capsList, 'b_support_read_log');
+  const settingsSupported = capBool(capsList, "b_support_config_log");
+  const filesSupported = capBool(capsList, "b_support_read_log");
 
   return (
     <Tabs
@@ -631,15 +671,15 @@ const HubLogs: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       onSelect={(_event, key) => setActiveTab(String(key))}
       mountOnEnter
       unmountOnExit
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
       <Tab eventKey="settings" title={<TabTitleText>Settings</TabTitleText>}>
-        <div style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}>
+        <div style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}>
           <HubLogSettings hub={hub} supported={settingsSupported} />
         </div>
       </Tab>
       <Tab eventKey="files" title={<TabTitleText>Files</TabTitleText>}>
-        <div style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}>
+        <div style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}>
           <HubLogFiles supported={filesSupported} />
         </div>
       </Tab>

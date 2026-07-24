@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   ActionGroup,
   Alert,
@@ -16,23 +16,23 @@ import {
   Stack,
   StackItem,
   TextInput,
-} from '@patternfly/react-core';
+} from "@patternfly/react-core";
 import {
   ManagedLoginPayload,
   ManagedSession,
   ManagedSessionApiError,
   login as submitManagedLogin,
-} from './sessionApi';
+} from "./sessionApi";
 
 type AuthenticatedManagedSession = Extract<ManagedSession, { authenticated: true }>;
-type ManagedLoginHints = Omit<ManagedLoginPayload, 'password'>;
+type ManagedLoginHints = Omit<ManagedLoginPayload, "password">;
 
 interface ManagedLoginFormProps {
   onLogin: (session: AuthenticatedManagedSession) => void;
 }
 
 const DEFAULT_PORT = 443;
-export const MANAGED_LOGIN_HINTS_KEY = 'softether-vpn-console.managed-login-hints';
+export const MANAGED_LOGIN_HINTS_KEY = "softether-vpn-console.managed-login-hints";
 
 interface LoginFailure {
   title: string;
@@ -42,44 +42,46 @@ interface LoginFailure {
 const describeLoginFailure = (error: unknown): LoginFailure => {
   if (!(error instanceof ManagedSessionApiError)) {
     return {
-      title: 'Console unavailable',
-      message: 'The console gateway could not be reached. Check your network connection and try again.',
+      title: "Console unavailable",
+      message:
+        "The console gateway could not be reached. Check your network connection and try again.",
     };
   }
 
   if (error.status === 401) {
     return {
-      title: 'Login details rejected',
-      message: 'Check the administrator password and Virtual Hub, then try again.',
+      title: "Login details rejected",
+      message: "Check the administrator password and Virtual Hub, then try again.",
     };
   }
   if (error.status === 400) {
     return {
-      title: 'Invalid server details',
-      message: 'Review the server address, port, and connection options, then try again.',
+      title: "Invalid server details",
+      message: "Review the server address, port, and connection options, then try again.",
     };
   }
-  if (error.message.toLowerCase().includes('certificate')) {
+  if (error.message.toLowerCase().includes("certificate")) {
     return {
-      title: 'Certificate verification failed',
+      title: "Certificate verification failed",
       message:
-        'Check the server address and certificate. For a trusted private server, allow self-signed certificates under Advanced connection options.',
+        "Check the server address and certificate. For a trusted private server, allow self-signed certificates under Advanced connection options.",
     };
   }
-  if (error.message.includes('valid response')) {
+  if (error.message.includes("valid response")) {
     return {
-      title: 'Unsupported server response',
-      message: 'Check that the address and port belong to a compatible SoftEther VPN Server.',
+      title: "Unsupported server response",
+      message: "Check that the address and port belong to a compatible SoftEther VPN Server.",
     };
   }
   if (error.status === 502) {
     return {
-      title: 'Server unavailable',
-      message: 'Check the server address and port, confirm that the server is running, then try again.',
+      title: "Server unavailable",
+      message:
+        "Check the server address and port, confirm that the server is running, then try again.",
     };
   }
 
-  return { title: 'Login failed', message: error.message };
+  return { title: "Login failed", message: error.message };
 };
 
 const parsePort = (port: string): number => Number(port);
@@ -88,13 +90,15 @@ const validPort = (port: number): boolean => Number.isInteger(port) && port >= 1
 
 const loadLoginHints = (): ManagedLoginHints | null => {
   try {
-    const value = JSON.parse(window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY) ?? 'null') as Partial<ManagedLoginHints> | null;
+    const value = JSON.parse(
+      window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY) ?? "null",
+    ) as Partial<ManagedLoginHints> | null;
     if (
       !value ||
-      typeof value.host !== 'string' ||
+      typeof value.host !== "string" ||
       !validPort(value.port ?? 0) ||
-      typeof value.hub !== 'string' ||
-      typeof value.allowSelfSigned !== 'boolean'
+      typeof value.hub !== "string" ||
+      typeof value.allowSelfSigned !== "boolean"
     ) {
       return null;
     }
@@ -106,7 +110,10 @@ const loadLoginHints = (): ManagedLoginHints | null => {
 
 const saveLoginHints = ({ host, port, hub, allowSelfSigned }: ManagedLoginPayload): void => {
   try {
-    window.localStorage.setItem(MANAGED_LOGIN_HINTS_KEY, JSON.stringify({ host, port, hub, allowSelfSigned }));
+    window.localStorage.setItem(
+      MANAGED_LOGIN_HINTS_KEY,
+      JSON.stringify({ host, port, hub, allowSelfSigned }),
+    );
   } catch {
     // Browser storage can be unavailable without preventing login.
   }
@@ -122,11 +129,13 @@ const clearLoginHints = (): void => {
 
 const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLogin }) => {
   const [initialHints] = React.useState(loadLoginHints);
-  const [host, setHost] = React.useState(initialHints?.host ?? '');
+  const [host, setHost] = React.useState(initialHints?.host ?? "");
   const [port, setPort] = React.useState(String(initialHints?.port ?? DEFAULT_PORT));
-  const [hub, setHub] = React.useState(initialHints?.hub ?? '');
-  const [password, setPassword] = React.useState('');
-  const [allowSelfSigned, setAllowSelfSigned] = React.useState(initialHints?.allowSelfSigned ?? false);
+  const [hub, setHub] = React.useState(initialHints?.hub ?? "");
+  const [password, setPassword] = React.useState("");
+  const [allowSelfSigned, setAllowSelfSigned] = React.useState(
+    initialHints?.allowSelfSigned ?? false,
+  );
   const [rememberServer, setRememberServer] = React.useState(initialHints !== null);
   const [advancedOpen, setAdvancedOpen] = React.useState(initialHints?.allowSelfSigned ?? false);
   const [submitted, setSubmitted] = React.useState(false);
@@ -158,7 +167,11 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
 
     if (!canSubmit) {
       if (!submitting) {
-        const firstInvalid = !hostValid ? hostRef.current : !portIsValid ? portRef.current : passwordRef.current;
+        const firstInvalid = !hostValid
+          ? hostRef.current
+          : !portIsValid
+            ? portRef.current
+            : passwordRef.current;
         firstInvalid?.focus();
       }
       return;
@@ -183,7 +196,10 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
           }
           onLogin(session);
         } else {
-          setError({ title: 'Login failed', message: 'The console did not create a session. Try again.' });
+          setError({
+            title: "Login failed",
+            message: "The console did not create a session. Try again.",
+          });
         }
       })
       .catch((e) => setError(describeLoginFailure(e)))
@@ -205,7 +221,11 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
             </StackItem>
           )}
           <StackItem>
-            <Form aria-label="SoftEther server login" onSubmit={handleSubmit} aria-busy={submitting}>
+            <Form
+              aria-label="SoftEther server login"
+              onSubmit={handleSubmit}
+              aria-busy={submitting}
+            >
               <div className="se-managed-login__target-fields">
                 <FormGroup label="Server host" fieldId="managed-login-host" isRequired>
                   <TextInput
@@ -215,9 +235,11 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                     value={host}
                     placeholder="vpn.example.com"
                     onChange={(_event, value) => setHost(value)}
-                    validated={submitted && !hostValid ? 'error' : 'default'}
+                    validated={submitted && !hostValid ? "error" : "default"}
                     aria-label="Server host"
-                    aria-describedby={submitted && !hostValid ? 'managed-login-host-error' : undefined}
+                    aria-describedby={
+                      submitted && !hostValid ? "managed-login-host-error" : undefined
+                    }
                     aria-invalid={submitted && !hostValid}
                     isDisabled={submitting}
                   />
@@ -241,9 +263,11 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                     max={65535}
                     value={port}
                     onChange={(_event, value) => setPort(value)}
-                    validated={submitted && !portIsValid ? 'error' : 'default'}
+                    validated={submitted && !portIsValid ? "error" : "default"}
                     aria-label="Port"
-                    aria-describedby={submitted && !portIsValid ? 'managed-login-port-error' : undefined}
+                    aria-describedby={
+                      submitted && !portIsValid ? "managed-login-port-error" : undefined
+                    }
                     aria-invalid={submitted && !portIsValid}
                     isDisabled={submitting}
                   />
@@ -277,9 +301,11 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   autoComplete="current-password"
                   value={password}
                   onChange={(_event, value) => setPassword(value)}
-                  validated={submitted && !passwordValid ? 'error' : 'default'}
+                  validated={submitted && !passwordValid ? "error" : "default"}
                   aria-label="Password"
-                  aria-describedby={submitted && !passwordValid ? 'managed-login-password-error' : undefined}
+                  aria-describedby={
+                    submitted && !passwordValid ? "managed-login-password-error" : undefined
+                  }
                   aria-invalid={submitted && !passwordValid}
                   isDisabled={submitting}
                 />
@@ -309,7 +335,8 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   <FormHelperText>
                     <HelperText>
                       <HelperTextItem>
-                        Certificate verification will be disabled. Use this only for a trusted private server.
+                        Certificate verification will be disabled. Use this only for a trusted
+                        private server.
                       </HelperTextItem>
                     </HelperText>
                   </FormHelperText>
@@ -331,8 +358,9 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                 <FormHelperText>
                   <HelperText>
                     <HelperTextItem>
-                      Saves the host, port, Virtual Hub, and certificate preference. The administrator password is
-                      never saved. Clear this checkbox to forget the saved details.
+                      Saves the host, port, Virtual Hub, and certificate preference. The
+                      administrator password is never saved. Clear this checkbox to forget the saved
+                      details.
                     </HelperTextItem>
                   </HelperText>
                 </FormHelperText>

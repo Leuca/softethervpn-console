@@ -1,29 +1,30 @@
-import * as React from 'react';
-import { api } from '@app/utils/vpnrpc_settings';
+import * as React from "react";
+import { api } from "@app/utils/vpnrpc_settings";
 
 const notEnoughPrivilegesCode = 52;
 const capabilityLabels = [
-  'Local Bridge',
-  'Clustering Configuration',
-  'Layer 3 Switch',
-  'VPN Azure',
-  'Dynamic DNS',
-  'Legacy Protocols',
+  "Local Bridge",
+  "Clustering Configuration",
+  "Layer 3 Switch",
+  "VPN Azure",
+  "Dynamic DNS",
+  "Legacy Protocols",
 ];
 
 const probeErrorCode = (error: unknown): number | null => {
   const rpcCode = (error as { Error?: { code?: unknown } } | null | undefined)?.Error?.code;
-  if (typeof rpcCode === 'number') {
+  if (typeof rpcCode === "number") {
     return rpcCode;
   }
-  if (typeof rpcCode === 'string' && rpcCode.trim() !== '') {
+  if (typeof rpcCode === "string" && rpcCode.trim() !== "") {
     return Number(rpcCode);
   }
   const match = String(error).match(/\bCode=(\d+)\b/);
   return match ? Number(match[1]) : null;
 };
 
-const isNotEnoughPrivilegesError = (error: unknown): boolean => probeErrorCode(error) === notEnoughPrivilegesCode;
+const isNotEnoughPrivilegesError = (error: unknown): boolean =>
+  probeErrorCode(error) === notEnoughPrivilegesCode;
 
 const logUnexpectedProbeError = (probe: string, error: unknown) => {
   if (!isNotEnoughPrivilegesError(error)) {
@@ -58,8 +59,8 @@ export interface ServerState {
 
 const initialState: ServerState = {
   loading: true,
-  user: 'Unknown',
-  ddnsHostname: '',
+  user: "Unknown",
+  ddnsHostname: "",
   ddnsProxy: false,
   azure: false,
   capsList: [],
@@ -85,7 +86,9 @@ export const useServer = (): ServerState => React.useContext(ServerContext);
  * DDNS/Azure status, capabilities and server info) and exposes the results,
  * plus the derived navigation visibility rules, to the whole app.
  */
-export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode }> = ({ children }) => {
+export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [state, setState] = React.useState<ServerState>(initialState);
   const pending = React.useRef(0);
 
@@ -110,12 +113,12 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
     // Determine whether we are a full server administrator or a hub administrator
     api
       .EnumConnection()
-      .then(() => merge({ user: 'Administrator' }))
+      .then(() => merge({ user: "Administrator" }))
       .catch((error) => {
         if (isNotEnoughPrivilegesError(error)) {
-          merge({ user: 'Hub Administrator', hideAdminOnly: true });
+          merge({ user: "Hub Administrator", hideAdminOnly: true });
         } else {
-          logUnexpectedProbeError('EnumConnection', error);
+          logUnexpectedProbeError("EnumConnection", error);
           merge({});
         }
       });
@@ -126,7 +129,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
       .then((response) => {
         const hidden = new Set<string>();
         if (response.ServerType_u32 === 0) {
-          hidden.add('Clustering Status');
+          hidden.add("Clustering Status");
         }
         merge({
           hideNonCluster: response.ServerType_u32 === 1 || response.ServerType_u32 === 2,
@@ -134,7 +137,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
         });
       })
       .catch((error) => {
-        logUnexpectedProbeError('GetFarmSetting', error);
+        logUnexpectedProbeError("GetFarmSetting", error);
         merge({});
       });
 
@@ -144,10 +147,12 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
       .then((response) =>
         api
           .GetAzureStatus()
-          .then((azure) => merge({ ddnsHostname: response.CurrentHostName_str, azure: azure.IsEnabled_bool })),
+          .then((azure) =>
+            merge({ ddnsHostname: response.CurrentHostName_str, azure: azure.IsEnabled_bool }),
+          ),
       )
       .catch((error) => {
-        logUnexpectedProbeError('GetDDnsClientStatus/GetAzureStatus', error);
+        logUnexpectedProbeError("GetDDnsClientStatus/GetAzureStatus", error);
         merge({});
       });
 
@@ -159,32 +164,33 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
         const raw = response as unknown as Record<string, number>;
         const caps = (name: string): boolean => raw[name] == 1;
 
-        if (!caps('caps_b_local_bridge_u32')) hidden.add('Local Bridge');
-        if (!caps('caps_b_support_cluster_u32')) hidden.add('Clustering Configuration');
-        if (!caps('caps_b_support_layer3_u32')) hidden.add('Layer 3 Switch');
-        if (!caps('caps_b_support_azure_u32')) hidden.add('VPN Azure');
-        if (!caps('caps_b_support_ddns_u32')) hidden.add('Dynamic DNS');
+        if (!caps("caps_b_local_bridge_u32")) hidden.add("Local Bridge");
+        if (!caps("caps_b_support_cluster_u32")) hidden.add("Clustering Configuration");
+        if (!caps("caps_b_support_layer3_u32")) hidden.add("Layer 3 Switch");
+        if (!caps("caps_b_support_azure_u32")) hidden.add("VPN Azure");
+        if (!caps("caps_b_support_ddns_u32")) hidden.add("Dynamic DNS");
 
-        const isIpsecCapable = caps('caps_b_support_ipsec_u32');
-        const isOpenVPNSupported = caps('caps_b_support_openvpn_u32');
-        const isSSTPSupported = caps('caps_b_support_sstp_u32');
-        if (!isIpsecCapable && !isOpenVPNSupported && !isSSTPSupported) hidden.add('Legacy Protocols');
+        const isIpsecCapable = caps("caps_b_support_ipsec_u32");
+        const isOpenVPNSupported = caps("caps_b_support_openvpn_u32");
+        const isSSTPSupported = caps("caps_b_support_sstp_u32");
+        if (!isIpsecCapable && !isOpenVPNSupported && !isSSTPSupported)
+          hidden.add("Legacy Protocols");
 
         merge({
           capsList: response.CapsList,
-          isTapSupported: caps('caps_b_tap_supported_u32'),
-          isBridgeMode: caps('caps_b_bridge_u32'),
-          isV4: caps('caps_b_vpn4_u32'),
-          ddnsProxy: caps('caps_b_support_ddns_proxy_u32'),
+          isTapSupported: caps("caps_b_tap_supported_u32"),
+          isBridgeMode: caps("caps_b_bridge_u32"),
+          isV4: caps("caps_b_vpn4_u32"),
+          ddnsProxy: caps("caps_b_support_ddns_proxy_u32"),
           isIpsecCapable,
           isOpenVPNSupported,
           isSSTPSupported,
-          hideNonBridge: caps('caps_b_bridge_u32'),
+          hideNonBridge: caps("caps_b_bridge_u32"),
           hiddenLabels: hidden,
         });
       })
       .catch((error) => {
-        logUnexpectedProbeError('GetCaps', error);
+        logUnexpectedProbeError("GetCaps", error);
         merge({ hiddenLabels: new Set(capabilityLabels) });
       });
 
@@ -195,10 +201,10 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
         const hidden = new Set<string>();
         const serverType = Number(response.ServerType_u32);
         if (serverType === 0) {
-          hidden.add('Clustering Status');
+          hidden.add("Clustering Status");
         }
         if (response.ServerType_u32 === 2) {
-          hidden.add('Hubs');
+          hidden.add("Hubs");
         }
         merge({
           info: response as unknown as Record<string, unknown>,
@@ -209,7 +215,7 @@ export const ServerProvider: React.FunctionComponent<{ children: React.ReactNode
         });
       })
       .catch((error) => {
-        logUnexpectedProbeError('GetServerInfo', error);
+        logUnexpectedProbeError("GetServerInfo", error);
         merge({});
       });
   }, []);

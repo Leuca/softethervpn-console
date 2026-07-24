@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -8,17 +8,17 @@ import {
   Spinner,
   Stack,
   StackItem,
-} from '@patternfly/react-core';
-import { Table, Tbody, Td, Th, Tr } from '@patternfly/react-table';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { AppPage } from '@app/components/AppPage';
-import { KeyValueTable } from '@app/components/KeyValueTable';
-import { mode_to_string } from '@app/utils/string_utils';
+} from "@patternfly/react-core";
+import { Table, Tbody, Td, Th, Tr } from "@patternfly/react-table";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { AppPage } from "@app/components/AppPage";
+import { KeyValueTable } from "@app/components/KeyValueTable";
+import { mode_to_string } from "@app/utils/string_utils";
 
 // A capability whose description starts with this word is a numeric limit
 // (e.g. "Maximum number of Virtual Hubs") rather than a yes/no flag.
-const MAXIMUM = 'Maximum';
+const MAXIMUM = "Maximum";
 
 // Render a caps value: numeric limits keep their number, flags become Yes/No.
 const capsValue = (cap: VPN.VpnCaps): string => {
@@ -26,10 +26,10 @@ const capsValue = (cap: VPN.VpnCaps): string => {
     return cap.CapsValue_u32.toLocaleString();
   }
   if (cap.CapsValue_u32 === 1) {
-    return 'Yes';
+    return "Yes";
   }
   if (cap.CapsValue_u32 === 0) {
-    return 'No';
+    return "No";
   }
   return cap.CapsValue_u32.toLocaleString();
 };
@@ -63,14 +63,20 @@ const About: React.FunctionComponent = () => {
   const isLoading = info === null && error === null;
 
   // Show the server mode as text instead of the raw ServerType_u32 enum.
-  const infoRows = info && { ...info, ServerType_u32: mode_to_string(info.ServerType_u32 as number) };
+  const infoRows = info && {
+    ...info,
+    ServerType_u32: mode_to_string(info.ServerType_u32 as number),
+  };
 
   return (
-    <AppPage title="About This VPN Server" description="Product identity and the feature set this server supports.">
+    <AppPage
+      title="About This VPN Server"
+      description="Product identity and the feature set this server supports."
+    >
       {error ? (
-          <Alert variant="danger" title="Could not load server information" isInline>
-            {error}
-          </Alert>
+        <Alert variant="danger" title="Could not load server information" isInline>
+          {error}
+        </Alert>
       ) : isLoading || infoRows === null || caps === null ? (
         <Bullseye>
           <Spinner size="xl" aria-label="Loading server information" />
@@ -93,7 +99,7 @@ const About: React.FunctionComponent = () => {
                   <Tbody>
                     {orderCaps(caps).map((cap) => (
                       <Tr key={cap.CapsName_str}>
-                        <Th scope="row" width={40} visibility={['hidden', 'visibleOnMd']}>
+                        <Th scope="row" width={40} visibility={["hidden", "visibleOnMd"]}>
                           {cap.CapsDescrption_utf}
                         </Th>
                         <Td dataLabel={cap.CapsDescrption_utf}>{capsValue(cap)}</Td>

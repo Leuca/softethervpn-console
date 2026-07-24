@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -26,81 +26,104 @@ import {
   ModalVariant,
   Spinner,
   TextInput,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { PlusCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { FormErrorAlert } from '@app/components/FormErrorAlert';
-import { CertificateModal } from '@app/CertificateViewer/CertificateViewer';
-import { SecurityPolicyModal } from '@app/Hubs/SecurityPolicyModal';
-import { KeyValueTable } from '@app/components/KeyValueTable';
-import { binToBytes } from '@app/utils/blob_utils';
-import { recordChanged } from '@app/utils/dirty';
-import { formatOptionalDate } from '@app/utils/format';
-import { extractPkcs12KeyPair, isPkcs12File } from '@app/utils/pkcs12';
-import { hashSoftEtherPassword } from '@app/utils/sha0';
-import { certificateBytesToDer } from '@app/utils/x509';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { PlusCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { FormErrorAlert } from "@app/components/FormErrorAlert";
+import { CertificateModal } from "@app/CertificateViewer/CertificateViewer";
+import { SecurityPolicyModal } from "@app/Hubs/SecurityPolicyModal";
+import { KeyValueTable } from "@app/components/KeyValueTable";
+import { binToBytes } from "@app/utils/blob_utils";
+import { recordChanged } from "@app/utils/dirty";
+import { formatOptionalDate } from "@app/utils/format";
+import { extractPkcs12KeyPair, isPkcs12File } from "@app/utils/pkcs12";
+import { hashSoftEtherPassword } from "@app/utils/sha0";
+import { certificateBytesToDer } from "@app/utils/x509";
 
 // Cascade client-auth methods. RADIUS / NT domain auth is the plain-password
 // type (the server forwards the plaintext); "standard" password auth is SHA-0
 // hashed client-side and only works against local hub users.
 const LINK_AUTH_TYPES = [
-  { value: VPN.VpnRpcClientAuthType.Anonymous, label: 'Anonymous' },
-  { value: VPN.VpnRpcClientAuthType.SHA0_Hashed_Password, label: 'Standard password' },
-  { value: VPN.VpnRpcClientAuthType.PlainPassword, label: 'RADIUS / NT domain (plain password)' },
-  { value: VPN.VpnRpcClientAuthType.Cert, label: 'Client certificate' },
+  { value: VPN.VpnRpcClientAuthType.Anonymous, label: "Anonymous" },
+  { value: VPN.VpnRpcClientAuthType.SHA0_Hashed_Password, label: "Standard password" },
+  { value: VPN.VpnRpcClientAuthType.PlainPassword, label: "RADIUS / NT domain (plain password)" },
+  { value: VPN.VpnRpcClientAuthType.Cert, label: "Client certificate" },
 ];
 
 // Read a certificate file, validating that it parses before returning bytes.
-const readCertBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m: string) => void): void => {
+const readCertBytes = (
+  file: File,
+  onBytes: (b: Uint8Array) => void,
+  onError: (m: string) => void,
+): void => {
   const reader = new FileReader();
   reader.onload = () => {
     try {
       const bytes = new Uint8Array(reader.result as ArrayBuffer);
       onBytes(certificateBytesToDer(bytes));
     } catch {
-      onError('The file is not a valid certificate (PEM or DER).');
+      onError("The file is not a valid certificate (PEM or DER).");
     }
   };
-  reader.onerror = () => onError('The certificate file could not be read.');
+  reader.onerror = () => onError("The certificate file could not be read.");
   reader.readAsArrayBuffer(file);
 };
 
 // Read a private key. The RPC decodes the key with no passphrase
 // (InRpcClientAuth -> BufToK(..., NULL)), so an encrypted key would fail
 // silently server-side; direct those files through the PKCS #12 flow instead.
-const readKeyBytes = (file: File, onBytes: (b: Uint8Array) => void, onError: (m: string) => void): void => {
+const readKeyBytes = (
+  file: File,
+  onBytes: (b: Uint8Array) => void,
+  onError: (m: string) => void,
+): void => {
   const reader = new FileReader();
   reader.onload = () => {
     const bytes = new Uint8Array(reader.result as ArrayBuffer);
-    const text = new TextDecoder('latin1').decode(bytes);
+    const text = new TextDecoder("latin1").decode(bytes);
     if (/ENCRYPTED PRIVATE KEY|Proc-Type:\s*4,\s*ENCRYPTED|DEK-Info:/i.test(text)) {
-      onError('Encrypted private-key files cannot be imported separately. Use a PKCS #12 archive instead.');
+      onError(
+        "Encrypted private-key files cannot be imported separately. Use a PKCS #12 archive instead.",
+      );
       return;
     }
     onBytes(bytes);
   };
-  reader.onerror = () => onError('The private key file could not be read.');
+  reader.onerror = () => onError("The private key file could not be read.");
   reader.readAsArrayBuffer(file);
 };
 
 // _bin fields round-tripped from GetLink arrive as base64 strings; convert to
 // real bytes before SetLink so the client does not double-encode them.
-const LINK_BIN_KEYS = ['HashedPassword_bin', 'ClientX_bin', 'ClientK_bin', 'ServerCert_bin'];
-const AUTH_KEYS = ['AuthType_u32', 'Username_str', 'HashedPassword_bin', 'PlainPassword_str', 'ClientX_bin', 'ClientK_bin'];
-const PROXY_KEYS = ['ProxyType_u32', 'ProxyName_str', 'ProxyPort_u32', 'ProxyUsername_str', 'ProxyPassword_str'];
+const LINK_BIN_KEYS = ["HashedPassword_bin", "ClientX_bin", "ClientK_bin", "ServerCert_bin"];
+const AUTH_KEYS = [
+  "AuthType_u32",
+  "Username_str",
+  "HashedPassword_bin",
+  "PlainPassword_str",
+  "ClientX_bin",
+  "ClientK_bin",
+];
+const PROXY_KEYS = [
+  "ProxyType_u32",
+  "ProxyName_str",
+  "ProxyPort_u32",
+  "ProxyUsername_str",
+  "ProxyPassword_str",
+];
 const ADVANCED_KEYS = [
-  'MaxConnection_u32',
-  'UseEncrypt_bool',
-  'UseCompress_bool',
-  'HalfConnection_bool',
-  'DisableQoS_bool',
-  'NoRoutingTracking_bool',
-  'NoUdpAcceleration_bool',
-  'AdditionalConnectionInterval_u32',
-  'ConnectionDisconnectSpan_u32',
+  "MaxConnection_u32",
+  "UseEncrypt_bool",
+  "UseCompress_bool",
+  "HalfConnection_bool",
+  "DisableQoS_bool",
+  "NoRoutingTracking_bool",
+  "NoUdpAcceleration_bool",
+  "AdditionalConnectionInterval_u32",
+  "ConnectionDisconnectSpan_u32",
 ];
 
 const MIN_TCP_CONNECTIONS = 1;
@@ -152,19 +175,29 @@ const AdvancedFields: React.FunctionComponent<{
   return (
     <ExpandableSection toggleText="Advanced settings">
       {numField(
-        'MaxConnection_u32',
-        'Number of TCP connections',
+        "MaxConnection_u32",
+        "Number of TCP connections",
         NATIVE_CASCADE_TCP_CONNECTIONS,
-        'Number of TCP connections',
+        "Number of TCP connections",
       )}
-      {checkbox('UseEncrypt_bool', 'Encrypt the VPN communication')}
-      {checkbox('UseCompress_bool', 'Compress the data')}
-      {checkbox('HalfConnection_bool', 'Use half-duplex mode (with multiple connections)')}
-      {checkbox('DisableQoS_bool', 'Disable VoIP / QoS control')}
-      {checkbox('NoRoutingTracking_bool', 'No adjustments of routing table')}
-      {checkbox('NoUdpAcceleration_bool', 'Disable UDP acceleration')}
-      {numField('AdditionalConnectionInterval_u32', 'Additional connection interval (seconds)', 1, 'Additional connection interval')}
-      {numField('ConnectionDisconnectSpan_u32', 'Connection life of each TCP connection (seconds, 0 = no expiry)', 0, 'Connection life')}
+      {checkbox("UseEncrypt_bool", "Encrypt the VPN communication")}
+      {checkbox("UseCompress_bool", "Compress the data")}
+      {checkbox("HalfConnection_bool", "Use half-duplex mode (with multiple connections)")}
+      {checkbox("DisableQoS_bool", "Disable VoIP / QoS control")}
+      {checkbox("NoRoutingTracking_bool", "No adjustments of routing table")}
+      {checkbox("NoUdpAcceleration_bool", "Disable UDP acceleration")}
+      {numField(
+        "AdditionalConnectionInterval_u32",
+        "Additional connection interval (seconds)",
+        1,
+        "Additional connection interval",
+      )}
+      {numField(
+        "ConnectionDisconnectSpan_u32",
+        "Connection life of each TCP connection (seconds, 0 = no expiry)",
+        0,
+        "Connection life",
+      )}
     </ExpandableSection>
   );
 };
@@ -180,21 +213,24 @@ const coerceLinkNumbers = (obj: Record<string, unknown>): void => {
     }
     return Math.min(Math.max(n, min), max ?? n);
   };
-  if ('MaxConnection_u32' in obj) obj.MaxConnection_u32 = asInt(obj.MaxConnection_u32, MIN_TCP_CONNECTIONS, MAX_TCP_CONNECTIONS);
-  if ('AdditionalConnectionInterval_u32' in obj) obj.AdditionalConnectionInterval_u32 = asInt(obj.AdditionalConnectionInterval_u32, 1);
-  if ('ConnectionDisconnectSpan_u32' in obj) obj.ConnectionDisconnectSpan_u32 = asInt(obj.ConnectionDisconnectSpan_u32, 0);
-  if ('ProxyPort_u32' in obj) obj.ProxyPort_u32 = asInt(obj.ProxyPort_u32, 0);
+  if ("MaxConnection_u32" in obj)
+    obj.MaxConnection_u32 = asInt(obj.MaxConnection_u32, MIN_TCP_CONNECTIONS, MAX_TCP_CONNECTIONS);
+  if ("AdditionalConnectionInterval_u32" in obj)
+    obj.AdditionalConnectionInterval_u32 = asInt(obj.AdditionalConnectionInterval_u32, 1);
+  if ("ConnectionDisconnectSpan_u32" in obj)
+    obj.ConnectionDisconnectSpan_u32 = asInt(obj.ConnectionDisconnectSpan_u32, 0);
+  if ("ProxyPort_u32" in obj) obj.ProxyPort_u32 = asInt(obj.ProxyPort_u32, 0);
 };
 
 const advancedComplete = (get: (key: string) => unknown): boolean => {
-  const maxConnection = Number(get('MaxConnection_u32') ?? NATIVE_CASCADE_TCP_CONNECTIONS);
-  const interval = Number(get('AdditionalConnectionInterval_u32') ?? 1);
-  const disconnectSpan = Number(get('ConnectionDisconnectSpan_u32') ?? 0);
+  const maxConnection = Number(get("MaxConnection_u32") ?? NATIVE_CASCADE_TCP_CONNECTIONS);
+  const interval = Number(get("AdditionalConnectionInterval_u32") ?? 1);
+  const disconnectSpan = Number(get("ConnectionDisconnectSpan_u32") ?? 0);
   return (
     Number.isInteger(maxConnection) &&
     maxConnection >= MIN_TCP_CONNECTIONS &&
     maxConnection <= MAX_TCP_CONNECTIONS &&
-    (!get('HalfConnection_bool') || maxConnection > MIN_TCP_CONNECTIONS) &&
+    (!get("HalfConnection_bool") || maxConnection > MIN_TCP_CONNECTIONS) &&
     Number.isInteger(interval) &&
     interval >= 1 &&
     Number.isInteger(disconnectSpan) &&
@@ -211,28 +247,28 @@ const editAdvancedComplete = (get: (key: string) => unknown): boolean => {
     if (value === undefined || value === null) {
       return true;
     }
-    return value !== '' && Number.isFinite(Number(value));
+    return value !== "" && Number.isFinite(Number(value));
   };
   return (
-    finiteNumber('MaxConnection_u32') &&
-    finiteNumber('AdditionalConnectionInterval_u32') &&
-    finiteNumber('ConnectionDisconnectSpan_u32')
+    finiteNumber("MaxConnection_u32") &&
+    finiteNumber("AdditionalConnectionInterval_u32") &&
+    finiteNumber("ConnectionDisconnectSpan_u32")
   );
 };
 
 const PROXY_TYPES = [
-  { value: VPN.VpnRpcProxyType.Direct, label: 'Direct (no proxy)' },
-  { value: VPN.VpnRpcProxyType.HTTP, label: 'HTTP proxy' },
-  { value: VPN.VpnRpcProxyType.SOCKS, label: 'SOCKS proxy' },
+  { value: VPN.VpnRpcProxyType.Direct, label: "Direct (no proxy)" },
+  { value: VPN.VpnRpcProxyType.HTTP, label: "HTTP proxy" },
+  { value: VPN.VpnRpcProxyType.SOCKS, label: "SOCKS proxy" },
 ];
 
 // A proxy config is complete when it is Direct, or has a host and a valid port.
 const proxyComplete = (get: (key: string) => unknown): boolean => {
-  if ((Number(get('ProxyType_u32')) || 0) === VPN.VpnRpcProxyType.Direct) {
+  if ((Number(get("ProxyType_u32")) || 0) === VPN.VpnRpcProxyType.Direct) {
     return true;
   }
-  const host = String(get('ProxyName_str') ?? '').trim();
-  const port = Number(get('ProxyPort_u32'));
+  const host = String(get("ProxyName_str") ?? "").trim();
+  const port = Number(get("ProxyPort_u32"));
   return host.length > 0 && Number.isInteger(port) && port >= 1 && port <= 65535;
 };
 
@@ -242,14 +278,14 @@ const ProxyFields: React.FunctionComponent<{
   get: (key: string) => unknown;
   set: (key: string, value: unknown) => void;
 }> = ({ idPrefix, get, set }) => {
-  const type = Number(get('ProxyType_u32')) || 0;
+  const type = Number(get("ProxyType_u32")) || 0;
   return (
     <ExpandableSection toggleText="Proxy">
       <FormGroup label="Proxy type" fieldId={`${idPrefix}-proxytype`}>
         <FormSelect
           id={`${idPrefix}-proxytype`}
           value={type}
-          onChange={(_event, value) => set('ProxyType_u32', Number(value))}
+          onChange={(_event, value) => set("ProxyType_u32", Number(value))}
           aria-label="Proxy type"
         >
           {PROXY_TYPES.map((option) => (
@@ -263,8 +299,8 @@ const ProxyFields: React.FunctionComponent<{
             <TextInput
               isRequired
               id={`${idPrefix}-proxyhost`}
-              value={String(get('ProxyName_str') ?? '')}
-              onChange={(_event, value) => set('ProxyName_str', value)}
+              value={String(get("ProxyName_str") ?? "")}
+              onChange={(_event, value) => set("ProxyName_str", value)}
               aria-label="Proxy host"
             />
           </FormGroup>
@@ -273,16 +309,16 @@ const ProxyFields: React.FunctionComponent<{
               isRequired
               type="number"
               id={`${idPrefix}-proxyport`}
-              value={String(get('ProxyPort_u32') ?? '')}
-              onChange={(_event, value) => set('ProxyPort_u32', value)}
+              value={String(get("ProxyPort_u32") ?? "")}
+              onChange={(_event, value) => set("ProxyPort_u32", value)}
               aria-label="Proxy port"
             />
           </FormGroup>
           <FormGroup label="Proxy username" fieldId={`${idPrefix}-proxyuser`}>
             <TextInput
               id={`${idPrefix}-proxyuser`}
-              value={String(get('ProxyUsername_str') ?? '')}
-              onChange={(_event, value) => set('ProxyUsername_str', value)}
+              value={String(get("ProxyUsername_str") ?? "")}
+              onChange={(_event, value) => set("ProxyUsername_str", value)}
               aria-label="Proxy username"
             />
           </FormGroup>
@@ -290,8 +326,8 @@ const ProxyFields: React.FunctionComponent<{
             <TextInput
               type="password"
               id={`${idPrefix}-proxypass`}
-              value={String(get('ProxyPassword_str') ?? '')}
-              onChange={(_event, value) => set('ProxyPassword_str', value)}
+              value={String(get("ProxyPassword_str") ?? "")}
+              onChange={(_event, value) => set("ProxyPassword_str", value)}
               aria-label="Proxy password"
             />
           </FormGroup>
@@ -309,24 +345,28 @@ const ServerCertificateFields: React.FunctionComponent<{
   set: (key: string, value: unknown) => void;
   onViewCert: (cert: Uint8Array | string) => void;
 }> = ({ idPrefix, get, set, onViewCert }) => {
-  const [filename, setFilename] = React.useState('');
+  const [filename, setFilename] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
-  const checkServerCert = Boolean(get('CheckServerCert_bool'));
-  const pinnedCert = binToBytes(get('ServerCert_bin'));
+  const checkServerCert = Boolean(get("CheckServerCert_bool"));
+  const pinnedCert = binToBytes(get("ServerCert_bin"));
   return (
     <FormGroup label="Server certificate" fieldId={`${idPrefix}-servercert`}>
       <Checkbox
         id={`${idPrefix}-checkservercert`}
         label="Always verify the destination server certificate"
         isChecked={checkServerCert}
-        onChange={(_event, checked) => set('CheckServerCert_bool', checked)}
+        onChange={(_event, checked) => set("CheckServerCert_bool", checked)}
       />
       {checkServerCert && (
         <>
           {pinnedCert && (
-            <Flex gap={{ default: 'gapSm' }}>
+            <Flex gap={{ default: "gapSm" }}>
               <FlexItem>
-                <Button variant="link" isInline onClick={() => onViewCert(get('ServerCert_bin') as Uint8Array | string)}>
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => onViewCert(get("ServerCert_bin") as Uint8Array | string)}
+                >
                   View pinned certificate
                 </Button>
               </FlexItem>
@@ -335,9 +375,9 @@ const ServerCertificateFields: React.FunctionComponent<{
                   variant="link"
                   isInline
                   onClick={() => {
-                    setFilename('');
+                    setFilename("");
                     setError(null);
-                    set('ServerCert_bin', undefined);
+                    set("ServerCert_bin", undefined);
                   }}
                 >
                   Remove pinned certificate
@@ -349,32 +389,38 @@ const ServerCertificateFields: React.FunctionComponent<{
             id={`${idPrefix}-servercert`}
             type="dataURL"
             filename={filename}
-            filenamePlaceholder={pinnedCert ? 'Replace pinned server certificate' : 'Optionally pin a specific server certificate'}
-            browseButtonText={pinnedCert ? 'Replace' : 'Upload'}
+            filenamePlaceholder={
+              pinnedCert
+                ? "Replace pinned server certificate"
+                : "Optionally pin a specific server certificate"
+            }
+            browseButtonText={pinnedCert ? "Replace" : "Upload"}
             hideDefaultPreview
             onFileInputChange={(_event, file) => {
               setError(null);
               setFilename(file.name);
               readCertBytes(
                 file,
-                (bytes) => set('ServerCert_bin', bytes),
+                (bytes) => set("ServerCert_bin", bytes),
                 (message) => {
                   setError(message);
-                  set('ServerCert_bin', undefined);
+                  set("ServerCert_bin", undefined);
                 },
               );
             }}
             onClearClick={() => {
-              setFilename('');
+              setFilename("");
               setError(null);
-              set('ServerCert_bin', undefined);
+              set("ServerCert_bin", undefined);
             }}
-            dropzoneProps={{ accept: { 'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'] } }}
+            dropzoneProps={{
+              accept: { "application/x-x509-ca-cert": [".cer", ".crt", ".cert", ".pem"] },
+            }}
             filenameAriaLabel="Server certificate file name"
           />
           <HelperText>
-            <HelperTextItem variant={error ? 'error' : 'default'}>
-              {error ?? 'If pinned, the server must present exactly this certificate.'}
+            <HelperTextItem variant={error ? "error" : "default"}>
+              {error ?? "If pinned, the server must present exactly this certificate."}
             </HelperTextItem>
           </HelperText>
         </>
@@ -385,31 +431,31 @@ const ServerCertificateFields: React.FunctionComponent<{
 
 // GetLinkStatus returns many fields; surface the connection summary only.
 const STATUS_KEYS = [
-  'Connected_bool',
-  'ServerName_str',
-  'ServerPort_u32',
-  'ServerProductName_str',
-  'NumConnectionsEatablished_u32',
-  'NumTcpConnections_u32',
-  'StartTime_dt',
-  'CurrentConnectionEstablishTime_dt',
+  "Connected_bool",
+  "ServerName_str",
+  "ServerPort_u32",
+  "ServerProductName_str",
+  "NumConnectionsEatablished_u32",
+  "NumTcpConnections_u32",
+  "StartTime_dt",
+  "CurrentConnectionEstablishTime_dt",
 ];
 
-type StatusLabel = { text: string; color: 'green' | 'grey' | 'red' | 'blue' };
+type StatusLabel = { text: string; color: "green" | "grey" | "red" | "blue" };
 
 // A cascade is offline (administratively down), connected, retrying after an
 // error, or connecting. LastError_u32 is a SoftEther error code (0 = none).
 const linkStatus = (l: VPN.VpnRpcEnumLinkItem): StatusLabel => {
   if (!l.Online_bool) {
-    return { text: 'Offline', color: 'grey' };
+    return { text: "Offline", color: "grey" };
   }
   if (l.Connected_bool) {
-    return { text: 'Connected', color: 'green' };
+    return { text: "Connected", color: "green" };
   }
   if (l.LastError_u32) {
-    return { text: `Error (code ${l.LastError_u32})`, color: 'red' };
+    return { text: `Error (code ${l.LastError_u32})`, color: "red" };
   }
-  return { text: 'Connecting', color: 'blue' };
+  return { text: "Connecting", color: "blue" };
 };
 
 interface StatusState {
@@ -420,9 +466,13 @@ interface StatusState {
 
 // True when the auth section has everything it needs to save. `password` may be
 // empty in edit mode when the existing secret is kept (hasSecret).
-const authComplete = (get: (key: string) => unknown, password: string, hasSecret: boolean): boolean => {
-  const type = Number(get('AuthType_u32')) || 0;
-  const username = String(get('Username_str') ?? '').trim();
+const authComplete = (
+  get: (key: string) => unknown,
+  password: string,
+  hasSecret: boolean,
+): boolean => {
+  const type = Number(get("AuthType_u32")) || 0;
+  const username = String(get("Username_str") ?? "").trim();
   const { Anonymous, SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
   if (type === Anonymous) {
     return true;
@@ -431,7 +481,11 @@ const authComplete = (get: (key: string) => unknown, password: string, hasSecret
     return username.length > 0 && (password.length > 0 || hasSecret);
   }
   if (type === Cert) {
-    return username.length > 0 && binToBytes(get('ClientX_bin')) !== null && binToBytes(get('ClientK_bin')) !== null;
+    return (
+      username.length > 0 &&
+      binToBytes(get("ClientX_bin")) !== null &&
+      binToBytes(get("ClientK_bin")) !== null
+    );
   }
   return false;
 };
@@ -443,15 +497,15 @@ const authTypeNeedsUsername = (type: number): boolean => {
 
 const authHasSecret = (get: (key: string) => unknown): boolean => {
   const { SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
-  const type = Number(get('AuthType_u32')) || 0;
+  const type = Number(get("AuthType_u32")) || 0;
   if (type === SHA0_Hashed_Password) {
-    return binToBytes(get('HashedPassword_bin')) !== null;
+    return binToBytes(get("HashedPassword_bin")) !== null;
   }
   if (type === PlainPassword) {
-    return String(get('PlainPassword_str') ?? '').length > 0;
+    return String(get("PlainPassword_str") ?? "").length > 0;
   }
   if (type === Cert) {
-    return binToBytes(get('ClientX_bin')) !== null && binToBytes(get('ClientK_bin')) !== null;
+    return binToBytes(get("ClientX_bin")) !== null && binToBytes(get("ClientK_bin")) !== null;
   }
   return true;
 };
@@ -462,12 +516,15 @@ const editAuthComplete = (
   password: string,
   touched: Set<string>,
 ): boolean => {
-  const type = Number(get('AuthType_u32')) || 0;
+  const type = Number(get("AuthType_u32")) || 0;
   const originalType = Number(original?.AuthType_u32 ?? type) || 0;
-  const username = String(get('Username_str') ?? '').trim();
+  const username = String(get("Username_str") ?? "").trim();
   const authTypeChanged = type !== originalType;
   const secretChanged =
-    password.length > 0 || ['HashedPassword_bin', 'PlainPassword_str', 'ClientX_bin', 'ClientK_bin'].some((key) => touched.has(key));
+    password.length > 0 ||
+    ["HashedPassword_bin", "PlainPassword_str", "ClientX_bin", "ClientK_bin"].some((key) =>
+      touched.has(key),
+    );
   if (!authTypeChanged && !secretChanged) {
     return authTypeNeedsUsername(type) ? username.length > 0 : true;
   }
@@ -477,10 +534,14 @@ const editAuthComplete = (
 // Write the chosen auth method's fields onto `target` from the auth inputs.
 // A blank password leaves the secret already on `target` untouched (edit keeps
 // the existing one); _bin fields are handed real bytes.
-const applyAuth = (target: Record<string, unknown>, get: (key: string) => unknown, password: string): void => {
+const applyAuth = (
+  target: Record<string, unknown>,
+  get: (key: string) => unknown,
+  password: string,
+): void => {
   const { SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
-  const type = Number(get('AuthType_u32')) || 0;
-  const username = String(get('Username_str') ?? '').trim();
+  const type = Number(get("AuthType_u32")) || 0;
+  const username = String(get("Username_str") ?? "").trim();
   target.AuthType_u32 = type;
   target.Username_str = username;
   if (type === SHA0_Hashed_Password) {
@@ -492,8 +553,8 @@ const applyAuth = (target: Record<string, unknown>, get: (key: string) => unknow
       target.PlainPassword_str = password;
     }
   } else if (type === Cert) {
-    const x = binToBytes(get('ClientX_bin'));
-    const k = binToBytes(get('ClientK_bin'));
+    const x = binToBytes(get("ClientX_bin"));
+    const k = binToBytes(get("ClientK_bin"));
     if (x) {
       target.ClientX_bin = x;
     }
@@ -516,13 +577,13 @@ interface ClientCertificateUploadState {
 }
 
 const emptyClientCertificateUpload = (): ClientCertificateUploadState => ({
-  certFilename: '',
+  certFilename: "",
   certError: null,
-  keyFilename: '',
+  keyFilename: "",
   keyError: null,
   certificateIsPkcs12: false,
   pkcs12Bytes: null,
-  pkcs12Password: '',
+  pkcs12Password: "",
   pkcs12Error: null,
   openingPkcs12: false,
 });
@@ -536,7 +597,10 @@ const AuthFields: React.FunctionComponent<{
   idPrefix: string;
   get: (key: string) => unknown;
   set: (key: string, value: unknown) => void;
-  setCertificatePair: (certificate: Uint8Array | undefined, privateKey: Uint8Array | undefined) => void;
+  setCertificatePair: (
+    certificate: Uint8Array | undefined,
+    privateKey: Uint8Array | undefined,
+  ) => void;
   certificateUpload: ClientCertificateUploadState;
   setCertificateUpload: React.Dispatch<React.SetStateAction<ClientCertificateUploadState>>;
   password: string;
@@ -556,8 +620,9 @@ const AuthFields: React.FunctionComponent<{
   onViewCert,
 }) => {
   const { Anonymous, SHA0_Hashed_Password, PlainPassword, Cert } = VPN.VpnRpcClientAuthType;
-  const authType = Number(get('AuthType_u32')) || Anonymous;
-  const needsUsername = authType === SHA0_Hashed_Password || authType === PlainPassword || authType === Cert;
+  const authType = Number(get("AuthType_u32")) || Anonymous;
+  const needsUsername =
+    authType === SHA0_Hashed_Password || authType === PlainPassword || authType === Cert;
   const {
     certFilename,
     certError,
@@ -575,8 +640,10 @@ const AuthFields: React.FunctionComponent<{
   const setCertError = (value: string | null) => updateCertificateUpload({ certError: value });
   const setKeyFilename = (value: string) => updateCertificateUpload({ keyFilename: value });
   const setKeyError = (value: string | null) => updateCertificateUpload({ keyError: value });
-  const setCertificateIsPkcs12 = (value: boolean) => updateCertificateUpload({ certificateIsPkcs12: value });
-  const setPkcs12Bytes = (value: Uint8Array | null) => updateCertificateUpload({ pkcs12Bytes: value });
+  const setCertificateIsPkcs12 = (value: boolean) =>
+    updateCertificateUpload({ certificateIsPkcs12: value });
+  const setPkcs12Bytes = (value: Uint8Array | null) =>
+    updateCertificateUpload({ pkcs12Bytes: value });
   const setPkcs12Password = (value: string) => updateCertificateUpload({ pkcs12Password: value });
   const setPkcs12Error = (value: string | null) => updateCertificateUpload({ pkcs12Error: value });
   const setOpeningPkcs12 = (value: boolean) => updateCertificateUpload({ openingPkcs12: value });
@@ -590,7 +657,7 @@ const AuthFields: React.FunctionComponent<{
     reader.onload = () => setPkcs12Bytes(new Uint8Array(reader.result as ArrayBuffer));
     reader.onerror = () => {
       setPkcs12Bytes(null);
-      setPkcs12Error('The PKCS #12 archive could not be read.');
+      setPkcs12Error("The PKCS #12 archive could not be read.");
     };
     reader.readAsArrayBuffer(file);
   };
@@ -604,7 +671,7 @@ const AuthFields: React.FunctionComponent<{
     try {
       const pair = await extractPkcs12KeyPair(pkcs12Bytes, pkcs12Password);
       setCertificatePair(certificateBytesToDer(pair.certificate), pair.privateKey);
-      setPkcs12Password('');
+      setPkcs12Password("");
     } catch (error) {
       clearClientIdentity();
       setPkcs12Error(error instanceof Error ? error.message : String(error));
@@ -619,7 +686,7 @@ const AuthFields: React.FunctionComponent<{
         <FormSelect
           id={`${idPrefix}-auth`}
           value={authType}
-          onChange={(_event, value) => set('AuthType_u32', Number(value))}
+          onChange={(_event, value) => set("AuthType_u32", Number(value))}
           aria-label="Authentication method"
         >
           {LINK_AUTH_TYPES.map((option) => (
@@ -632,14 +699,18 @@ const AuthFields: React.FunctionComponent<{
           <TextInput
             isRequired
             id={`${idPrefix}-username`}
-            value={String(get('Username_str') ?? '')}
-            onChange={(_event, value) => set('Username_str', value)}
+            value={String(get("Username_str") ?? "")}
+            onChange={(_event, value) => set("Username_str", value)}
             aria-label="Username"
           />
         </FormGroup>
       )}
       {(authType === SHA0_Hashed_Password || authType === PlainPassword) && (
-        <FormGroup label="Password" isRequired={!passwordPlaceholder} fieldId={`${idPrefix}-password`}>
+        <FormGroup
+          label="Password"
+          isRequired={!passwordPlaceholder}
+          fieldId={`${idPrefix}-password`}
+        >
           <TextInput
             isRequired={!passwordPlaceholder}
             type="password"
@@ -653,7 +724,11 @@ const AuthFields: React.FunctionComponent<{
       )}
       {authType === Cert && (
         <>
-          <FormGroup label="Client certificate or PKCS #12 archive" isRequired fieldId={`${idPrefix}-cert`}>
+          <FormGroup
+            label="Client certificate or PKCS #12 archive"
+            isRequired
+            fieldId={`${idPrefix}-cert`}
+          >
             <FileUpload
               id={`${idPrefix}-cert`}
               type="dataURL"
@@ -664,10 +739,10 @@ const AuthFields: React.FunctionComponent<{
               onFileInputChange={(_event, file) => {
                 clearClientIdentity();
                 setCertError(null);
-                setKeyFilename('');
+                setKeyFilename("");
                 setKeyError(null);
                 setPkcs12Bytes(null);
-                setPkcs12Password('');
+                setPkcs12Password("");
                 setPkcs12Error(null);
                 setCertFilename(file.name);
                 const archive = isPkcs12File(file);
@@ -677,29 +752,29 @@ const AuthFields: React.FunctionComponent<{
                 } else {
                   readCertBytes(
                     file,
-                    (bytes) => set('ClientX_bin', bytes),
+                    (bytes) => set("ClientX_bin", bytes),
                     (message) => {
                       setCertError(message);
-                      set('ClientX_bin', undefined);
+                      set("ClientX_bin", undefined);
                     },
                   );
                 }
               }}
               onClearClick={() => {
-                setCertFilename('');
+                setCertFilename("");
                 setCertError(null);
-                setKeyFilename('');
+                setKeyFilename("");
                 setKeyError(null);
                 setCertificateIsPkcs12(false);
                 setPkcs12Bytes(null);
-                setPkcs12Password('');
+                setPkcs12Password("");
                 setPkcs12Error(null);
                 clearClientIdentity();
               }}
               dropzoneProps={{
                 accept: {
-                  'application/x-x509-ca-cert': ['.cer', '.crt', '.cert', '.pem'],
-                  'application/x-pkcs12': ['.p12', '.pfx'],
+                  "application/x-x509-ca-cert": [".cer", ".crt", ".cert", ".pem"],
+                  "application/x-pkcs12": [".p12", ".pfx"],
                 },
               }}
               filenameAriaLabel="Client certificate or PKCS #12 file name"
@@ -725,19 +800,21 @@ const AuthFields: React.FunctionComponent<{
                     setKeyFilename(file.name);
                     readKeyBytes(
                       file,
-                      (bytes) => set('ClientK_bin', bytes),
+                      (bytes) => set("ClientK_bin", bytes),
                       (message) => {
                         setKeyError(message);
-                        set('ClientK_bin', undefined);
+                        set("ClientK_bin", undefined);
                       },
                     );
                   }}
                   onClearClick={() => {
-                    setKeyFilename('');
+                    setKeyFilename("");
                     setKeyError(null);
-                    set('ClientK_bin', undefined);
+                    set("ClientK_bin", undefined);
                   }}
-                  dropzoneProps={{ accept: { 'application/octet-stream': ['.key', '.pem', '.der'] } }}
+                  dropzoneProps={{
+                    accept: { "application/octet-stream": [".key", ".pem", ".der"] },
+                  }}
                   filenameAriaLabel="Private key file name"
                 />
                 {keyError && (
@@ -763,7 +840,8 @@ const AuthFields: React.FunctionComponent<{
                 />
                 <HelperText>
                   <HelperTextItem>
-                    The password is used only in this browser to open the archive and is never sent to the server.
+                    The password is used only in this browser to open the archive and is never sent
+                    to the server.
                   </HelperTextItem>
                 </HelperText>
               </FormGroup>
@@ -780,7 +858,7 @@ const AuthFields: React.FunctionComponent<{
                   <HelperTextItem variant="error">{pkcs12Error}</HelperTextItem>
                 </HelperText>
               )}
-              {binToBytes(get('ClientX_bin')) && binToBytes(get('ClientK_bin')) && !pkcs12Error && (
+              {binToBytes(get("ClientX_bin")) && binToBytes(get("ClientK_bin")) && !pkcs12Error && (
                 <HelperText>
                   <HelperTextItem variant="success">
                     Certificate and private key are ready.
@@ -789,8 +867,12 @@ const AuthFields: React.FunctionComponent<{
               )}
             </>
           )}
-          {binToBytes(get('ClientX_bin')) && !certError && !pkcs12Error && (
-            <Button variant="link" isInline onClick={() => onViewCert(get('ClientX_bin') as Uint8Array | string)}>
+          {binToBytes(get("ClientX_bin")) && !certError && !pkcs12Error && (
+            <Button
+              variant="link"
+              isInline
+              onClick={() => onViewCert(get("ClientX_bin") as Uint8Array | string)}
+            >
               View certificate
             </Button>
           )}
@@ -806,19 +888,21 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [submitting, setSubmitting] = React.useState(false);
 
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [name, setName] = React.useState('');
-  const [host, setHost] = React.useState('');
-  const [port, setPort] = React.useState('443');
-  const [destHub, setDestHub] = React.useState('');
+  const [name, setName] = React.useState("");
+  const [host, setHost] = React.useState("");
+  const [port, setPort] = React.useState("443");
+  const [destHub, setDestHub] = React.useState("");
   // Auth for a new cascade: AuthType_u32, Username_str and cert ClientX/K_bin
   // live in this object (bound to AuthFields); password is the plaintext secret.
   const [auth, setAuth] = React.useState<Record<string, unknown>>({
     AuthType_u32: VPN.VpnRpcClientAuthType.Anonymous,
   });
-  const [password, setPassword] = React.useState('');
-  const [createCertificateUpload, setCreateCertificateUpload] = React.useState(emptyClientCertificateUpload);
+  const [password, setPassword] = React.useState("");
+  const [createCertificateUpload, setCreateCertificateUpload] = React.useState(
+    emptyClientCertificateUpload,
+  );
   // Plaintext password entered while editing (blank keeps the existing secret).
-  const [editPassword, setEditPassword] = React.useState('');
+  const [editPassword, setEditPassword] = React.useState("");
   // Server-certificate verification for a new cascade: CheckServerCert and
   // optional pinned ServerCert live in this object.
   const [serverCert, setServerCert] = React.useState<Record<string, unknown>>({
@@ -827,13 +911,17 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Certificate to show in the shared viewer (staged-create or loaded-edit bytes).
   const [viewCert, setViewCert] = React.useState<Uint8Array | string | null>(null);
   // Advanced tuning for a new cascade.
-  const [advanced, setAdvanced] = React.useState<Record<string, number | boolean>>({ ...ADVANCED_DEFAULTS });
+  const [advanced, setAdvanced] = React.useState<Record<string, number | boolean>>({
+    ...ADVANCED_DEFAULTS,
+  });
   // Proxy config for a new cascade.
-  const [proxy, setProxy] = React.useState<Record<string, unknown>>({ ProxyType_u32: VPN.VpnRpcProxyType.Direct });
+  const [proxy, setProxy] = React.useState<Record<string, unknown>>({
+    ProxyType_u32: VPN.VpnRpcProxyType.Direct,
+  });
   // Security policy for a new cascade (policy:* fields + UsePolicy_bool).
   const [createPolicy, setCreatePolicy] = React.useState<Record<string, unknown>>({});
   // Which form the shared SecurityPolicyModal is editing, if any.
-  const [policyFor, setPolicyFor] = React.useState<'create' | 'edit' | null>(null);
+  const [policyFor, setPolicyFor] = React.useState<"create" | "edit" | null>(null);
 
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<StatusState | null>(null);
@@ -841,7 +929,9 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [edit, setEdit] = React.useState<Record<string, unknown> | null>(null);
   const [editOriginal, setEditOriginal] = React.useState<Record<string, unknown> | null>(null);
   const [editTouched, setEditTouched] = React.useState<Set<string>>(() => new Set());
-  const [editCertificateUpload, setEditCertificateUpload] = React.useState(emptyClientCertificateUpload);
+  const [editCertificateUpload, setEditCertificateUpload] = React.useState(
+    emptyClientCertificateUpload,
+  );
 
   const load = React.useCallback(() => {
     setError(null);
@@ -857,12 +947,12 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   const openCreate = () => {
     setError(null);
-    setName('');
-    setHost('');
-    setPort('443');
-    setDestHub('');
+    setName("");
+    setHost("");
+    setPort("443");
+    setDestHub("");
     setAuth({ AuthType_u32: VPN.VpnRpcClientAuthType.Anonymous });
-    setPassword('');
+    setPassword("");
     setCreateCertificateUpload(emptyClientCertificateUpload());
     setServerCert({ CheckServerCert_bool: false });
     setAdvanced({ ...ADVANCED_DEFAULTS });
@@ -931,7 +1021,9 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const openStatus = (accountName: string) => {
     setStatus({ name: accountName, status: null, error: null });
     api
-      .GetLinkStatus(new VPN.VpnRpcLinkStatus({ HubName_Ex_str: hub, AccountName_utf: accountName }))
+      .GetLinkStatus(
+        new VPN.VpnRpcLinkStatus({ HubName_Ex_str: hub, AccountName_utf: accountName }),
+      )
       .then((response) => {
         const raw = response as unknown as Record<string, unknown>;
         const subset: Record<string, unknown> = {};
@@ -949,7 +1041,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // the local hub (HubName_Ex_str) and the account name.
   const openEdit = (accountName: string) => {
     setError(null);
-    setEditPassword('');
+    setEditPassword("");
     setEditTouched(new Set());
     setEditCertificateUpload(emptyClientCertificateUpload());
     api
@@ -981,7 +1073,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       const bytes = binToBytes(edit[key]);
       if (bytes) {
         (obj as unknown as Record<string, unknown>)[key] = bytes;
-      } else if (key === 'ServerCert_bin') {
+      } else if (key === "ServerCert_bin") {
         obj.ServerCert_bin = new Uint8Array();
       } else {
         delete (obj as unknown as Record<string, unknown>)[key];
@@ -1037,13 +1129,18 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <Flex
-      direction={{ default: 'column' }}
-      gap={{ default: 'gapMd' }}
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
+      <Flex justifyContent={{ default: "justifyContentFlexEnd" }} gap={{ default: "gapSm" }}>
         <FlexItem>
-          <Button variant="primary" icon={<PlusCircleIcon />} onClick={openCreate} isDisabled={isLoading}>
+          <Button
+            variant="primary"
+            icon={<PlusCircleIcon />}
+            onClick={openCreate}
+            isDisabled={isLoading}
+          >
             New cascade
           </Button>
         </FlexItem>
@@ -1062,8 +1159,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       ) : links !== null && links.length === 0 ? (
         <EmptyState titleText="No cascade connections" headingLevel="h2">
           <EmptyStateBody>
-            A cascade connection links this hub to a Virtual Hub on another VPN server, joining the two Layer 2
-            segments.
+            A cascade connection links this hub to a Virtual Hub on another VPN server, joining the
+            two Layer 2 segments.
           </EmptyStateBody>
           <EmptyStateFooter>
             <EmptyStateActions>
@@ -1097,20 +1194,29 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     </Label>
                   </Td>
                   <Td dataLabel="Established">
-                    {l.Connected_bool ? formatOptionalDate(l.ConnectedTime_dt, '-') : '-'}
+                    {l.Connected_bool ? formatOptionalDate(l.ConnectedTime_dt, "-") : "-"}
                   </Td>
                   <Td dataLabel="Destination server">{l.Hostname_str}</Td>
                   <Td dataLabel="Destination hub">{l.TargetHubName_str}</Td>
                   <Td isActionCell>
                     <ActionsColumn
                       items={[
-                        { title: 'Edit settings', onClick: () => openEdit(l.AccountName_utf) },
-                        { title: 'Connection status', onClick: () => openStatus(l.AccountName_utf) },
+                        { title: "Edit settings", onClick: () => openEdit(l.AccountName_utf) },
+                        {
+                          title: "Connection status",
+                          onClick: () => openStatus(l.AccountName_utf),
+                        },
                         l.Online_bool
-                          ? { title: 'Set offline', onClick: () => setOnline(l.AccountName_utf, false) }
-                          : { title: 'Set online', onClick: () => setOnline(l.AccountName_utf, true) },
+                          ? {
+                              title: "Set offline",
+                              onClick: () => setOnline(l.AccountName_utf, false),
+                            }
+                          : {
+                              title: "Set online",
+                              onClick: () => setOnline(l.AccountName_utf, true),
+                            },
                         { isSeparator: true },
-                        { title: 'Delete', onClick: () => setPendingDelete(l.AccountName_utf) },
+                        { title: "Delete", onClick: () => setPendingDelete(l.AccountName_utf) },
                       ]}
                     />
                   </Td>
@@ -1199,17 +1305,24 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
             <AdvancedFields
               idPrefix="link"
               get={(key) => advanced[key]}
-              set={(key, value) => setAdvanced((prev) => ({ ...prev, [key]: value as number | boolean }))}
+              set={(key, value) =>
+                setAdvanced((prev) => ({ ...prev, [key]: value as number | boolean }))
+              }
             />
             <FormGroup label="Security policy" fieldId="link-policy">
-              <Button variant="secondary" onClick={() => setPolicyFor('create')}>
+              <Button variant="secondary" onClick={() => setPolicyFor("create")}>
                 Edit security policy
               </Button>
             </FormGroup>
           </Form>
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={create} isDisabled={!canCreate || submitting} isLoading={submitting}>
+          <Button
+            variant="primary"
+            onClick={create}
+            isDisabled={!canCreate || submitting}
+            isLoading={submitting}
+          >
             Create
           </Button>
           <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={submitting}>
@@ -1224,7 +1337,9 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         isOpen={edit !== null && !subModalOpen}
         onClose={() => !submitting && setEdit(null)}
       >
-        <ModalHeader title={edit ? `Cascade settings: ${String(edit.AccountName_utf ?? '')}` : ''} />
+        <ModalHeader
+          title={edit ? `Cascade settings: ${String(edit.AccountName_utf ?? "")}` : ""}
+        />
         <ModalBody>
           <FormErrorAlert error={error} title="Cascade operation failed" />
           {edit && (
@@ -1233,8 +1348,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <TextInput
                   isRequired
                   id="edit-host"
-                  value={String(edit.Hostname_str ?? '')}
-                  onChange={(_event, value) => setEditField('Hostname_str', value)}
+                  value={String(edit.Hostname_str ?? "")}
+                  onChange={(_event, value) => setEditField("Hostname_str", value)}
                   aria-label="Destination server host"
                 />
               </FormGroup>
@@ -1243,8 +1358,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   isRequired
                   type="number"
                   id="edit-port"
-                  value={String(edit.Port_u32 ?? '')}
-                  onChange={(_event, value) => setEditField('Port_u32', Number(value) || 0)}
+                  value={String(edit.Port_u32 ?? "")}
+                  onChange={(_event, value) => setEditField("Port_u32", Number(value) || 0)}
                   aria-label="Port"
                 />
               </FormGroup>
@@ -1252,8 +1367,8 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <TextInput
                   isRequired
                   id="edit-desthub"
-                  value={String(edit.HubName_str ?? '')}
-                  onChange={(_event, value) => setEditField('HubName_str', value)}
+                  value={String(edit.HubName_str ?? "")}
+                  onChange={(_event, value) => setEditField("HubName_str", value)}
                   aria-label="Destination virtual hub"
                 />
               </FormGroup>
@@ -1271,13 +1386,13 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         }
                       : prev,
                   );
-                  setEditTouched((prev) => new Set(prev).add('ClientX_bin').add('ClientK_bin'));
+                  setEditTouched((prev) => new Set(prev).add("ClientX_bin").add("ClientK_bin"));
                 }}
                 certificateUpload={editCertificateUpload}
                 setCertificateUpload={setEditCertificateUpload}
                 password={editPassword}
                 setPassword={(value) => {
-                  setEditTouched((prev) => new Set(prev).add('PlainPassword_str'));
+                  setEditTouched((prev) => new Set(prev).add("PlainPassword_str"));
                   setEditPassword(value);
                 }}
                 passwordPlaceholder="Leave blank to keep the current password"
@@ -1292,7 +1407,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               <ProxyFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <AdvancedFields idPrefix="edit" get={(key) => edit[key]} set={setEditField} />
               <FormGroup label="Security policy" fieldId="edit-policy">
-                <Button variant="secondary" onClick={() => setPolicyFor('edit')}>
+                <Button variant="secondary" onClick={() => setPolicyFor("edit")}>
                   Edit security policy
                 </Button>
               </FormGroup>
@@ -1307,13 +1422,14 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               !edit ||
               !editDirty ||
               submitting ||
-              String(edit.Hostname_str ?? '').trim().length === 0 ||
-              String(edit.HubName_str ?? '').trim().length === 0 ||
+              String(edit.Hostname_str ?? "").trim().length === 0 ||
+              String(edit.HubName_str ?? "").trim().length === 0 ||
               !(Number(edit.Port_u32) >= 1 && Number(edit.Port_u32) <= 65535) ||
               (advancedTouched && !advancedComplete((key) => edit[key])) ||
               (!advancedTouched && !editAdvancedComplete((key) => edit[key])) ||
               (proxyTouched && !proxyComplete((key) => edit[key])) ||
-              (authTouched && !editAuthComplete((key) => edit[key], editOriginal, editPassword, editTouched))
+              (authTouched &&
+                !editAuthComplete((key) => edit[key], editOriginal, editPassword, editTouched))
             }
             isLoading={submitting}
           >
@@ -1327,7 +1443,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
       {/* Connection status */}
       <Modal variant={ModalVariant.medium} isOpen={status !== null} onClose={() => setStatus(null)}>
-        <ModalHeader title={status ? `Cascade status: ${status.name}` : ''} />
+        <ModalHeader title={status ? `Cascade status: ${status.name}` : ""} />
         <ModalBody>
           {status?.error ? (
             <Alert variant="danger" title="Could not load cascade status" isInline>
@@ -1356,11 +1472,16 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       >
         <ModalHeader title="Delete cascade connection" titleIconVariant="warning" />
         <ModalBody>
-          Delete the cascade connection <strong>{pendingDelete}</strong>? If it is online it will be disconnected
-          first.
+          Delete the cascade connection <strong>{pendingDelete}</strong>? If it is online it will be
+          disconnected first.
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete} isLoading={submitting} isDisabled={submitting}>
+          <Button
+            variant="danger"
+            onClick={confirmDelete}
+            isLoading={submitting}
+            isDisabled={submitting}
+          >
             Delete
           </Button>
           <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={submitting}>
@@ -1369,18 +1490,22 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ModalFooter>
       </Modal>
 
-      <CertificateModal certBin={viewCert} isOpen={viewCert !== null} onClose={() => setViewCert(null)} />
+      <CertificateModal
+        certBin={viewCert}
+        isOpen={viewCert !== null}
+        onClose={() => setViewCert(null)}
+      />
 
       <SecurityPolicyModal
         title="Cascade security policy"
-        subject={policyFor === 'create' ? createPolicy : policyFor === 'edit' ? edit : null}
+        subject={policyFor === "create" ? createPolicy : policyFor === "edit" ? edit : null}
         isOpen={policyFor !== null}
         onClose={() => setPolicyFor(null)}
         onSave={(updated) => {
-          if (policyFor === 'create') {
+          if (policyFor === "create") {
             setCreatePolicy(updated);
           } else {
-            setEditTouched((prev) => new Set(prev).add('policy:Ver3_bool'));
+            setEditTouched((prev) => new Set(prev).add("policy:Ver3_bool"));
             setEdit(updated);
           }
           setPolicyFor(null);

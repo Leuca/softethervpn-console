@@ -23,7 +23,7 @@ export class ManagedSessionApiError extends Error {
   constructor(message: string, status: number) {
     super(message);
     Object.setPrototypeOf(this, ManagedSessionApiError.prototype);
-    this.name = 'ManagedSessionApiError';
+    this.name = "ManagedSessionApiError";
     this.status = status;
   }
 }
@@ -34,7 +34,9 @@ const parseResponse = async <T>(response: Response): Promise<T> => {
 
   if (!response.ok) {
     const message =
-      body && typeof body.error === 'string' ? body.error : `Managed session request failed (${response.status})`;
+      body && typeof body.error === "string"
+        ? body.error
+        : `Managed session request failed (${response.status})`;
     throw new ManagedSessionApiError(message, response.status);
   }
 
@@ -43,7 +45,7 @@ const parseResponse = async <T>(response: Response): Promise<T> => {
 
 const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
-    credentials: 'same-origin',
+    credentials: "same-origin",
     ...init,
   });
 
@@ -54,18 +56,19 @@ const postJson = <T>(path: string, body?: unknown): Promise<T> =>
   requestJson<T>(
     path,
     body === undefined
-      ? { method: 'POST' }
+      ? { method: "POST" }
       : {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify(body),
         },
   );
 
-export const getSession = (): Promise<ManagedSession> => requestJson<ManagedSession>('/session');
+export const getSession = (): Promise<ManagedSession> => requestJson<ManagedSession>("/session");
 
-export const login = (payload: ManagedLoginPayload): Promise<ManagedSession> => postJson<ManagedSession>('/login', payload);
+export const login = (payload: ManagedLoginPayload): Promise<ManagedSession> =>
+  postJson<ManagedSession>("/login", payload);
 
-export const logout = (): Promise<void> => postJson<void>('/logout');
+export const logout = (): Promise<void> => postJson<void>("/logout");

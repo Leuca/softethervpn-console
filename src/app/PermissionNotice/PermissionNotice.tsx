@@ -1,7 +1,13 @@
-import * as React from 'react';
-import { Button, EmptyState, EmptyStateBody, EmptyStateFooter, PageSection } from '@patternfly/react-core';
-import { ExclamationCircleIcon } from '@patternfly/react-icons';
-import { useLocation, useNavigate } from 'react-router-dom';
+import * as React from "react";
+import {
+  Button,
+  EmptyState,
+  EmptyStateBody,
+  EmptyStateFooter,
+  PageSection,
+} from "@patternfly/react-core";
+import { ExclamationCircleIcon } from "@patternfly/react-icons";
+import { useLocation, useNavigate } from "react-router-dom";
 
 interface PermissionState {
   requestedPath?: string;
@@ -18,11 +24,12 @@ const PermissionNotice: React.FunctionComponent = () => {
       <EmptyState titleText="Permission required" variant="full" icon={ExclamationCircleIcon}>
         <EmptyStateBody>
           You do not have permission to access this page.
-          {state.requestedPath ? ` (attempted: ${state.requestedPath})` : ''}
-          {state.reason ? `\n${state.reason}.` : ''} Please switch to a session with higher privileges and try again.
+          {state.requestedPath ? ` (attempted: ${state.requestedPath})` : ""}
+          {state.reason ? `\n${state.reason}.` : ""} Please switch to a session with higher
+          privileges and try again.
         </EmptyStateBody>
         <EmptyStateFooter>
-          <Button onClick={() => navigate('/')}>Take me home</Button>
+          <Button onClick={() => navigate("/")}>Take me home</Button>
           <Button variant="link" onClick={() => navigate(-1)}>
             Go back
           </Button>

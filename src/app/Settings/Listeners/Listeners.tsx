@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -18,28 +18,31 @@ import {
   ModalVariant,
   NumberInput,
   Spinner,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import { PlusCircleIcon } from '@patternfly/react-icons';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { AppPage } from '@app/components/AppPage';
-import { FormErrorAlert } from '@app/components/FormErrorAlert';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import { PlusCircleIcon } from "@patternfly/react-icons";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { AppPage } from "@app/components/AppPage";
+import { FormErrorAlert } from "@app/components/FormErrorAlert";
 
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
-type StatusColor = 'green' | 'grey' | 'red';
+type StatusColor = "green" | "grey" | "red";
 
-function listenerStatus(listener: VPN.VpnRpcListenerListItem): { label: string; color: StatusColor } {
+function listenerStatus(listener: VPN.VpnRpcListenerListItem): {
+  label: string;
+  color: StatusColor;
+} {
   if (listener.Errors_bool) {
-    return { label: 'Error', color: 'red' };
+    return { label: "Error", color: "red" };
   }
   if (!listener.Enables_bool) {
-    return { label: 'Stopped', color: 'grey' };
+    return { label: "Stopped", color: "grey" };
   }
-  return { label: 'Listening', color: 'green' };
+  return { label: "Listening", color: "green" };
 }
 
 const Listeners: React.FunctionComponent = () => {
@@ -64,7 +67,10 @@ const Listeners: React.FunctionComponent = () => {
     load();
   }, [load]);
 
-  const usedPorts = React.useMemo(() => new Set((listeners ?? []).map((l) => l.Ports_u32)), [listeners]);
+  const usedPorts = React.useMemo(
+    () => new Set((listeners ?? []).map((l) => l.Ports_u32)),
+    [listeners],
+  );
 
   const run = (promise: Promise<unknown>) => {
     setBusy(true);
@@ -136,7 +142,7 @@ const Listeners: React.FunctionComponent = () => {
           variant="danger"
           title="Listener operation failed"
           isInline
-          style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
+          style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}
         >
           {error}
         </Alert>
@@ -181,10 +187,10 @@ const Listeners: React.FunctionComponent = () => {
                     <ActionsColumn
                       items={[
                         listener.Enables_bool
-                          ? { title: 'Stop', onClick: () => setEnabled(listener.Ports_u32, false) }
-                          : { title: 'Start', onClick: () => setEnabled(listener.Ports_u32, true) },
+                          ? { title: "Stop", onClick: () => setEnabled(listener.Ports_u32, false) }
+                          : { title: "Start", onClick: () => setEnabled(listener.Ports_u32, true) },
                         { isSeparator: true },
-                        { title: 'Delete', onClick: () => setPendingDelete(listener.Ports_u32) },
+                        { title: "Delete", onClick: () => setPendingDelete(listener.Ports_u32) },
                       ]}
                       isDisabled={busy}
                     />
@@ -205,7 +211,9 @@ const Listeners: React.FunctionComponent = () => {
         <ModalHeader title="Create listener" />
         <ModalBody>
           <FormErrorAlert error={error} title="Listener operation failed" />
-          <Content component="p">Add a TCP/IP port number for the VPN server to accept client connections on.</Content>
+          <Content component="p">
+            Add a TCP/IP port number for the VPN server to accept client connections on.
+          </Content>
           <Form>
             <FormGroup label="Port number" fieldId="listener-port">
               <NumberInput
@@ -231,7 +239,7 @@ const Listeners: React.FunctionComponent = () => {
               variant="warning"
               title="Port already in use"
               isInline
-              style={{ marginBlockStart: 'var(--pf-t--global--spacer--md)' }}
+              style={{ marginBlockStart: "var(--pf-t--global--spacer--md)" }}
             >
               A listener on port {newPort} already exists.
             </Alert>
@@ -240,10 +248,10 @@ const Listeners: React.FunctionComponent = () => {
             variant="info"
             title="Only one program can bind a port"
             isInline
-            style={{ marginBlockStart: 'var(--pf-t--global--spacer--md)' }}
+            style={{ marginBlockStart: "var(--pf-t--global--spacer--md)" }}
           >
-            If another program is already using this port, the listener will show an error state until that program
-            releases it.
+            If another program is already using this port, the listener will show an error state
+            until that program releases it.
           </Alert>
         </ModalBody>
         <ModalFooter>
@@ -262,11 +270,15 @@ const Listeners: React.FunctionComponent = () => {
       </Modal>
 
       {/* Delete confirmation */}
-      <Modal variant={ModalVariant.small} isOpen={pendingDelete !== null} onClose={() => setPendingDelete(null)}>
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+      >
         <ModalHeader title="Delete listener" titleIconVariant="warning" />
         <ModalBody>
-          Delete the listener on <strong>TCP port {pendingDelete}</strong>? The server will stop accepting connections
-          on this port.
+          Delete the listener on <strong>TCP port {pendingDelete}</strong>? The server will stop
+          accepting connections on this port.
         </ModalBody>
         <ModalFooter>
           <Button variant="danger" onClick={confirmDelete}>

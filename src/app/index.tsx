@@ -1,14 +1,14 @@
-import * as React from 'react';
-import '@patternfly/react-core/dist/styles/base.css';
-import { HashRouter as Router } from 'react-router-dom';
-import { Bullseye, Spinner } from '@patternfly/react-core';
-import { AppLayout } from '@app/AppLayout/AppLayout';
-import { AppRoutes } from '@app/routes';
-import { ServerProvider, useServer } from '@app/ServerContext';
-import { consoleMode } from '@app/consoleMode';
-import { ManagedSessionGate } from '@app/managed/ManagedSessionGate';
-import '@app/theme-dark-chrome.css';
-import '@app/app.css';
+import * as React from "react";
+import "@patternfly/react-core/dist/styles/base.css";
+import { HashRouter as Router } from "react-router-dom";
+import { Bullseye, Spinner } from "@patternfly/react-core";
+import { AppLayout } from "@app/AppLayout/AppLayout";
+import { AppRoutes } from "@app/routes";
+import { ServerProvider, useServer } from "@app/ServerContext";
+import { consoleMode } from "@app/consoleMode";
+import { ManagedSessionGate } from "@app/managed/ManagedSessionGate";
+import "@app/theme-dark-chrome.css";
+import "@app/app.css";
 
 const LoadingPage: React.FunctionComponent = () => (
   <Bullseye>
@@ -34,7 +34,7 @@ const AppShell: React.FunctionComponent = () => {
 // embedded web server, which cannot rewrite arbitrary paths to index.html.
 const App: React.FunctionComponent = () => (
   <Router>
-    {consoleMode === 'managed' ? (
+    {consoleMode === "managed" ? (
       <ManagedSessionGate>
         <ServerProvider>
           <AppShell />

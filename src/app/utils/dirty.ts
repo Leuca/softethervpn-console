@@ -1,4 +1,4 @@
-import { binToBytes } from '@app/utils/blob_utils';
+import { binToBytes } from "@app/utils/blob_utils";
 
 const bytesEqual = (a: Uint8Array | null, b: Uint8Array | null): boolean => {
   if (a === null || b === null) {
@@ -11,7 +11,7 @@ const dateTime = (value: unknown): number | null => {
   if (value instanceof Date) {
     return value.getTime();
   }
-  if (typeof value === 'string' || typeof value === 'number') {
+  if (typeof value === "string" || typeof value === "number") {
     const time = new Date(value).getTime();
     return Number.isNaN(time) ? null : time;
   }
@@ -21,10 +21,10 @@ const dateTime = (value: unknown): number | null => {
 const numericField = (key: string): boolean => /_(?:u|i)(?:32|64)$/.test(key);
 
 const numericValue = (value: unknown): number | null => {
-  if (value === undefined || value === null || value === '') {
+  if (value === undefined || value === null || value === "") {
     return 0;
   }
-  if (typeof value === 'number' || typeof value === 'string') {
+  if (typeof value === "number" || typeof value === "string") {
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
   }
@@ -32,10 +32,10 @@ const numericValue = (value: unknown): number | null => {
 };
 
 export const dirtyValueEqual = (key: string, a: unknown, b: unknown): boolean => {
-  if (key.endsWith('_bin')) {
+  if (key.endsWith("_bin")) {
     return bytesEqual(binToBytes(a), binToBytes(b));
   }
-  if (key.endsWith('_dt')) {
+  if (key.endsWith("_dt")) {
     const aTime = dateTime(a);
     const bTime = dateTime(b);
     if (aTime !== null || bTime !== null) {

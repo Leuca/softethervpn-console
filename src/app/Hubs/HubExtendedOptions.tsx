@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -10,34 +10,36 @@ import {
   ModalHeader,
   ModalVariant,
   Spinner,
-} from '@patternfly/react-core';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { AdminOptionEditor } from '@app/Hubs/AdminOptionEditor';
-import { useServer } from '@app/ServerContext';
-import { api } from '@app/utils/vpnrpc_settings';
+} from "@patternfly/react-core";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { AdminOptionEditor } from "@app/Hubs/AdminOptionEditor";
+import { useServer } from "@app/ServerContext";
+import { api } from "@app/utils/vpnrpc_settings";
 
 const extendedNumericOptionNames = new Set([
-  'BroadcastStormDetectionThreshold',
-  'ClientMinimumRequiredBuild',
-  'VlanTypeId',
-  'RequiredClientId',
-  'AdjustTcpMssValue',
-  'SecureNAT_MaxTcpSessionsPerIp',
-  'SecureNAT_MaxTcpSynSentPerIp',
-  'SecureNAT_MaxUdpSessionsPerIp',
-  'SecureNAT_MaxDnsSessionsPerIp',
-  'SecureNAT_MaxIcmpSessionsPerIp',
-  'AccessListIncludeFileCacheLifetime',
-  'MaxLoggedPacketsPerMinute',
-  'FloodingSendQueueBufferQuota',
-  'DetectDormantSessionInterval',
-  'DhcpDiscoverTimeoutMs',
+  "BroadcastStormDetectionThreshold",
+  "ClientMinimumRequiredBuild",
+  "VlanTypeId",
+  "RequiredClientId",
+  "AdjustTcpMssValue",
+  "SecureNAT_MaxTcpSessionsPerIp",
+  "SecureNAT_MaxTcpSynSentPerIp",
+  "SecureNAT_MaxUdpSessionsPerIp",
+  "SecureNAT_MaxDnsSessionsPerIp",
+  "SecureNAT_MaxIcmpSessionsPerIp",
+  "AccessListIncludeFileCacheLifetime",
+  "MaxLoggedPacketsPerMinute",
+  "FloodingSendQueueBufferQuota",
+  "DetectDormantSessionInterval",
+  "DhcpDiscoverTimeoutMs",
 ]);
 
 const canChangeExtendedOptions = (user: string, adminOptions: VPN.VpnAdminOption[]): boolean =>
-  user === 'Administrator' ||
+  user === "Administrator" ||
   !adminOptions.some(
-    (option) => option.Name_str.toLowerCase() === 'deny_hub_admin_change_ext_option' && option.Value_u32 !== 0,
+    (option) =>
+      option.Name_str.toLowerCase() === "deny_hub_admin_change_ext_option" &&
+      option.Value_u32 !== 0,
   );
 
 interface HubExtendedOptionsProps {
@@ -111,7 +113,7 @@ const HubExtendedOptions: React.FunctionComponent<HubExtendedOptionsProps> = ({ 
       >
         <ModalHeader title="Virtual Hub Extended Options" />
         <ModalBody>
-          <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }}>
+          <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
             {error && (
               <Alert variant="danger" title="Could not load or save hub extended options" isInline>
                 {error}

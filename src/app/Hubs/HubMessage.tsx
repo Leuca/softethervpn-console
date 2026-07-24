@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -13,11 +13,11 @@ import {
   ModalVariant,
   Spinner,
   TextArea,
-} from '@patternfly/react-core';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { binToBytes } from '@app/utils/blob_utils';
-import { useServer } from '@app/ServerContext';
-import { api } from '@app/utils/vpnrpc_settings';
+} from "@patternfly/react-core";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { binToBytes } from "@app/utils/blob_utils";
+import { useServer } from "@app/ServerContext";
+import { api } from "@app/utils/vpnrpc_settings";
 
 const MAX_MESSAGE_LENGTH = 20000;
 
@@ -26,14 +26,16 @@ const decodeMessage = (value: unknown): string => {
     return new TextDecoder().decode(value as Uint8Array);
   }
   const bytes = binToBytes(value);
-  return bytes ? new TextDecoder().decode(bytes) : '';
+  return bytes ? new TextDecoder().decode(bytes) : "";
 };
 
 const encodeMessage = (value: string): Uint8Array => new TextEncoder().encode(value);
 
 const canChangeMessage = (user: string, options: VPN.VpnAdminOption[]): boolean =>
-  user === 'Administrator' ||
-  !options.some((option) => option.Name_str.toLowerCase() === 'no_change_msg' && option.Value_u32 !== 0);
+  user === "Administrator" ||
+  !options.some(
+    (option) => option.Name_str.toLowerCase() === "no_change_msg" && option.Value_u32 !== 0,
+  );
 
 interface HubMessageProps {
   hub: string;
@@ -45,7 +47,7 @@ const HubMessage: React.FunctionComponent<HubMessageProps> = ({ hub, trigger }) 
   const [open, setOpen] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
   const [useMessage, setUseMessage] = React.useState(false);
-  const [message, setMessage] = React.useState('');
+  const [message, setMessage] = React.useState("");
   const [adminOptions, setAdminOptions] = React.useState<VPN.VpnAdminOption[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -112,7 +114,12 @@ const HubMessage: React.FunctionComponent<HubMessageProps> = ({ hub, trigger }) 
         trigger(openModal)
       ) : (
         <FormGroup label="Client connection message" fieldId="hub-message-open">
-          <Button id="hub-message-open" variant="secondary" aria-label="Set the Message" onClick={openModal}>
+          <Button
+            id="hub-message-open"
+            variant="secondary"
+            aria-label="Set the Message"
+            onClick={openModal}
+          >
             Set the Message
           </Button>
         </FormGroup>
@@ -156,8 +163,8 @@ const HubMessage: React.FunctionComponent<HubMessageProps> = ({ hub, trigger }) 
                   onChange={(_event, value) => setMessage(value)}
                   aria-label="Message"
                   resizeOrientation="vertical"
-                  validated={isValid ? 'default' : 'error'}
-                  style={{ minHeight: '14rem' }}
+                  validated={isValid ? "default" : "error"}
+                  style={{ minHeight: "14rem" }}
                 />
               </FormGroup>
             </Form>

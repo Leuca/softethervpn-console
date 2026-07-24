@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -16,15 +16,15 @@ import {
   Tab,
   TabTitleText,
   Tabs,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { formatMacAddress, formatRpcValue } from '@app/utils/format';
-import { api } from '@app/utils/vpnrpc_settings';
-import { useAutoRefresh } from '@app/utils/useAutoRefresh';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { formatMacAddress, formatRpcValue } from "@app/utils/format";
+import { api } from "@app/utils/vpnrpc_settings";
+import { useAutoRefresh } from "@app/utils/useAutoRefresh";
 
-type TableKind = 'mac' | 'ip';
+type TableKind = "mac" | "ip";
 
 interface PendingDelete {
   kind: TableKind;
@@ -40,13 +40,14 @@ interface HubTablesProps {
   confirmInline?: boolean;
 }
 
-const entryLocation = (remote: boolean, hostname: string): string => (remote ? hostname || 'Remote' : 'Local');
+const entryLocation = (remote: boolean, hostname: string): string =>
+  remote ? hostname || "Remote" : "Local";
 
 const HubTables: React.FunctionComponent<HubTablesProps> = ({
   hub,
   sessionName,
   singleKind,
-  initialTab = 'mac',
+  initialTab = "mac",
   confirmInline = false,
 }) => {
   const fetchTables = React.useCallback(
@@ -58,8 +59,12 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
         const macTable = macResponse.MacTable ?? [];
         const ipTable = ipResponse.IpTable ?? [];
         return {
-          mac: sessionName ? macTable.filter((entry) => entry.SessionName_str === sessionName) : macTable,
-          ip: sessionName ? ipTable.filter((entry) => entry.SessionName_str === sessionName) : ipTable,
+          mac: sessionName
+            ? macTable.filter((entry) => entry.SessionName_str === sessionName)
+            : macTable,
+          ip: sessionName
+            ? ipTable.filter((entry) => entry.SessionName_str === sessionName)
+            : ipTable,
         };
       }),
     [hub, sessionName],
@@ -81,7 +86,7 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
     setDeleting(true);
     setActionError(null);
     const payload = new VPN.VpnRpcDeleteTable({ HubName_str: hub, Key_u32: entry.key });
-    const request = entry.kind === 'mac' ? api.DeleteMacTable(payload) : api.DeleteIpTable(payload);
+    const request = entry.kind === "mac" ? api.DeleteMacTable(payload) : api.DeleteIpTable(payload);
     request
       .then(() => {
         setPendingDelete(null);
@@ -96,22 +101,32 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
   };
 
   const isInitialLoading = mac === null && ip === null && error === null;
-  const scopedText = sessionName ? ' for this session' : ' for this hub';
+  const scopedText = sessionName ? " for this session" : " for this hub";
 
   const confirmMessage = pendingDelete ? (
     <>
-      Delete the {pendingDelete.kind === 'ip' ? 'IP' : 'MAC'} table entry <strong>{pendingDelete.label}</strong>?
+      Delete the {pendingDelete.kind === "ip" ? "IP" : "MAC"} table entry{" "}
+      <strong>{pendingDelete.label}</strong>?
     </>
   ) : null;
 
   const macTable = (
-    <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }} style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}>
+    <Flex
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
+    >
       {mac !== null && mac.length === 0 ? (
         <EmptyState titleText="No MAC addresses" headingLevel="h2">
           <EmptyStateBody>No MAC addresses are currently registered{scopedText}.</EmptyStateBody>
         </EmptyState>
       ) : mac !== null ? (
-        <ScrollableTable aria-label={sessionName ? `Session MAC address table for ${sessionName}` : 'Hub MAC address table'} variant="compact">
+        <ScrollableTable
+          aria-label={
+            sessionName ? `Session MAC address table for ${sessionName}` : "Hub MAC address table"
+          }
+          variant="compact"
+        >
           <Thead>
             <Tr>
               <Th>Session name</Th>
@@ -128,18 +143,25 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
               const address = formatMacAddress(entry.MacAddress_bin);
               return (
                 <Tr key={entry.Key_u32}>
-                  <Td dataLabel="Session name">{entry.SessionName_str || '-'}</Td>
-                  <Td dataLabel="VLAN">{entry.VlanId_u32 ? entry.VlanId_u32 : '-'}</Td>
+                  <Td dataLabel="Session name">{entry.SessionName_str || "-"}</Td>
+                  <Td dataLabel="VLAN">{entry.VlanId_u32 ? entry.VlanId_u32 : "-"}</Td>
                   <Td dataLabel="MAC address">{address}</Td>
-                  <Td dataLabel="Created">{formatRpcValue('CreatedTime_dt', entry.CreatedTime_dt)}</Td>
-                  <Td dataLabel="Updated">{formatRpcValue('UpdatedTime_dt', entry.UpdatedTime_dt)}</Td>
-                  <Td dataLabel="Location">{entryLocation(entry.RemoteItem_bool, entry.RemoteHostname_str)}</Td>
+                  <Td dataLabel="Created">
+                    {formatRpcValue("CreatedTime_dt", entry.CreatedTime_dt)}
+                  </Td>
+                  <Td dataLabel="Updated">
+                    {formatRpcValue("UpdatedTime_dt", entry.UpdatedTime_dt)}
+                  </Td>
+                  <Td dataLabel="Location">
+                    {entryLocation(entry.RemoteItem_bool, entry.RemoteHostname_str)}
+                  </Td>
                   <Td isActionCell>
                     <ActionsColumn
                       items={[
                         {
-                          title: 'Delete',
-                          onClick: () => setPendingDelete({ kind: 'mac', key: entry.Key_u32, label: address }),
+                          title: "Delete",
+                          onClick: () =>
+                            setPendingDelete({ kind: "mac", key: entry.Key_u32, label: address }),
                         },
                       ]}
                     />
@@ -154,13 +176,22 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
   );
 
   const ipTable = (
-    <Flex direction={{ default: 'column' }} gap={{ default: 'gapMd' }} style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}>
+    <Flex
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
+    >
       {ip !== null && ip.length === 0 ? (
         <EmptyState titleText="No IP addresses" headingLevel="h2">
           <EmptyStateBody>No IP addresses are currently registered{scopedText}.</EmptyStateBody>
         </EmptyState>
       ) : ip !== null ? (
-        <ScrollableTable aria-label={sessionName ? `Session IP address table for ${sessionName}` : 'Hub IP address table'} variant="compact">
+        <ScrollableTable
+          aria-label={
+            sessionName ? `Session IP address table for ${sessionName}` : "Hub IP address table"
+          }
+          variant="compact"
+        >
           <Thead>
             <Tr>
               <Th>Session name</Th>
@@ -175,20 +206,26 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
           <Tbody>
             {ip.map((entry) => (
               <Tr key={entry.Key_u32}>
-                <Td dataLabel="Session name">{entry.SessionName_str || '-'}</Td>
-                <Td dataLabel="IP address">{entry.IpAddress_ip || '-'}</Td>
-                <Td dataLabel="DHCP">{entry.DhcpAllocated_bool ? 'Yes' : 'No'}</Td>
-                <Td dataLabel="Created">{formatRpcValue('CreatedTime_dt', entry.CreatedTime_dt)}</Td>
-                <Td dataLabel="Updated">{formatRpcValue('UpdatedTime_dt', entry.UpdatedTime_dt)}</Td>
-                <Td dataLabel="Location">{entryLocation(entry.RemoteItem_bool, entry.RemoteHostname_str)}</Td>
+                <Td dataLabel="Session name">{entry.SessionName_str || "-"}</Td>
+                <Td dataLabel="IP address">{entry.IpAddress_ip || "-"}</Td>
+                <Td dataLabel="DHCP">{entry.DhcpAllocated_bool ? "Yes" : "No"}</Td>
+                <Td dataLabel="Created">
+                  {formatRpcValue("CreatedTime_dt", entry.CreatedTime_dt)}
+                </Td>
+                <Td dataLabel="Updated">
+                  {formatRpcValue("UpdatedTime_dt", entry.UpdatedTime_dt)}
+                </Td>
+                <Td dataLabel="Location">
+                  {entryLocation(entry.RemoteItem_bool, entry.RemoteHostname_str)}
+                </Td>
                 <Td isActionCell>
                   <ActionsColumn
                     items={[
                       {
-                        title: 'Delete',
+                        title: "Delete",
                         onClick: () =>
                           setPendingDelete({
-                            kind: 'ip',
+                            kind: "ip",
                             key: entry.Key_u32,
                             label: entry.IpAddress_ip || `key ${entry.Key_u32}`,
                           }),
@@ -206,18 +243,21 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
 
   return (
     <Flex
-      direction={{ default: 'column' }}
-      gap={{ default: 'gapMd' }}
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
+      <Flex
+        justifyContent={{ default: "justifyContentFlexEnd" }}
+        alignItems={{ default: "alignItemsCenter" }}
+      >
         <FlexItem>
-          <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+          <span style={{ color: "var(--pf-t--global--text--color--subtle)" }}>
             {refreshing && mac !== null && ip !== null
-              ? 'Refreshing...'
+              ? "Refreshing..."
               : lastUpdated
                 ? `Updated ${lastUpdated.toLocaleTimeString()}`
-                : 'Auto-refreshes every 10s'}
+                : "Auto-refreshes every 10s"}
           </span>
         </FlexItem>
       </Flex>
@@ -230,9 +270,17 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
 
       {pendingDelete && confirmInline && (
         <Alert variant="warning" title={confirmMessage} isInline>
-          <Flex gap={{ default: 'gapSm' }} style={{ marginBlockStart: 'var(--pf-t--global--spacer--sm)' }}>
+          <Flex
+            gap={{ default: "gapSm" }}
+            style={{ marginBlockStart: "var(--pf-t--global--spacer--sm)" }}
+          >
             <FlexItem>
-              <Button variant="danger" onClick={confirmDelete} isLoading={deleting} isDisabled={deleting}>
+              <Button
+                variant="danger"
+                onClick={confirmDelete}
+                isLoading={deleting}
+                isDisabled={deleting}
+              >
                 Delete
               </Button>
             </FlexItem>
@@ -249,9 +297,9 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
         <Bullseye>
           <Spinner size="xl" aria-label="Loading address tables" />
         </Bullseye>
-      ) : singleKind === 'mac' ? (
+      ) : singleKind === "mac" ? (
         macTable
-      ) : singleKind === 'ip' ? (
+      ) : singleKind === "ip" ? (
         ipTable
       ) : (
         <Tabs
@@ -274,12 +322,17 @@ const HubTables: React.FunctionComponent<HubTablesProps> = ({
         onClose={() => !deleting && setPendingDelete(null)}
       >
         <ModalHeader
-          title={pendingDelete?.kind === 'ip' ? 'Delete IP table entry' : 'Delete MAC table entry'}
+          title={pendingDelete?.kind === "ip" ? "Delete IP table entry" : "Delete MAC table entry"}
           titleIconVariant="warning"
         />
         <ModalBody>{confirmMessage}</ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDelete} isLoading={deleting} isDisabled={deleting}>
+          <Button
+            variant="danger"
+            onClick={confirmDelete}
+            isLoading={deleting}
+            isDisabled={deleting}
+          >
             Delete
           </Button>
           <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={deleting}>

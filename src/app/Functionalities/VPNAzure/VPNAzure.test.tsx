@@ -1,12 +1,12 @@
-import * as React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { VpnAzure } from './VPNAzure';
-import { api } from '@app/utils/vpnrpc_settings';
+import * as React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { VpnAzure } from "./VPNAzure";
+import { api } from "@app/utils/vpnrpc_settings";
 
-vi.mock('@app/utils/vpnrpc_settings', () => ({
+vi.mock("@app/utils/vpnrpc_settings", () => ({
   api: {
     GetAzureStatus: vi.fn(),
     SetAzureStatus: vi.fn(),
@@ -20,7 +20,7 @@ const getDDnsClientStatus = api.GetDDnsClientStatus as unknown as Mock;
 
 const renderPage = () =>
   render(
-    <MemoryRouter initialEntries={['/functionalities/vpnazure']}>
+    <MemoryRouter initialEntries={["/functionalities/vpnazure"]}>
       <Routes>
         <Route path="/functionalities/vpnazure" element={<VpnAzure />} />
         <Route path="/functionalities/ddns" element={<div>DDNS page</div>} />
@@ -28,7 +28,7 @@ const renderPage = () =>
     </MemoryRouter>,
   );
 
-describe('VpnAzure', () => {
+describe("VpnAzure", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
@@ -38,70 +38,70 @@ describe('VpnAzure', () => {
     vi.useRealTimers();
   });
 
-  it('shows the hostname and connected status when enabled', async () => {
+  it("shows the hostname and connected status when enabled", async () => {
     getAzureStatus.mockResolvedValue({ IsEnabled_bool: true, IsConnected_bool: true });
-    getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: 'vpn123456' });
+    getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: "vpn123456" });
 
     renderPage();
 
-    expect(await screen.findByText('vpn123456.vpnazure.net')).toBeInTheDocument();
-    expect(screen.getByText('Connected')).toBeInTheDocument();
-    expect(screen.getByRole('switch')).toBeChecked();
+    expect(await screen.findByText("vpn123456.vpnazure.net")).toBeInTheDocument();
+    expect(screen.getByText("Connected")).toBeInTheDocument();
+    expect(screen.getByRole("switch")).toBeChecked();
   });
 
-  it('hides the hostname section when disabled', async () => {
+  it("hides the hostname section when disabled", async () => {
     getAzureStatus.mockResolvedValue({ IsEnabled_bool: false, IsConnected_bool: false });
 
     renderPage();
 
-    expect(await screen.findByText('Not connected')).toBeInTheDocument();
-    expect(screen.getByRole('switch')).not.toBeChecked();
-    expect(screen.queryByText('VPN Azure hostname')).not.toBeInTheDocument();
+    expect(await screen.findByText("Not connected")).toBeInTheDocument();
+    expect(screen.getByRole("switch")).not.toBeChecked();
+    expect(screen.queryByText("VPN Azure hostname")).not.toBeInTheDocument();
     expect(getDDnsClientStatus).not.toHaveBeenCalled();
   });
 
-  it('enables VPN Azure via the toggle and reloads status', async () => {
+  it("enables VPN Azure via the toggle and reloads status", async () => {
     getAzureStatus
       .mockResolvedValueOnce({ IsEnabled_bool: false, IsConnected_bool: false })
       .mockResolvedValueOnce({ IsEnabled_bool: true, IsConnected_bool: false })
       .mockResolvedValueOnce({ IsEnabled_bool: true, IsConnected_bool: true });
-    getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: 'vpn123456' });
+    getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: "vpn123456" });
     setAzureStatus.mockResolvedValue({ IsEnabled_bool: true });
     const user = userEvent.setup();
 
     renderPage();
-    await screen.findByText('Not connected');
+    await screen.findByText("Not connected");
 
-    await user.click(screen.getByRole('switch'));
+    await user.click(screen.getByRole("switch"));
 
     await waitFor(() => expect(setAzureStatus).toHaveBeenCalledTimes(1));
     expect(setAzureStatus.mock.calls[0][0].IsEnabled_bool).toBe(true);
-    await waitFor(() => expect(screen.getByRole('switch')).toBeChecked());
-    expect(screen.getByText('Connecting')).toBeInTheDocument();
-    expect(await screen.findByText('vpn123456.vpnazure.net')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("switch")).toBeChecked());
+    expect(screen.getByText("Connecting")).toBeInTheDocument();
+    expect(await screen.findByText("vpn123456.vpnazure.net")).toBeInTheDocument();
 
-    expect(await screen.findByText('Connected', {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText("Connected", {}, { timeout: 3000 })).toBeInTheDocument();
     expect(getAzureStatus).toHaveBeenCalledTimes(3);
   });
 
-  it('navigates to the DDNS page from Change hostname', async () => {
+  it("navigates to the DDNS page from Change hostname", async () => {
     getAzureStatus.mockResolvedValue({ IsEnabled_bool: true, IsConnected_bool: true });
-    getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: 'vpn123456' });
+    getDDnsClientStatus.mockResolvedValue({ CurrentHostName_str: "vpn123456" });
     const user = userEvent.setup();
 
     renderPage();
-    await screen.findByText('vpn123456.vpnazure.net');
+    await screen.findByText("vpn123456.vpnazure.net");
 
-    await user.click(screen.getByRole('button', { name: 'Change hostname' }));
+    await user.click(screen.getByRole("button", { name: "Change hostname" }));
 
-    expect(await screen.findByText('DDNS page')).toBeInTheDocument();
+    expect(await screen.findByText("DDNS page")).toBeInTheDocument();
   });
 
-  it('shows an error alert when loading fails', async () => {
-    getAzureStatus.mockRejectedValue(new Error('boom'));
+  it("shows an error alert when loading fails", async () => {
+    getAzureStatus.mockRejectedValue(new Error("boom"));
 
     renderPage();
 
-    expect(await screen.findByText('VPN Azure operation failed')).toBeInTheDocument();
+    expect(await screen.findByText("VPN Azure operation failed")).toBeInTheDocument();
   });
 });

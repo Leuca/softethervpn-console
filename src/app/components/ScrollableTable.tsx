@@ -1,18 +1,18 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   InnerScrollContainer,
   OuterScrollContainer,
   Table,
   type TableProps,
-} from '@patternfly/react-table';
-import './ScrollableTable.css';
+} from "@patternfly/react-table";
+import "./ScrollableTable.css";
 
 interface ScrollableTableProps extends TableProps {
-  'aria-label': string;
+  "aria-label": string;
 }
 
 const ScrollableTable: React.FunctionComponent<ScrollableTableProps> = ({
-  'aria-label': ariaLabel,
+  "aria-label": ariaLabel,
   isStickyHeader = true,
   ...props
 }) => (

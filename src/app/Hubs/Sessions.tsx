@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   Alert,
   Bullseye,
@@ -13,35 +13,35 @@ import {
   ModalHeader,
   ModalVariant,
   Spinner,
-} from '@patternfly/react-core';
-import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { ScrollableTable } from '@app/components/ScrollableTable';
-import * as VPN from 'vpnrpc/dist/vpnrpc';
-import { api } from '@app/utils/vpnrpc_settings';
-import { KeyValueTable } from '@app/components/KeyValueTable';
-import { HubTables } from '@app/Hubs/HubTables';
-import { useAutoRefresh } from '@app/utils/useAutoRefresh';
+} from "@patternfly/react-core";
+import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
+import { ScrollableTable } from "@app/components/ScrollableTable";
+import * as VPN from "vpnrpc/dist/vpnrpc";
+import { api } from "@app/utils/vpnrpc_settings";
+import { KeyValueTable } from "@app/components/KeyValueTable";
+import { HubTables } from "@app/Hubs/HubTables";
+import { useAutoRefresh } from "@app/utils/useAutoRefresh";
 
-type SessionTableKind = 'mac' | 'ip';
+type SessionTableKind = "mac" | "ip";
 
 // GetSessionStatus returns many fields (including the inline security policy);
 // show only the identity/connection ones the native session dialog surfaces.
 const STATUS_KEYS = [
-  'Username_str',
-  'RealUsername_str',
-  'GroupName_str',
-  'Client_Ip_Address_ip',
-  'SessionStatus_ClientHostName_str',
-  'ServerName_str',
-  'Connected_bool',
-  'Active_bool',
-  'LinkMode_bool',
+  "Username_str",
+  "RealUsername_str",
+  "GroupName_str",
+  "Client_Ip_Address_ip",
+  "SessionStatus_ClientHostName_str",
+  "ServerName_str",
+  "Connected_bool",
+  "Active_bool",
+  "LinkMode_bool",
 ];
 
 // A session's location: remote sessions (cluster/cascade) name their server,
 // local sessions are terminated on this server.
 const sessionLocation = (s: VPN.VpnRpcEnumSessionItem): string =>
-  s.RemoteSession_bool ? s.RemoteHostname_str || 'Remote' : 'Local';
+  s.RemoteSession_bool ? s.RemoteHostname_str || "Remote" : "Local";
 
 interface DetailState {
   name: string;
@@ -57,7 +57,9 @@ interface SessionTableState {
 const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const fetchSessions = React.useCallback(
     () =>
-      api.EnumSession(new VPN.VpnRpcEnumSession({ HubName_str: hub })).then((response) => response.SessionList ?? []),
+      api
+        .EnumSession(new VPN.VpnRpcEnumSession({ HubName_str: hub }))
+        .then((response) => response.SessionList ?? []),
     [hub],
   );
   const { data: sessions, error, refreshing, lastUpdated, load } = useAutoRefresh(fetchSessions);
@@ -121,18 +123,21 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
   return (
     <Flex
-      direction={{ default: 'column' }}
-      gap={{ default: 'gapMd' }}
-      style={{ paddingBlockStart: 'var(--pf-t--global--spacer--md)' }}
+      direction={{ default: "column" }}
+      gap={{ default: "gapMd" }}
+      style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} alignItems={{ default: 'alignItemsCenter' }}>
+      <Flex
+        justifyContent={{ default: "justifyContentFlexEnd" }}
+        alignItems={{ default: "alignItemsCenter" }}
+      >
         <FlexItem>
-          <span style={{ color: 'var(--pf-t--global--text--color--subtle)' }}>
+          <span style={{ color: "var(--pf-t--global--text--color--subtle)" }}>
             {refreshing && sessions !== null
-              ? 'Refreshing...'
+              ? "Refreshing..."
               : lastUpdated
                 ? `Updated ${lastUpdated.toLocaleTimeString()}`
-                : 'Auto-refreshes every 10s'}
+                : "Auto-refreshes every 10s"}
           </span>
         </FlexItem>
       </Flex>
@@ -170,21 +175,27 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               <Tr key={s.Name_str}>
                 <Td dataLabel="Session name">{s.Name_str}</Td>
                 <Td dataLabel="Location">{sessionLocation(s)}</Td>
-                <Td dataLabel="User">{s.Username_str || '-'}</Td>
-                <Td dataLabel="Source host">{s.Hostname_str || '-'}</Td>
+                <Td dataLabel="User">{s.Username_str || "-"}</Td>
+                <Td dataLabel="Source host">{s.Hostname_str || "-"}</Td>
                 <Td dataLabel="TCP">{`${s.CurrentNumTcp_u32} / ${s.MaxNumTcp_u32}`}</Td>
                 <Td dataLabel="Transfer">
                   {`${s.PacketSize_u64.toLocaleString()} bytes / ${s.PacketNum_u64.toLocaleString()} packets`}
                 </Td>
-                <Td dataLabel="VLAN">{s.VLanId_u32 ? s.VLanId_u32 : '-'}</Td>
+                <Td dataLabel="VLAN">{s.VLanId_u32 ? s.VLanId_u32 : "-"}</Td>
                 <Td isActionCell>
                   <ActionsColumn
                     items={[
-                      { title: 'Session details', onClick: () => openDetail(s.Name_str) },
-                      { title: 'MAC address table', onClick: () => setSessionTable({ name: s.Name_str, kind: 'mac' }) },
-                      { title: 'IP address table', onClick: () => setSessionTable({ name: s.Name_str, kind: 'ip' }) },
+                      { title: "Session details", onClick: () => openDetail(s.Name_str) },
+                      {
+                        title: "MAC address table",
+                        onClick: () => setSessionTable({ name: s.Name_str, kind: "mac" }),
+                      },
+                      {
+                        title: "IP address table",
+                        onClick: () => setSessionTable({ name: s.Name_str, kind: "ip" }),
+                      },
                       { isSeparator: true },
-                      { title: 'Disconnect', onClick: () => setPendingDisconnect(s.Name_str) },
+                      { title: "Disconnect", onClick: () => setPendingDisconnect(s.Name_str) },
                     ]}
                   />
                 </Td>
@@ -196,7 +207,7 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
       {/* Session details: status summary only. Session MAC/IP tables open separately. */}
       <Modal variant={ModalVariant.medium} isOpen={detail !== null} onClose={() => setDetail(null)}>
-        <ModalHeader title={detail ? `Session: ${detail.name}` : ''} />
+        <ModalHeader title={detail ? `Session: ${detail.name}` : ""} />
         <ModalBody>
           {detail?.error ? (
             <Alert variant="danger" title="Could not load session details" isInline>
@@ -225,8 +236,8 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         <ModalHeader
           title={
             sessionTable
-              ? `${sessionTable.kind === 'mac' ? 'MAC address table' : 'IP address table'}: ${sessionTable.name}`
-              : ''
+              ? `${sessionTable.kind === "mac" ? "MAC address table" : "IP address table"}: ${sessionTable.name}`
+              : ""
           }
         />
         <ModalBody>
@@ -254,13 +265,23 @@ const Sessions: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       >
         <ModalHeader title="Disconnect session" titleIconVariant="warning" />
         <ModalBody>
-          Disconnect the session <strong>{pendingDisconnect}</strong>? The client may reconnect automatically.
+          Disconnect the session <strong>{pendingDisconnect}</strong>? The client may reconnect
+          automatically.
         </ModalBody>
         <ModalFooter>
-          <Button variant="danger" onClick={confirmDisconnect} isLoading={disconnecting} isDisabled={disconnecting}>
+          <Button
+            variant="danger"
+            onClick={confirmDisconnect}
+            isLoading={disconnecting}
+            isDisabled={disconnecting}
+          >
             Disconnect
           </Button>
-          <Button variant="link" onClick={() => setPendingDisconnect(null)} isDisabled={disconnecting}>
+          <Button
+            variant="link"
+            onClick={() => setPendingDisconnect(null)}
+            isDisabled={disconnecting}
+          >
             Cancel
           </Button>
         </ModalFooter>

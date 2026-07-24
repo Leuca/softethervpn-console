@@ -1,7 +1,7 @@
 // @peculiar/x509 depends on tsyringe, which needs the reflect-metadata polyfill
 // loaded before it. Import it here, the single module that pulls in x509.
-import 'reflect-metadata';
-import { X509Certificate } from '@peculiar/x509';
+import "reflect-metadata";
+import { X509Certificate } from "@peculiar/x509";
 
 // Distinguished-name fields shown in the certificate viewer.
 export interface CertificateName {
@@ -31,23 +31,23 @@ export interface ParsedCertificate {
 }
 
 // Group hex digits in pairs, upper case, for readable fingerprints.
-const spacedHex = (hex: string): string => (hex.match(/.{1,2}/g) ?? []).join(' ').toUpperCase();
+const spacedHex = (hex: string): string => (hex.match(/.{1,2}/g) ?? []).join(" ").toUpperCase();
 
 const bufferToHex = (buffer: ArrayBuffer): string =>
   Array.from(new Uint8Array(buffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 
-const name = (cert: X509Certificate, which: 'subjectName' | 'issuerName'): CertificateName => {
+const name = (cert: X509Certificate, which: "subjectName" | "issuerName"): CertificateName => {
   const dn = cert[which];
-  const first = (id: string): string => dn.getField(id)[0] ?? '';
+  const first = (id: string): string => dn.getField(id)[0] ?? "";
   return {
-    commonName: first('CN'),
-    organization: first('O'),
-    organizationalUnit: first('OU'),
-    country: first('C'),
-    state: first('ST'),
-    locality: first('L'),
+    commonName: first("CN"),
+    organization: first("O"),
+    organizationalUnit: first("OU"),
+    country: first("C"),
+    state: first("ST"),
+    locality: first("L"),
   };
 };
 
@@ -56,8 +56,8 @@ const name = (cert: X509Certificate, which: 'subjectName' | 'issuerName'): Certi
 // both: X509Certificate parses a PEM string but treats a Uint8Array as DER.
 // The block is located anywhere in the bytes, not just at byte 0, because PEM
 // files commonly carry leading text (openssl -text output, comments).
-const PEM_HEADER = '-----BEGIN CERTIFICATE-----';
-const PEM_FOOTER = '-----END CERTIFICATE-----';
+const PEM_HEADER = "-----BEGIN CERTIFICATE-----";
+const PEM_FOOTER = "-----END CERTIFICATE-----";
 
 const asCertificate = (bytes: Uint8Array): X509Certificate => {
   const text = new TextDecoder().decode(bytes);
@@ -73,7 +73,8 @@ const asCertificate = (bytes: Uint8Array): X509Certificate => {
 
 // Normalize a PEM or DER certificate to raw DER bytes. Several SoftEther RPC
 // paths call BufToX(..., false), so sending PEM text bytes is silently ignored.
-export const certificateBytesToDer = (bytes: Uint8Array): Uint8Array => new Uint8Array(asCertificate(bytes).rawData);
+export const certificateBytesToDer = (bytes: Uint8Array): Uint8Array =>
+  new Uint8Array(asCertificate(bytes).rawData);
 
 /**
  * Parse an X.509 certificate (the raw `*_bin` field returned by the JSON-RPC
@@ -86,15 +87,15 @@ export const certificateBytesToDer = (bytes: Uint8Array): Uint8Array => new Uint
 export function parseCertificate(bytes: Uint8Array): ParsedCertificate {
   const cert = asCertificate(bytes);
   return {
-    subject: name(cert, 'subjectName'),
-    issuer: name(cert, 'issuerName'),
+    subject: name(cert, "subjectName"),
+    issuer: name(cert, "issuerName"),
     serialNumber: spacedHex(cert.serialNumber),
     notBefore: cert.notBefore,
     notAfter: cert.notAfter,
     signatureAlgorithm: cert.signatureAlgorithm.hash.name,
-    publicKeyHex: spacedHex(cert.publicKey.toString('hex')),
+    publicKeyHex: spacedHex(cert.publicKey.toString("hex")),
     signatureHex: spacedHex(bufferToHex(cert.signature)),
     isSelfIssued: cert.subject === cert.issuer,
-    pem: cert.toString('pem'),
+    pem: cert.toString("pem"),
   };
 }

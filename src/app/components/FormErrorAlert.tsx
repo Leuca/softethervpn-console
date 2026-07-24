@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { Alert } from '@patternfly/react-core';
+import * as React from "react";
+import { Alert } from "@patternfly/react-core";
 
 interface FormErrorAlertProps {
   error: string | null;
@@ -13,7 +13,7 @@ const FormErrorAlert: React.FunctionComponent<FormErrorAlertProps> = ({ error, t
       title={title}
       isInline
       isLiveRegion
-      style={{ marginBlockEnd: 'var(--pf-t--global--spacer--md)' }}
+      style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}
     >
       {error}
     </Alert>
