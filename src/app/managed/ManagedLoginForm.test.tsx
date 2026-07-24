@@ -106,6 +106,8 @@ describe("ManagedLoginForm", () => {
     expect(screen.getByLabelText("Password")).toHaveAccessibleDescription(
       /Enter the administrator password\./,
     );
+
+    expect(screen.getByLabelText("Server host")).toHaveAttribute("autocomplete", "url");
     expect(screen.getByLabelText("Password")).toHaveAttribute("autocomplete", "current-password");
     expect(screen.getByRole("form", { name: "SoftEther server login" })).toBeInTheDocument();
     expect(loginMock).not.toHaveBeenCalled();

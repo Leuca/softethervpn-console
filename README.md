@@ -78,6 +78,22 @@ npm --prefix gateway start
 The managed gateway handles server selection and login. See
 [`gateway/README.md`](gateway/README.md) for its deployment and TLS boundaries.
 
+### Password manager custom fields
+
+The managed login form exposes stable identifiers for password managers that
+support custom fields:
+
+| Field       | Preferred `id`       | Fallback `name` |
+| ----------- | -------------------- | --------------- |
+| Server host | `managed-login-host` | `host`          |
+| Port        | `managed-login-port` | `port`          |
+| Virtual Hub | `managed-login-hub`  | `hub`           |
+
+Configure those fields on the same password-manager entry as the administrator
+password. Prefer the `id` when the password manager supports it. Custom-field
+matching is password-manager-specific; the password itself uses the standard
+`current-password` autocomplete field.
+
 ## Development scripts
 
 ```sh

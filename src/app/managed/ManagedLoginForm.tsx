@@ -231,6 +231,7 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   <TextInput
                     id="managed-login-host"
                     name="host"
+                    autoComplete="url"
                     ref={hostRef}
                     value={host}
                     placeholder="vpn.example.com"
