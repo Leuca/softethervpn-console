@@ -29,11 +29,17 @@ import * as VPN from "vpnrpc/dist/vpnrpc";
 import { api } from "@app/utils/vpnrpc_settings";
 import { useServer } from "@app/ServerContext";
 import { AppPage } from "@app/components/AppPage";
+import { useTransitionRefresh } from "@app/utils/useTransitionRefresh";
 
 // Tap device names are limited to 11 characters by SoftEther.
 const MAX_TAP_NAME = 11;
 
 type BridgeMode = "adapter" | "tap";
+
+interface BridgeTarget {
+  hub: string;
+  device: string;
+}
 
 type StatusColor = "green" | "red";
 
@@ -61,24 +67,71 @@ const LocalBridge: React.FunctionComponent = () => {
   const [tapName, setTapName] = React.useState("");
 
   const [pendingDelete, setPendingDelete] = React.useState<VPN.VpnRpcLocalBridge | null>(null);
+  const [transitioningBridge, setTransitioningBridge] = React.useState<BridgeTarget | null>(null);
 
   const load = React.useCallback(() => {
     setError(null);
-    Promise.all([api.GetBridgeSupport(), api.EnumLocalBridge(), api.EnumHub(), api.EnumEthernet()])
+    return Promise.all([
+      api.GetBridgeSupport(),
+      api.EnumLocalBridge(),
+      api.EnumHub(),
+      api.EnumEthernet(),
+    ])
       .then(([support, bridgeList, hubList, ethList]) => {
+        const next = bridgeList.LocalBridgeList ?? [];
         setBridgeSupported(support.IsBridgeSupportedOs_bool);
-        setBridges(bridgeList.LocalBridgeList ?? []);
+        setBridges(next);
         setHubs((hubList.HubList ?? []).map((hub) => hub.HubName_str));
         setAdapters(ethList.EthList ?? []);
+        return next;
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        setError(String(e));
+        return null;
+      });
   }, []);
+
+  const loadBridgeStatus = React.useCallback(
+    () =>
+      api.EnumLocalBridge().then((bridgeList) => {
+        const next = bridgeList.LocalBridgeList ?? [];
+        setBridges(next);
+        return next;
+      }),
+    [],
+  );
 
   React.useEffect(() => {
     load();
   }, [load]);
 
-  const run = (promise: Promise<unknown>) => {
+  const refreshBridgeTransition = React.useCallback(() => {
+    const target = transitioningBridge;
+    if (target === null) {
+      return Promise.resolve(true);
+    }
+    return loadBridgeStatus().then((next) => {
+      const bridge = next?.find(
+        (candidate) =>
+          candidate.HubNameLB_str === target.hub && candidate.DeviceName_str === target.device,
+      );
+      const complete = bridge?.Online_bool === true && bridge.Active_bool === true;
+      if (complete) {
+        setTransitioningBridge((current) =>
+          current?.hub === target.hub && current.device === target.device ? null : current,
+        );
+      }
+      return complete;
+    });
+  }, [loadBridgeStatus, transitioningBridge]);
+  useTransitionRefresh(
+    transitioningBridge === null
+      ? null
+      : `${transitioningBridge.hub}:${transitioningBridge.device}`,
+    refreshBridgeTransition,
+  );
+
+  const run = (promise: Promise<unknown>, transition?: BridgeTarget) => {
     setBusy(true);
     promise
       .then(() => {
@@ -88,6 +141,13 @@ const LocalBridge: React.FunctionComponent = () => {
       .catch((e) => {
         setError(String(e));
         setBusy(false);
+        if (transition !== undefined) {
+          setTransitioningBridge((current) =>
+            current?.hub === transition.hub && current.device === transition.device
+              ? null
+              : current,
+          );
+        }
       });
   };
 
@@ -101,7 +161,9 @@ const LocalBridge: React.FunctionComponent = () => {
 
   const create = () => {
     const deviceName = mode === "tap" ? tapName : newAdapter;
+    const transition = { hub: newHub, device: deviceName };
     setCreateOpen(false);
+    setTransitioningBridge(transition);
     run(
       api.AddLocalBridge(
         new VPN.VpnRpcLocalBridge({
@@ -110,6 +172,7 @@ const LocalBridge: React.FunctionComponent = () => {
           TapMode_bool: mode === "tap",
         }),
       ),
+      transition,
     );
   };
 

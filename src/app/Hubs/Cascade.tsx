@@ -41,6 +41,7 @@ import { recordChanged } from "@app/utils/dirty";
 import { formatOptionalDate } from "@app/utils/format";
 import { extractPkcs12KeyPair, isPkcs12File } from "@app/utils/pkcs12";
 import { hashSoftEtherPassword } from "@app/utils/sha0";
+import { useTransitionRefresh } from "@app/utils/useTransitionRefresh";
 import { certificateBytesToDer } from "@app/utils/x509";
 
 // Cascade client-auth methods. RADIUS / NT domain auth is the plain-password
@@ -457,6 +458,9 @@ const linkStatus = (l: VPN.VpnRpcEnumLinkItem): StatusLabel => {
   }
   return { text: "Connecting", color: "blue" };
 };
+
+const linkIsTransitioning = (link: VPN.VpnRpcEnumLinkItem): boolean =>
+  link.Online_bool && !link.Connected_bool;
 
 interface StatusState {
   name: string;
@@ -933,17 +937,44 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     emptyClientCertificateUpload,
   );
 
+  const refreshLinks = React.useCallback(
+    () =>
+      api.EnumLink(new VPN.VpnRpcEnumLink({ HubName_str: hub })).then((response) => {
+        const next = response.LinkList ?? [];
+        setLinks(next);
+        return next;
+      }),
+    [hub],
+  );
+
   const load = React.useCallback(() => {
     setError(null);
-    api
-      .EnumLink(new VPN.VpnRpcEnumLink({ HubName_str: hub }))
-      .then((response) => setLinks(response.LinkList ?? []))
-      .catch((e) => setError(String(e)));
-  }, [hub]);
+    return refreshLinks().catch((e) => {
+      setError(String(e));
+      return null;
+    });
+  }, [refreshLinks]);
 
   React.useEffect(() => {
     load();
   }, [load]);
+
+  const linkTransitionKey =
+    links === null
+      ? null
+      : links
+          .filter(linkIsTransitioning)
+          .map((link) => link.AccountName_utf)
+          .sort()
+          .join(",") || null;
+  const refreshLinkTransitions = React.useCallback(
+    () => refreshLinks().then((next) => !next.some((link) => linkIsTransitioning(link))),
+    [refreshLinks],
+  );
+  useTransitionRefresh(
+    linkTransitionKey === null ? null : `${hub}:${linkTransitionKey}`,
+    refreshLinkTransitions,
+  );
 
   const openCreate = () => {
     setError(null);
@@ -1018,24 +1049,49 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       .catch((e) => setError(String(e)));
   };
 
+  const loadStatus = React.useCallback(
+    (accountName: string) =>
+      api
+        .GetLinkStatus(
+          new VPN.VpnRpcLinkStatus({ HubName_Ex_str: hub, AccountName_utf: accountName }),
+        )
+        .then((response) => {
+          const raw = response as unknown as Record<string, unknown>;
+          const subset: Record<string, unknown> = {};
+          for (const key of STATUS_KEYS) {
+            if (key in raw) {
+              subset[key] = raw[key];
+            }
+          }
+          setStatus((current) =>
+            current?.name === accountName
+              ? { name: accountName, status: subset, error: null }
+              : current,
+          );
+          return raw.Connected_bool !== false;
+        })
+        .catch((e) => {
+          setStatus((current) =>
+            current?.name === accountName ? { ...current, error: String(e) } : current,
+          );
+          throw e;
+        }),
+    [hub],
+  );
+
   const openStatus = (accountName: string) => {
     setStatus({ name: accountName, status: null, error: null });
-    api
-      .GetLinkStatus(
-        new VPN.VpnRpcLinkStatus({ HubName_Ex_str: hub, AccountName_utf: accountName }),
-      )
-      .then((response) => {
-        const raw = response as unknown as Record<string, unknown>;
-        const subset: Record<string, unknown> = {};
-        for (const key of STATUS_KEYS) {
-          if (key in raw) {
-            subset[key] = raw[key];
-          }
-        }
-        setStatus({ name: accountName, status: subset, error: null });
-      })
-      .catch((e) => setStatus({ name: accountName, status: null, error: String(e) }));
+    loadStatus(accountName).catch(() => undefined);
   };
+
+  const statusName = status?.name ?? null;
+  const statusTransitionKey =
+    status?.status?.Connected_bool === false ? `${hub}:${status.name}` : null;
+  const refreshStatusTransition = React.useCallback(
+    () => (statusName === null ? Promise.resolve(true) : loadStatus(statusName)),
+    [loadStatus, statusName],
+  );
+  useTransitionRefresh(statusTransitionKey, refreshStatusTransition);
 
   // Load the full cascade config for inspection / editing. GetLink is keyed by
   // the local hub (HubName_Ex_str) and the account name.

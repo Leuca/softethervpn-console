@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { Layer3Switch } from "./Layer3Switch";
@@ -325,7 +325,58 @@ describe("Layer3Switch", () => {
 
   it("starts a stopped switch from the kebab", async () => {
     setup();
-    m("StartL3Switch").mockResolvedValue({});
+    m("EnumL3Switch")
+      .mockResolvedValueOnce({
+        L3SWList: [
+          {
+            Name_str: "L3SW",
+            NumInterfaces_u32: 1,
+            NumTables_u32: 2,
+            Active_bool: false,
+            Online_bool: false,
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new Error("temporary switch refresh failure"))
+      .mockResolvedValueOnce({
+        L3SWList: [
+          {
+            Name_str: "L3SW",
+            NumInterfaces_u32: 1,
+            NumTables_u32: 2,
+            Active_bool: false,
+            Online_bool: false,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        L3SWList: [
+          {
+            Name_str: "L3SW",
+            NumInterfaces_u32: 1,
+            NumTables_u32: 2,
+            Active_bool: true,
+            Online_bool: false,
+          },
+        ],
+      })
+      .mockResolvedValue({
+        L3SWList: [
+          {
+            Name_str: "L3SW",
+            NumInterfaces_u32: 1,
+            NumTables_u32: 2,
+            Active_bool: true,
+            Online_bool: true,
+          },
+        ],
+      });
+    let resolveStart!: () => void;
+    m("StartL3Switch").mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveStart = resolve;
+      }),
+    );
     const user = userEvent.setup();
 
     render(<Layer3Switch />);
@@ -335,6 +386,11 @@ describe("Layer3Switch", () => {
 
     await waitFor(() => expect(m("StartL3Switch")).toHaveBeenCalledTimes(1));
     expect(m("StartL3Switch").mock.calls[0][0].Name_str).toBe("L3SW");
+    await waitFor(() => expect(m("EnumL3Switch")).toHaveBeenCalledTimes(3), { timeout: 3500 });
+    await act(async () => resolveStart());
+    expect(await screen.findByText("Operational", {}, { timeout: 2500 })).toBeInTheDocument();
+    expect(m("EnumL3Switch")).toHaveBeenCalledTimes(5);
+    expect(m("EnumHub")).toHaveBeenCalledTimes(2);
   });
 
   it("deletes a switch after confirmation", async () => {

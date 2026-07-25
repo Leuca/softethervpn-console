@@ -32,6 +32,7 @@ import { PlusCircleIcon } from "@patternfly/react-icons";
 import * as VPN from "vpnrpc/dist/vpnrpc";
 import { api } from "@app/utils/vpnrpc_settings";
 import { AppPage } from "@app/components/AppPage";
+import { useTransitionRefresh } from "@app/utils/useTransitionRefresh";
 
 const parseIPv4 = (value: string): number | null => {
   const parts = value.split(".");
@@ -210,6 +211,7 @@ const Layer3Switch: React.FunctionComponent = () => {
   const [pendingSwitch, setPendingSwitch] = React.useState<string | null>(null);
   const [pendingIf, setPendingIf] = React.useState<VPN.VpnRpcL3If | null>(null);
   const [pendingRoute, setPendingRoute] = React.useState<VPN.VpnRpcL3Table | null>(null);
+  const [transitioningSwitch, setTransitioningSwitch] = React.useState<string | null>(null);
 
   const loadDetail = React.useCallback((name: string, preserveCurrent = false) => {
     if (!preserveCurrent) {
@@ -228,13 +230,28 @@ const Layer3Switch: React.FunctionComponent = () => {
 
   const load = React.useCallback(() => {
     setError(null);
-    Promise.all([api.EnumL3Switch(), api.EnumHub()])
+    return Promise.all([api.EnumL3Switch(), api.EnumHub()])
       .then(([sw, hubList]) => {
-        setSwitches(sw.L3SWList ?? []);
+        const next = sw.L3SWList ?? [];
+        setSwitches(next);
         setHubs((hubList.HubList ?? []).map((h) => h.HubName_str));
+        return next;
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        setError(String(e));
+        return null;
+      });
   }, []);
+
+  const loadSwitchStatus = React.useCallback(
+    () =>
+      api.EnumL3Switch().then((response) => {
+        const next = response.L3SWList ?? [];
+        setSwitches(next);
+        return next;
+      }),
+    [],
+  );
 
   React.useEffect(() => {
     load();
@@ -247,7 +264,23 @@ const Layer3Switch: React.FunctionComponent = () => {
     }
   }, [selected, loadDetail]);
 
-  const run = (promise: Promise<unknown>, after?: () => void) => {
+  const refreshSwitchTransition = React.useCallback(() => {
+    const name = transitioningSwitch;
+    if (name === null) {
+      return Promise.resolve(true);
+    }
+    return loadSwitchStatus().then((next) => {
+      const item = next.find((candidate) => candidate.Name_str === name);
+      const complete = item === undefined || item.Online_bool;
+      if (complete) {
+        setTransitioningSwitch((current) => (current === name ? null : current));
+      }
+      return complete;
+    });
+  }, [loadSwitchStatus, transitioningSwitch]);
+  useTransitionRefresh(transitioningSwitch, refreshSwitchTransition);
+
+  const run = (promise: Promise<unknown>, after?: () => void, transitionName?: string) => {
     setBusy(true);
     setError(null);
     promise
@@ -262,6 +295,9 @@ const Layer3Switch: React.FunctionComponent = () => {
       .catch((e) => {
         setError(String(e));
         setBusy(false);
+        if (transitionName !== undefined) {
+          setTransitioningSwitch((current) => (current === transitionName ? null : current));
+        }
       });
   };
 
@@ -479,12 +515,16 @@ const Layer3Switch: React.FunctionComponent = () => {
                                 }
                               : {
                                   title: "Start",
-                                  onClick: () =>
+                                  onClick: () => {
+                                    setTransitioningSwitch(sw.Name_str);
                                     run(
                                       api.StartL3Switch(
                                         new VPN.VpnRpcL3Sw({ Name_str: sw.Name_str }),
                                       ),
-                                    ),
+                                      undefined,
+                                      sw.Name_str,
+                                    );
+                                  },
                                 },
                             { title: "Manage", onClick: () => setSelected(sw.Name_str) },
                             { isSeparator: true },

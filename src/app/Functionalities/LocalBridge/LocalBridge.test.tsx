@@ -85,6 +85,31 @@ describe("LocalBridge", () => {
 
   it("creates an adapter bridge from the modal", async () => {
     setup({ bridges: [] });
+    enumLocalBridge
+      .mockResolvedValueOnce({ LocalBridgeList: [] })
+      .mockResolvedValueOnce({
+        LocalBridgeList: [
+          {
+            HubNameLB_str: "DEFAULT",
+            DeviceName_str: "eth0",
+            TapMode_bool: false,
+            Online_bool: false,
+            Active_bool: false,
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new Error("temporary bridge refresh failure"))
+      .mockResolvedValue({
+        LocalBridgeList: [
+          {
+            HubNameLB_str: "DEFAULT",
+            DeviceName_str: "eth0",
+            TapMode_bool: false,
+            Online_bool: true,
+            Active_bool: true,
+          },
+        ],
+      });
     addLocalBridge.mockResolvedValue({});
     const user = userEvent.setup();
 
@@ -100,6 +125,11 @@ describe("LocalBridge", () => {
     expect(param.HubNameLB_str).toBe("DEFAULT");
     expect(param.DeviceName_str).toBe("eth0");
     expect(param.TapMode_bool).toBe(false);
+    expect(await screen.findByText("Operational", {}, { timeout: 3500 })).toBeInTheDocument();
+    expect(enumLocalBridge).toHaveBeenCalledTimes(4);
+    expect(getBridgeSupport).toHaveBeenCalledTimes(2);
+    expect(enumHub).toHaveBeenCalledTimes(2);
+    expect(enumEthernet).toHaveBeenCalledTimes(2);
   });
 
   it("creates a tap bridge when tap is supported", async () => {

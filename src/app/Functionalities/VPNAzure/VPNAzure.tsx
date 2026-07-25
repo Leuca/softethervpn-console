@@ -21,6 +21,7 @@ import { useNavigate } from "react-router-dom";
 import * as VPN from "vpnrpc/dist/vpnrpc";
 import { api } from "@app/utils/vpnrpc_settings";
 import { AppPage } from "@app/components/AppPage";
+import { useTransitionRefresh } from "@app/utils/useTransitionRefresh";
 
 const VPN_AZURE_URL = "https://www.vpnazure.net/en/";
 const CONNECTING_REFRESH_MS = 1000;
@@ -66,15 +67,18 @@ const VpnAzure: React.FunctionComponent = () => {
     load();
   }, [load]);
 
-  React.useEffect(() => {
-    if (connected !== null) {
-      return undefined;
-    }
-    const timer = window.setInterval(() => {
-      refreshStatus(true).catch((e) => setError(String(e)));
-    }, CONNECTING_REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [connected, refreshStatus]);
+  const refreshConnection = React.useCallback(
+    () => refreshStatus(true).then((status) => status.IsConnected_bool === true),
+    [refreshStatus],
+  );
+  useTransitionRefresh(
+    connected === null ? "vpn-azure" : null,
+    refreshConnection,
+    {
+      intervalMs: CONNECTING_REFRESH_MS,
+      onError: setError,
+    },
+  );
 
   const toggle = (_event: React.FormEvent<HTMLInputElement>, isChecked: boolean) => {
     setBusy(true);

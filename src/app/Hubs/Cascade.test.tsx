@@ -102,6 +102,27 @@ describe("Cascade", () => {
     expect(await screen.findByText("Offline")).toBeInTheDocument();
   });
 
+  it("refreshes a cascade while it is retrying after an error", async () => {
+    enumLink
+      .mockResolvedValueOnce({
+        LinkList: [
+          {
+            ...connectedLink,
+            Connected_bool: false,
+            LastError_u32: 42,
+          },
+        ],
+      })
+      .mockRejectedValueOnce(new Error("temporary link refresh failure"))
+      .mockResolvedValue({ LinkList: [connectedLink] });
+
+    render(<Cascade hub="DEFAULT" />);
+
+    expect(await screen.findByText("Error (code 42)")).toBeInTheDocument();
+    expect(await screen.findByText("Connected", {}, { timeout: 3500 })).toBeInTheDocument();
+    expect(enumLink).toHaveBeenCalledTimes(3);
+  });
+
   it("shows an empty state when the hub has no cascades", async () => {
     enumLink.mockResolvedValue({ LinkList: [] });
 
@@ -925,6 +946,26 @@ describe("Cascade", () => {
     });
   });
 
+  it("preserves operation errors during background refreshes", async () => {
+    enumLink.mockResolvedValue({
+      LinkList: [{ ...connectedLink, Connected_bool: false, LastError_u32: 0 }],
+    });
+    setLinkOffline.mockRejectedValue(new Error("offline failed"));
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText("Connecting");
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Set offline" }));
+
+    expect(await screen.findByText("Error: offline failed")).toBeInTheDocument();
+    const callsAfterError = enumLink.mock.calls.length;
+    await waitFor(() => expect(enumLink.mock.calls.length).toBeGreaterThan(callsAfterError), {
+      timeout: 2500,
+    });
+    expect(screen.getByText("Error: offline failed")).toBeInTheDocument();
+  });
+
   it("sets an offline cascade online", async () => {
     enumLink.mockResolvedValue({
       LinkList: [{ ...connectedLink, Online_bool: false, Connected_bool: false }],
@@ -1016,6 +1057,33 @@ describe("Cascade", () => {
       HubName_Ex_str: "DEFAULT",
       AccountName_utf: "to-branch",
     });
+  });
+
+  it("refreshes an open connection status while it is connecting", async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLinkStatus
+      .mockResolvedValueOnce({
+        Connected_bool: false,
+        ServerName_str: "connecting.example.com",
+      })
+      .mockRejectedValueOnce(new Error("temporary status failure"))
+      .mockResolvedValue({
+        Connected_bool: true,
+        ServerName_str: "connected.example.com",
+      });
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText("to-branch");
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Connection status" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("connecting.example.com")).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText("connected.example.com", {}, { timeout: 3500 }),
+    ).toBeInTheDocument();
+    expect(getLinkStatus).toHaveBeenCalledTimes(3);
   });
 
   it("deletes a cascade after confirmation", async () => {
