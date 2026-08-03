@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
 import { ManagedSessionGate, useManagedSession } from "./ManagedSessionGate";
 import { ManagedSession, getSession, login, logout } from "./sessionApi";
+import { ThemeProvider } from "@app/ThemeContext";
 
 vi.mock("./sessionApi", () => ({
   getSession: vi.fn(),
@@ -30,9 +31,11 @@ const ManagedApp = () => {
 
 const renderGate = () =>
   render(
-    <ManagedSessionGate>
-      <ManagedApp />
-    </ManagedSessionGate>,
+    <ThemeProvider>
+      <ManagedSessionGate>
+        <ManagedApp />
+      </ManagedSessionGate>
+    </ThemeProvider>,
   );
 
 describe("ManagedSessionGate", () => {
@@ -67,6 +70,7 @@ describe("ManagedSessionGate", () => {
     renderGate();
 
     expect(await screen.findByRole("button", { name: "Log in" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch to dark mode" })).toBeInTheDocument();
     expect(screen.queryByText("Managed app")).not.toBeInTheDocument();
   });
 

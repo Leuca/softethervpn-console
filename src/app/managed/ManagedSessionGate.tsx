@@ -12,6 +12,7 @@ import {
 import { ManagedLoginForm } from "./ManagedLoginForm";
 import { ManagedSession, getSession, logout } from "./sessionApi";
 import logo from "@app/bgimages/icons8-softether-vpn.svg";
+import { ThemeToggle } from "@app/components/ThemeToggle";
 import "./ManagedSessionGate.css";
 
 type AuthenticatedManagedSession = Extract<ManagedSession, { authenticated: true }>;
@@ -83,6 +84,7 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
   if (!session.authenticated) {
     return (
       <div className="se-managed-login">
+        <ThemeToggle className="se-managed-login__theme-toggle" />
         <div className="se-managed-login__panel">
           <div className="se-managed-login__intro">
             <div className="se-managed-login__brand">

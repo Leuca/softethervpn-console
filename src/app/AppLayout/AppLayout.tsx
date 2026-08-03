@@ -25,6 +25,7 @@ import { BarsIcon, UserIcon } from "@patternfly/react-icons";
 import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from "@app/routes";
 import { useServer } from "@app/ServerContext";
 import { useManagedSession } from "@app/managed/ManagedSessionGate";
+import { ThemeToggle } from "@app/components/ThemeToggle";
 import { accessibleRouteChangeHandler } from "@app/utils/utils";
 import logo from "@app/bgimages/icons8-softether-vpn.svg";
 
@@ -162,6 +163,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             <span className="se-user__role">{user}</span>
           </span>
         )}
+        <ThemeToggle />
       </MastheadContent>
     </Masthead>
   );

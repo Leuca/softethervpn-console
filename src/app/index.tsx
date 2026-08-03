@@ -7,6 +7,7 @@ import { AppRoutes } from "@app/routes";
 import { ServerProvider, useServer } from "@app/ServerContext";
 import { consoleMode } from "@app/consoleMode";
 import { ManagedSessionGate } from "@app/managed/ManagedSessionGate";
+import { ThemeProvider } from "@app/ThemeContext";
 import "@app/theme-dark-chrome.css";
 import "@app/app.css";
 
@@ -33,19 +34,21 @@ const AppShell: React.FunctionComponent = () => {
 // HashRouter: the console is served from a subpath of the VPN server's
 // embedded web server, which cannot rewrite arbitrary paths to index.html.
 const App: React.FunctionComponent = () => (
-  <Router>
-    {consoleMode === "managed" ? (
-      <ManagedSessionGate>
+  <ThemeProvider>
+    <Router>
+      {consoleMode === "managed" ? (
+        <ManagedSessionGate>
+          <ServerProvider>
+            <AppShell />
+          </ServerProvider>
+        </ManagedSessionGate>
+      ) : (
         <ServerProvider>
           <AppShell />
         </ServerProvider>
-      </ManagedSessionGate>
-    ) : (
-      <ServerProvider>
-        <AppShell />
-      </ServerProvider>
-    )}
-  </Router>
+      )}
+    </Router>
+  </ThemeProvider>
 );
 
 export default App;

@@ -7,13 +7,11 @@ body,
 /* ============================================================
    SoftEther VPN Console - application design layer
 
-   Dark chrome (masthead + sidebar) around a light content area,
-   with SoftEther-blue (#0066cc, PatternFly blue-50) accents. The
-   masthead and sidebar carry the .pf-v6-theme-dark class in
-   AppLayout, so PatternFly resolves their tokens to the dark
-   palette automatically; this file only adds branding, the active
-   navigation accent, and the depth cues that separate the chrome
-   from the workspace.
+   Dark chrome (masthead + sidebar) around the selected light or dark
+   content theme, with SoftEther-blue (#0066cc, PatternFly blue-50)
+   accents. The generated theme-dark-chrome.css keeps the chrome dark
+   independently; this file only adds branding, the active navigation
+   accent, and the depth cues that separate it from the workspace.
    ============================================================ */
 
 /* --- Brand lockup (masthead, left) --- */
