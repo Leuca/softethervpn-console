@@ -1,8 +1,9 @@
 import cookie from '@fastify/cookie';
-import Fastify, { FastifyInstance, FastifyServerOptions } from 'fastify';
+import Fastify, { FastifyInstance, FastifyRequest, FastifyServerOptions } from 'fastify';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerFrontend } from './frontend.js';
 import { LoginProbe, createLoginProbe } from './loginProbe.js';
+import { LoginRateLimiter } from './loginRateLimit.js';
 import { RpcForwarder, forwardRpcRequest, registerRpcProxy } from './rpcProxy.js';
 import { registerSessionRoutes } from './sessionRoutes.js';
 import { SessionStore } from './sessions.js';
@@ -10,11 +11,34 @@ import { SessionStore } from './sessions.js';
 interface GatewayServerOptions {
   frontendRoot?: string;
   loginProbe?: LoginProbe;
+  loginRateLimiter?: LoginRateLimiter;
   logger?: boolean;
   rpcForwarder?: RpcForwarder;
   sessions?: SessionStore;
   trustProxy?: FastifyServerOptions['trustProxy'];
 }
+
+export const REQUEST_BODY_LIMIT_BYTES = 1024 * 1024;
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+const hasAllowedOrigin = (request: FastifyRequest): boolean => {
+  const origin = request.headers.origin;
+  if (!origin) {
+    return true;
+  }
+
+  const host = request.host;
+  if (!host) {
+    return false;
+  }
+
+  try {
+    return new URL(origin).origin === new URL(`${request.protocol}://${host}`).origin;
+  } catch {
+    return false;
+  }
+};
 
 export const parsePort = (value: string | undefined): number => {
   const port = Number(value || 8080);
@@ -49,15 +73,23 @@ export const parseTrustProxy = (value: string | undefined): FastifyServerOptions
 
 export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyInstance => {
   const server = Fastify({
+    bodyLimit: REQUEST_BODY_LIMIT_BYTES,
     logger: options.logger ?? false,
     trustProxy: options.trustProxy ?? false,
   });
   const sessions = options.sessions ?? new SessionStore();
   const rpcForwarder = options.rpcForwarder ?? forwardRpcRequest;
 
+  server.addHook('onRequest', async (request, reply) => {
+    if (!SAFE_METHODS.has(request.method) && !hasAllowedOrigin(request)) {
+      return reply.code(403).send({ error: 'Cross-origin requests are not allowed.' });
+    }
+  });
+
   server.get('/healthz', async () => ({ status: 'ok' }));
   server.register(cookie);
   server.register(registerSessionRoutes, {
+    loginRateLimiter: options.loginRateLimiter,
     sessions,
     probe: options.loginProbe ?? createLoginProbe(rpcForwarder),
   });

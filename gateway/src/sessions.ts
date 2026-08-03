@@ -20,6 +20,7 @@ interface SessionStoreOptions {
 }
 
 export class SessionStore {
+  private readonly expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly sessions = new Map<string, GatewaySession>();
   private readonly ttlMs: number;
   private readonly now: () => number;
@@ -41,6 +42,13 @@ export class SessionStore {
       expiresAt: this.now() + this.ttlMs,
     });
 
+    const expiryTimer = setTimeout(() => {
+      this.expiryTimers.delete(id);
+      this.sessions.delete(id);
+    }, this.ttlMs);
+    expiryTimer.unref();
+    this.expiryTimers.set(id, expiryTimer);
+
     return id;
   }
 
@@ -48,7 +56,7 @@ export class SessionStore {
     const session = this.sessions.get(id);
 
     if (session && session.expiresAt <= this.now()) {
-      this.sessions.delete(id);
+      this.delete(id);
       return undefined;
     }
 
@@ -56,6 +64,11 @@ export class SessionStore {
   }
 
   delete(id: string): boolean {
+    const expiryTimer = this.expiryTimers.get(id);
+    if (expiryTimer) {
+      clearTimeout(expiryTimer);
+      this.expiryTimers.delete(id);
+    }
     return this.sessions.delete(id);
   }
 }

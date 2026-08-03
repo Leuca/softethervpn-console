@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SessionCredentials, SessionStore } from './sessions.js';
 
 const credentials: SessionCredentials = {
@@ -35,5 +35,20 @@ describe('SessionStore', () => {
 
     expect(store.delete(id)).toBe(true);
     expect(store.get(id)).toBeUndefined();
+  });
+
+  it('removes credentials when the session lifetime elapses without another read', () => {
+    vi.useFakeTimers();
+
+    try {
+      const store = new SessionStore({ ttlMs: 5_000 });
+      const id = store.create(credentials);
+
+      vi.advanceTimersByTime(5_000);
+
+      expect(store.delete(id)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

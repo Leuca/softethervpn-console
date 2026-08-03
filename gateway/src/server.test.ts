@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildGatewayServer, parsePort, parseTrustProxy } from './server.js';
+import {
+  REQUEST_BODY_LIMIT_BYTES,
+  buildGatewayServer,
+  parsePort,
+  parseTrustProxy,
+} from './server.js';
 
 describe('gateway configuration', () => {
   it('parses the listen port and rejects invalid values', () => {
@@ -28,6 +33,61 @@ describe('gateway server', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ status: 'ok' });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects cross-origin writes while accepting the trusted public origin', async () => {
+    const server = buildGatewayServer({ trustProxy: true });
+
+    try {
+      const rejected = await server.inject({
+        method: 'POST',
+        url: '/logout',
+        headers: {
+          host: '127.0.0.1:8080',
+          origin: 'https://attacker.example.com',
+          'x-forwarded-host': 'console.example.com:8443',
+          'x-forwarded-proto': 'https',
+        },
+      });
+      const accepted = await server.inject({
+        method: 'POST',
+        url: '/logout',
+        headers: {
+          host: '127.0.0.1:8080',
+          origin: 'https://console.example.com:8443',
+          'x-forwarded-host': 'console.example.com:8443',
+          'x-forwarded-proto': 'https',
+        },
+      });
+
+      expect(rejected.statusCode).toBe(403);
+      expect(rejected.json()).toEqual({ error: 'Cross-origin requests are not allowed.' });
+      expect(accepted.statusCode).toBe(204);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects request bodies larger than one MiB', async () => {
+    const server = buildGatewayServer();
+
+    try {
+      const response = await server.inject({
+        method: 'POST',
+        url: '/login',
+        payload: {
+          host: 'vpn.example.com',
+          port: 443,
+          hub: '',
+          password: 'x'.repeat(REQUEST_BODY_LIMIT_BYTES),
+          allowSelfSigned: false,
+        },
+      });
+
+      expect(response.statusCode).toBe(413);
     } finally {
       await server.close();
     }
