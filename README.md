@@ -9,6 +9,9 @@ This is the successor to [softethervpn-web-console](https://github.com/Leuca/sof
 [PatternFly seed](https://github.com/patternfly/patternfly-react-seed) (PatternFly 6 / React 18 /
 TypeScript 5 / react-router 7).
 
+Before deploying, review the [support](docs/SUPPORT.md) and
+[versioning](docs/VERSIONING.md) policies.
+
 ## Releases
 
 [GitHub releases](https://github.com/Leuca/softethervpn-console/releases) provide
