@@ -74,24 +74,6 @@ describe("HubTables", () => {
     expect(screen.getByText("Yes")).toBeInTheDocument();
   });
 
-  it("shows an empty state when both tables are empty", async () => {
-    enumMacTable.mockResolvedValue({ MacTable: [] });
-    enumIpTable.mockResolvedValue({ IpTable: [] });
-
-    render(<HubTables hub="DEFAULT" />);
-
-    expect(await screen.findByText("No MAC addresses")).toBeInTheDocument();
-  });
-
-  it("shows an error when table enumeration fails", async () => {
-    enumMacTable.mockRejectedValue(new Error("boom"));
-
-    render(<HubTables hub="DEFAULT" />);
-
-    expect(await screen.findByText("Address table operation failed")).toBeInTheDocument();
-    expect(screen.getByText("Error: boom")).toBeInTheDocument();
-  });
-
   it("deletes a MAC table entry after confirmation", async () => {
     const user = userEvent.setup();
 

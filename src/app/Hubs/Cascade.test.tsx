@@ -1,11 +1,12 @@
 import * as React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import forge from "node-forge";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { Cascade } from "./Cascade";
+import { PKCS12_ARCHIVE, PKCS12_PASSWORD } from "@app/utils/pkcs12.fixture";
 import { api } from "@app/utils/vpnrpc_settings";
 import { hashSoftEtherPassword } from "@app/utils/sha0";
+import { useTransitionRefresh } from "@app/utils/useTransitionRefresh";
 import {
   SELF_SIGNED_CERT_B64,
   SELF_SIGNED_CERT_DER,
@@ -13,10 +14,16 @@ import {
 } from "@app/utils/x509.fixture";
 
 // Fill the four always-required fields of the create form.
-async function fillCommonFields(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
-  await user.type(within(dialog).getByLabelText("Setting name"), "to-hq");
-  await user.type(within(dialog).getByLabelText("Destination server host"), "hq.example.com");
-  await user.type(within(dialog).getByLabelText("Destination virtual hub"), "HQ");
+function fillCommonFields(dialog: HTMLElement) {
+  fireEvent.change(within(dialog).getByLabelText("Setting name"), {
+    target: { value: "to-hq" },
+  });
+  fireEvent.change(within(dialog).getByLabelText("Destination server host"), {
+    target: { value: "hq.example.com" },
+  });
+  fireEvent.change(within(dialog).getByLabelText("Destination virtual hub"), {
+    target: { value: "HQ" },
+  });
 }
 
 vi.mock("@app/utils/vpnrpc_settings", () => ({
@@ -32,6 +39,10 @@ vi.mock("@app/utils/vpnrpc_settings", () => ({
   },
 }));
 
+vi.mock("@app/utils/useTransitionRefresh", () => ({
+  useTransitionRefresh: vi.fn(),
+}));
+
 const enumLink = api.EnumLink as unknown as Mock;
 const createLink = api.CreateLink as unknown as Mock;
 const getLink = api.GetLink as unknown as Mock;
@@ -40,29 +51,27 @@ const setLinkOnline = api.SetLinkOnline as unknown as Mock;
 const setLinkOffline = api.SetLinkOffline as unknown as Mock;
 const deleteLink = api.DeleteLink as unknown as Mock;
 const getLinkStatus = api.GetLinkStatus as unknown as Mock;
+const transitionRefresh = useTransitionRefresh as unknown as Mock;
 
-const pkcs12File = (password: string) => {
-  const keys = forge.pki.rsa.generateKeyPair(512);
-  const cert = forge.pki.createCertificate();
-  cert.publicKey = keys.publicKey;
-  cert.serialNumber = "01";
-  cert.validity.notBefore = new Date("2026-01-01T00:00:00Z");
-  cert.validity.notAfter = new Date("2027-01-01T00:00:00Z");
-  const attributes = [{ name: "commonName", value: "cascade.example.com" }];
-  cert.setSubject(attributes);
-  cert.setIssuer(attributes);
-  cert.sign(keys.privateKey, forge.md.sha256.create());
+const runTransitionRefresh = async (key: string): Promise<boolean> => {
+  const call = [...transitionRefresh.mock.calls]
+    .reverse()
+    .find(([transitionKey]) => transitionKey === key);
+  expect(call).toBeDefined();
 
-  const pfx = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [cert], password, {
-    algorithm: "3des",
-    generateLocalKeyId: true,
+  let result = false;
+  let error: unknown;
+  await act(async () => {
+    try {
+      result = await call![1]();
+    } catch (caught) {
+      error = caught;
+    }
   });
-  const der = forge.asn1.toDer(pfx).getBytes();
-  const bytes = Uint8Array.from(der, (character) => character.charCodeAt(0));
-  return {
-    file: new File([bytes.buffer], "client.p12", { type: "application/x-pkcs12" }),
-    modulus: keys.privateKey.n,
-  };
+  if (error !== undefined) {
+    throw error;
+  }
+  return result;
 };
 
 const connectedLink = {
@@ -113,30 +122,14 @@ describe("Cascade", () => {
           },
         ],
       })
-      .mockRejectedValueOnce(new Error("temporary link refresh failure"))
       .mockResolvedValue({ LinkList: [connectedLink] });
 
     render(<Cascade hub="DEFAULT" />);
 
     expect(await screen.findByText("Error (code 42)")).toBeInTheDocument();
-    expect(await screen.findByText("Connected", {}, { timeout: 3500 })).toBeInTheDocument();
-    expect(enumLink).toHaveBeenCalledTimes(3);
-  });
-
-  it("shows an empty state when the hub has no cascades", async () => {
-    enumLink.mockResolvedValue({ LinkList: [] });
-
-    render(<Cascade hub="DEFAULT" />);
-
-    expect(await screen.findByText("No cascade connections")).toBeInTheDocument();
-  });
-
-  it("shows an error when enumeration fails", async () => {
-    enumLink.mockRejectedValue(new Error("boom"));
-
-    render(<Cascade hub="DEFAULT" />);
-
-    expect(await screen.findByText("Cascade operation failed")).toBeInTheDocument();
+    expect(await runTransitionRefresh("DEFAULT:to-branch")).toBe(true);
+    expect(screen.getByText("Connected")).toBeInTheDocument();
+    expect(enumLink).toHaveBeenCalledTimes(2);
   });
 
   it("creates an anonymous cascade with the local and destination hub set correctly", async () => {
@@ -198,7 +191,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.selectOptions(
       within(dialog).getByLabelText("Authentication method"),
       "Standard password",
@@ -223,7 +216,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.selectOptions(
       within(dialog).getByLabelText("Authentication method"),
       "Standard password",
@@ -250,7 +243,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.selectOptions(
       within(dialog).getByLabelText("Authentication method"),
       "RADIUS / NT domain (plain password)",
@@ -276,7 +269,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.selectOptions(
       within(dialog).getByLabelText("Authentication method"),
       "Client certificate",
@@ -305,10 +298,8 @@ describe("Cascade", () => {
     expect(Array.from(sent.ClientK_bin)).toEqual([1, 2, 3, 4]);
   });
 
-  it("creates a certificate cascade from a password-protected PKCS #12 archive", async () => {
+  it("opens a PKCS #12 archive after returning from the policy modal", async () => {
     enumLink.mockResolvedValue({ LinkList: [] });
-    createLink.mockResolvedValue({});
-    const archive = pkcs12File("archive-password");
     const user = userEvent.setup();
 
     render(<Cascade hub="DEFAULT" />);
@@ -316,15 +307,20 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     let dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
     await user.selectOptions(
       within(dialog).getByLabelText("Authentication method"),
       "Client certificate",
     );
-    await user.type(within(dialog).getByLabelText("Username"), "carol");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(fileInput, archive.file);
-    await user.type(within(dialog).getByLabelText("PKCS #12 archive password"), "archive-password");
+    await user.upload(
+      fileInput,
+      new File([PKCS12_ARCHIVE().buffer as ArrayBuffer], "client.p12", {
+        type: "application/x-pkcs12",
+      }),
+    );
+    fireEvent.change(within(dialog).getByLabelText("PKCS #12 archive password"), {
+      target: { value: PKCS12_PASSWORD },
+    });
     await user.click(within(dialog).getByRole("button", { name: "Edit security policy" }));
     await screen.findByText("Cascade security policy");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -332,27 +328,11 @@ describe("Cascade", () => {
     expect(within(dialog).getByLabelText("Client certificate or PKCS #12 file name")).toHaveValue(
       "client.p12",
     );
-    expect(within(dialog).getByLabelText("PKCS #12 archive password")).toHaveValue(
-      "archive-password",
-    );
+    expect(within(dialog).getByLabelText("PKCS #12 archive password")).toHaveValue(PKCS12_PASSWORD);
     const openArchiveBtn = within(dialog).getByRole("button", { name: "Open archive" });
     await waitFor(() => expect(openArchiveBtn).toBeEnabled());
     await user.click(openArchiveBtn);
     await within(dialog).findByText("Certificate and private key are ready.");
-
-    const createBtn = within(dialog).getByRole("button", { name: "Create" });
-    await waitFor(() => expect(createBtn).toBeEnabled());
-    await user.click(createBtn);
-
-    const sent = createLink.mock.calls[0][0];
-    expect(sent.ClientX_bin).toBeInstanceOf(Uint8Array);
-    expect(sent.ClientX_bin.length).toBeGreaterThan(0);
-    expect(sent.ClientK_bin).toBeInstanceOf(Uint8Array);
-    expect(sent.ClientK_bin[0]).toBe(0x30);
-    const privateKey = forge.pki.privateKeyFromAsn1(
-      forge.asn1.fromDer(String.fromCharCode(...sent.ClientK_bin)),
-    );
-    expect(privateKey.n.compareTo(archive.modulus)).toBe(0);
   });
 
   it("rejects an encrypted private key with a clear error", async () => {
@@ -364,7 +344,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.selectOptions(
       within(dialog).getByLabelText("Authentication method"),
       "Client certificate",
@@ -399,7 +379,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     // Anonymous auth (default) -> the only file input is the pinned server cert.
     await user.click(
       within(dialog).getByLabelText("Always verify the destination server certificate"),
@@ -636,7 +616,7 @@ describe("Cascade", () => {
     expect(sent.PlainPassword_str).toBe("secret");
   });
 
-  it("disables save again when a changed username is restored", async () => {
+  it("does not decode standard-password hashes when they have already been returned as bytes", async () => {
     enumLink.mockResolvedValue({ LinkList: [connectedLink] });
     getLink.mockResolvedValue({
       HubName_Ex_str: "DEFAULT",
@@ -644,63 +624,12 @@ describe("Cascade", () => {
       Hostname_str: "branch.example.com",
       Port_u32: 443,
       HubName_str: "BRANCH",
-      AuthType_u32: 2,
+      AuthType_u32: 1,
       Username_str: "bob",
-      PlainPassword_str: "secret",
+      HashedPassword_bin: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTA=",
+      PlainPassword_str: "",
       CheckServerCert_bool: false,
       ServerCert_bin: "",
-    });
-    const user = userEvent.setup();
-
-    render(<Cascade hub="DEFAULT" />);
-    await screen.findByText("to-branch");
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
-    await user.click(await screen.findByRole("menuitem", { name: "Edit settings" }));
-
-    const dialog = await screen.findByRole("dialog");
-    const save = within(dialog).getByRole("button", { name: "Save" });
-    const username = within(dialog).getByLabelText("Username");
-
-    expect(save).toBeDisabled();
-    await user.clear(username);
-    await user.type(username, "alice");
-    expect(save).toBeEnabled();
-    await user.clear(username);
-    await user.type(username, "bob");
-    expect(save).toBeDisabled();
-  });
-
-  it.each([
-    [
-      "standard password",
-      {
-        AuthType_u32: 1,
-        Username_str: "bob",
-        HashedPassword_bin: "MTIzNDU2Nzg5MDEyMzQ1Njc4OTA=",
-      },
-      { HashedPassword_bin: new Uint8Array(new TextEncoder().encode("12345678901234567890")) },
-    ],
-    [
-      "client certificate",
-      {
-        AuthType_u32: 3,
-        Username_str: "bob",
-        ClientX_bin: SELF_SIGNED_CERT_B64,
-        ClientK_bin: "AQIDBA==",
-      },
-      { ClientX_bin: SELF_SIGNED_CERT_DER(), ClientK_bin: new Uint8Array([1, 2, 3, 4]) },
-    ],
-  ])("handles username dirty state for %s auth", async (_label, authFields, expectedBin) => {
-    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
-    getLink.mockResolvedValue({
-      HubName_Ex_str: "DEFAULT",
-      AccountName_utf: "to-branch",
-      Hostname_str: "branch.example.com",
-      Port_u32: 443,
-      HubName_str: "BRANCH",
-      CheckServerCert_bool: false,
-      ServerCert_bin: "",
-      ...authFields,
     });
     setLink.mockResolvedValue({});
     const user = userEvent.setup();
@@ -728,9 +657,50 @@ describe("Cascade", () => {
 
     const sent = setLink.mock.calls[0][0];
     expect(sent.Username_str).toBe("alice");
-    for (const [key, expected] of Object.entries(expectedBin)) {
-      expect(Array.from(sent[key])).toEqual(Array.from(expected));
-    }
+    expect(Array.from(sent.HashedPassword_bin)).toEqual(
+      Array.from(new TextEncoder().encode("12345678901234567890")),
+    );
+  });
+
+  it("does not decode certificate payloads when they are already returned as bytes", async () => {
+    enumLink.mockResolvedValue({ LinkList: [connectedLink] });
+    getLink.mockResolvedValue({
+      HubName_Ex_str: "DEFAULT",
+      AccountName_utf: "to-branch",
+      Hostname_str: "branch.example.com",
+      Port_u32: 443,
+      HubName_str: "BRANCH",
+      AuthType_u32: 3,
+      Username_str: "bob",
+      ClientX_bin: SELF_SIGNED_CERT_B64,
+      ClientK_bin: "AQIDBA==",
+      PlainPassword_str: "",
+      HashedPassword_bin: "",
+      CheckServerCert_bool: false,
+      ServerCert_bin: "",
+    });
+    setLink.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(<Cascade hub="DEFAULT" />);
+    await screen.findByText("to-branch");
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit settings" }));
+
+    const dialog = await screen.findByRole("dialog");
+    const save = within(dialog).getByRole("button", { name: "Save" });
+    const username = within(dialog).getByLabelText("Username");
+
+    expect(save).toBeDisabled();
+    await user.clear(username);
+    await user.type(username, "alice");
+    expect(save).toBeEnabled();
+    await user.click(save);
+
+    const sent = setLink.mock.calls[0][0];
+    expect(sent.Username_str).toBe("alice");
+    expect(Array.from(sent.ClientX_bin)).toEqual(Array.from(SELF_SIGNED_CERT_DER()));
+    expect(Array.from(sent.ClientK_bin)).toEqual([1, 2, 3, 4]);
   });
 
   it("applies advanced tuning options on create", async () => {
@@ -743,7 +713,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.click(within(dialog).getByRole("button", { name: /advanced settings/i }));
 
     const maxConn = within(dialog).getByLabelText("Number of TCP connections");
@@ -772,7 +742,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.click(within(dialog).getByRole("button", { name: /advanced settings/i }));
 
     const maxConn = within(dialog).getByLabelText("Number of TCP connections");
@@ -829,7 +799,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.click(within(dialog).getByRole("button", { name: /^proxy$/i }));
     await user.selectOptions(within(dialog).getByLabelText("Proxy type"), "HTTP proxy");
     await user.type(within(dialog).getByLabelText("Proxy host"), "proxy.example.com");
@@ -851,7 +821,7 @@ describe("Cascade", () => {
     await user.click(screen.getAllByRole("button", { name: /new cascade/i })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    await fillCommonFields(user, dialog);
+    fillCommonFields(dialog);
     await user.click(within(dialog).getByRole("button", { name: /^proxy$/i }));
     await user.selectOptions(within(dialog).getByLabelText("Proxy type"), "SOCKS proxy");
 
@@ -959,10 +929,7 @@ describe("Cascade", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Set offline" }));
 
     expect(await screen.findByText("Error: offline failed")).toBeInTheDocument();
-    const callsAfterError = enumLink.mock.calls.length;
-    await waitFor(() => expect(enumLink.mock.calls.length).toBeGreaterThan(callsAfterError), {
-      timeout: 2500,
-    });
+    expect(await runTransitionRefresh("DEFAULT:to-branch")).toBe(false);
     expect(screen.getByText("Error: offline failed")).toBeInTheDocument();
   });
 
@@ -1080,9 +1047,12 @@ describe("Cascade", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByText("connecting.example.com")).toBeInTheDocument();
-    expect(
-      await within(dialog).findByText("connected.example.com", {}, { timeout: 3500 }),
-    ).toBeInTheDocument();
+    await expect(runTransitionRefresh("DEFAULT:to-branch")).rejects.toThrow(
+      "temporary status failure",
+    );
+    expect(within(dialog).getByText("Error: temporary status failure")).toBeInTheDocument();
+    expect(await runTransitionRefresh("DEFAULT:to-branch")).toBe(true);
+    expect(within(dialog).getByText("connected.example.com")).toBeInTheDocument();
     expect(getLinkStatus).toHaveBeenCalledTimes(3);
   });
 

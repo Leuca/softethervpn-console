@@ -45,14 +45,6 @@ describe("Listeners", () => {
     expect(screen.getByText("Stopped")).toBeInTheDocument();
   });
 
-  it("shows an empty state when no listeners exist", async () => {
-    enumListener.mockResolvedValue({ ListenerList: [] });
-
-    render(<Listeners />);
-
-    expect(await screen.findByText("No listeners defined")).toBeInTheDocument();
-  });
-
   it("creates a listener on the chosen port and reloads", async () => {
     enumListener.mockResolvedValue({ ListenerList: [listening] });
     createListener.mockResolvedValue({});

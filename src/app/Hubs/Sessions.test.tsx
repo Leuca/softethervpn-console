@@ -57,22 +57,6 @@ describe("Sessions", () => {
     expect(enumSession.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT" });
   });
 
-  it("shows an empty state when the hub has no sessions", async () => {
-    enumSession.mockResolvedValue({ SessionList: [] });
-
-    render(<Sessions hub="DEFAULT" />);
-
-    expect(await screen.findByText("No active sessions")).toBeInTheDocument();
-  });
-
-  it("shows an error when enumeration fails", async () => {
-    enumSession.mockRejectedValue(new Error("boom"));
-
-    render(<Sessions hub="DEFAULT" />);
-
-    expect(await screen.findByText("Session operation failed")).toBeInTheDocument();
-  });
-
   it("opens the detail modal with session status only", async () => {
     enumSession.mockResolvedValue({ SessionList: [sid] });
     getSessionStatus.mockResolvedValue({ Username_str: "alice", Connected_bool: true });

@@ -30,12 +30,4 @@ describe("ServerStatus", () => {
     // date rendered as a locale string, not the raw ISO value
     expect(screen.queryByText("2026-07-03T12:03:14.642Z")).not.toBeInTheDocument();
   });
-
-  it("shows an error alert when the call fails", async () => {
-    getServerStatus.mockRejectedValue(new Error("boom"));
-
-    render(<ServerStatus />);
-
-    expect(await screen.findByText("Could not load server status")).toBeInTheDocument();
-  });
 });

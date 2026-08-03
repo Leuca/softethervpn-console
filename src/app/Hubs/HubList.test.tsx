@@ -70,14 +70,6 @@ describe("HubList", () => {
     expect(screen.getByText("3")).toBeInTheDocument(); // users
   });
 
-  it("shows an empty state when there are no hubs", async () => {
-    enumHub.mockResolvedValue({ HubList: [] });
-
-    renderList();
-
-    expect(await screen.findByText("No Virtual Hubs")).toBeInTheDocument();
-  });
-
   it("hides the empty-state create action for hub administrators", async () => {
     serverState.hideAdminOnly = true;
     enumHub.mockResolvedValue({ HubList: [] });

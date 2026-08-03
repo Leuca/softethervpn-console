@@ -71,14 +71,10 @@ const VpnAzure: React.FunctionComponent = () => {
     () => refreshStatus(true).then((status) => status.IsConnected_bool === true),
     [refreshStatus],
   );
-  useTransitionRefresh(
-    connected === null ? "vpn-azure" : null,
-    refreshConnection,
-    {
-      intervalMs: CONNECTING_REFRESH_MS,
-      onError: setError,
-    },
-  );
+  useTransitionRefresh(connected === null ? "vpn-azure" : null, refreshConnection, {
+    intervalMs: CONNECTING_REFRESH_MS,
+    onError: setError,
+  });
 
   const toggle = (_event: React.FormEvent<HTMLInputElement>, isChecked: boolean) => {
     setBusy(true);

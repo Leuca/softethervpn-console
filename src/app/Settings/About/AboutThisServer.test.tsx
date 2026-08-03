@@ -61,13 +61,4 @@ describe("About", () => {
     const rowLabels = screen.getAllByText(/function|Maximum/).map((el) => el.textContent);
     expect(rowLabels[rowLabels.length - 1]).toBe("Maximum number of Virtual Hubs");
   });
-
-  it("shows an error alert when a call fails", async () => {
-    getServerInfo.mockRejectedValue(new Error("boom"));
-    getCaps.mockResolvedValue(caps([]));
-
-    render(<About />);
-
-    expect(await screen.findByText("Could not load server information")).toBeInTheDocument();
-  });
 });

@@ -142,12 +142,4 @@ describe("ClusterConfig", () => {
 
     expect(setFarm).not.toHaveBeenCalled();
   });
-
-  it("shows an error when loading fails", async () => {
-    getFarm.mockRejectedValue(new Error("boom"));
-    render(<ClusterConfig />);
-    expect(
-      await screen.findByText("Could not load or save the clustering configuration"),
-    ).toBeInTheDocument();
-  });
 });

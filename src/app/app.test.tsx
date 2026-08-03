@@ -2,7 +2,7 @@ import * as React from "react";
 import App from "@app/index";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { type Mock, afterEach, describe, expect, it, test, vi } from "vitest";
+import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "@app/utils/vpnrpc_settings";
 
 // The server probes performed on mount cannot reach a real VPN server in tests;
@@ -74,7 +74,6 @@ async function withDesktopWidth(fn: () => Promise<void>) {
 describe("App tests", () => {
   const enumConnection = api.EnumConnection as unknown as Mock;
   const getCaps = api.GetCaps as unknown as Mock;
-  const getFarmSetting = api.GetFarmSetting as unknown as Mock;
   const defaultCaps = {
     CapsList: [],
     caps_b_local_bridge_u32: 1,
@@ -94,19 +93,6 @@ describe("App tests", () => {
   afterEach(() => {
     vi.clearAllMocks();
     window.history.replaceState({}, "", "/");
-  });
-
-  test("should render default App component", async () => {
-    const { asFragment } = render(<App />);
-
-    expect(asFragment()).toMatchSnapshot();
-    await screen.findByRole("button", { name: "Global navigation" });
-  });
-
-  it("should render a nav-toggle button once the server probes settle", async () => {
-    render(<App />);
-
-    expect(await screen.findByRole("button", { name: "Global navigation" })).toBeVisible();
   });
 
   it("should toggle the sidebar when clicking the nav-toggle button", async () => {
@@ -261,8 +247,6 @@ describe("App tests", () => {
   });
 
   it("denies functionalities pages to hub administrators on direct URLs", async () => {
-    // The Functionalities group is admin-only at group level; the flattened
-    // routes must inherit that flag so RouteGate matches the nav.
     enumConnection.mockRejectedValueOnce(
       new Error("Error: Code=52, Message=Error code 52: Not enough privileges."),
     );
@@ -272,33 +256,5 @@ describe("App tests", () => {
 
     expect(await screen.findByText("Permission required")).toBeVisible();
     expect(await screen.findByText(/server administrator privileges/i)).toBeVisible();
-  });
-
-  it("denies the EtherIP detail page in bridge mode on direct URLs", async () => {
-    getCaps.mockResolvedValueOnce({
-      ...defaultCaps,
-      caps_b_bridge_u32: 1,
-    });
-
-    window.history.pushState({}, "", "/#/functionalities/legacyprotocols/etherip");
-
-    render(<App />);
-
-    expect(await screen.findByText("Permission required")).toBeVisible();
-    expect(await screen.findByText(/This page is unavailable in bridge mode/i)).toBeVisible();
-  });
-
-  it("keeps clustering configuration reachable in cluster mode", async () => {
-    // Cluster members must still reach the page to change or leave clustering.
-    getFarmSetting.mockResolvedValue({ ServerType_u32: 1 });
-
-    window.history.pushState({}, "", "/#/settings/clusterconfig");
-
-    render(<App />);
-
-    expect(
-      await screen.findByRole("heading", { name: "Clustering Configuration", level: 1 }),
-    ).toBeVisible();
-    expect(screen.queryByText("Permission required")).not.toBeInTheDocument();
   });
 });

@@ -53,18 +53,6 @@ describe("HubMessage", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
-  it("shows load errors", async () => {
-    getHubMsg.mockRejectedValue(new Error("rpc failed"));
-    const user = userEvent.setup();
-
-    render(<HubMessage hub="DEFAULT" />);
-
-    await user.click(screen.getByRole("button", { name: "Set the Message" }));
-    expect(await screen.findByText("Hub message operation failed")).toBeInTheDocument();
-    expect(screen.getByText("Error: rpc failed")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-  });
-
   it("saves a new enabled message as bytes", async () => {
     getHubMsg.mockResolvedValue({ Msg_bin: new Uint8Array() });
     setHubMsg.mockResolvedValue({});

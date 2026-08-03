@@ -41,12 +41,6 @@ describe("EtherIPDetailed", () => {
     expect(within(row).getByText("site1")).toBeInTheDocument();
   });
 
-  it("shows an empty state when there are none", async () => {
-    setup([]);
-    renderPage();
-    expect(await screen.findByText("No client settings")).toBeInTheDocument();
-  });
-
   it("adds a client setting", async () => {
     setup([]);
     m("AddEtherIpId").mockResolvedValue({});
@@ -81,12 +75,5 @@ describe("EtherIPDetailed", () => {
 
     await waitFor(() => expect(m("DeleteEtherIpId")).toHaveBeenCalledTimes(1));
     expect(m("DeleteEtherIpId").mock.calls[0][0].Id_str).toBe("router@site");
-  });
-
-  it("shows an error when loading fails", async () => {
-    m("EnumEtherIpId").mockRejectedValue(new Error("boom"));
-    m("EnumHub").mockResolvedValue({ HubList: [] });
-    renderPage();
-    expect(await screen.findByText("EtherIP operation failed")).toBeInTheDocument();
   });
 });

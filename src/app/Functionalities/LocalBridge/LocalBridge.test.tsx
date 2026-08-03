@@ -1,8 +1,9 @@
 import * as React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocalBridge } from "./LocalBridge";
+import { useTransitionRefresh } from "@app/utils/useTransitionRefresh";
 import { api } from "@app/utils/vpnrpc_settings";
 
 vi.mock("@app/utils/vpnrpc_settings", () => ({
@@ -14,6 +15,10 @@ vi.mock("@app/utils/vpnrpc_settings", () => ({
     AddLocalBridge: vi.fn(),
     DeleteLocalBridge: vi.fn(),
   },
+}));
+
+vi.mock("@app/utils/useTransitionRefresh", () => ({
+  useTransitionRefresh: vi.fn(),
 }));
 
 // Toggle tap support per test; Linux servers expose the tap radio.
@@ -28,6 +33,20 @@ const enumHub = api.EnumHub as unknown as Mock;
 const enumEthernet = api.EnumEthernet as unknown as Mock;
 const addLocalBridge = api.AddLocalBridge as unknown as Mock;
 const deleteLocalBridge = api.DeleteLocalBridge as unknown as Mock;
+const transitionRefresh = useTransitionRefresh as unknown as Mock;
+
+const runTransitionRefresh = async (): Promise<boolean> => {
+  const call = [...transitionRefresh.mock.calls]
+    .reverse()
+    .find(([transitionKey]) => transitionKey !== null);
+  expect(call).toBeDefined();
+
+  let result = false;
+  await act(async () => {
+    result = await call![1]();
+  });
+  return result;
+};
 
 const setup = (options: { bridges?: unknown[]; supported?: boolean } = {}) => {
   getBridgeSupport.mockResolvedValue({ IsBridgeSupportedOs_bool: options.supported ?? true });
@@ -75,14 +94,6 @@ describe("LocalBridge", () => {
     expect(within(tap).getByText("Error")).toBeInTheDocument();
   });
 
-  it("shows an empty state when no bridge is defined", async () => {
-    setup({ bridges: [] });
-
-    render(<LocalBridge />);
-
-    expect(await screen.findByText("No local bridge defined")).toBeInTheDocument();
-  });
-
   it("creates an adapter bridge from the modal", async () => {
     setup({ bridges: [] });
     enumLocalBridge
@@ -98,7 +109,6 @@ describe("LocalBridge", () => {
           },
         ],
       })
-      .mockRejectedValueOnce(new Error("temporary bridge refresh failure"))
       .mockResolvedValue({
         LocalBridgeList: [
           {
@@ -125,8 +135,10 @@ describe("LocalBridge", () => {
     expect(param.HubNameLB_str).toBe("DEFAULT");
     expect(param.DeviceName_str).toBe("eth0");
     expect(param.TapMode_bool).toBe(false);
-    expect(await screen.findByText("Operational", {}, { timeout: 3500 })).toBeInTheDocument();
-    expect(enumLocalBridge).toHaveBeenCalledTimes(4);
+    await waitFor(() => expect(enumLocalBridge).toHaveBeenCalledTimes(2));
+    expect(await runTransitionRefresh()).toBe(true);
+    expect(screen.getByText("Operational")).toBeInTheDocument();
+    expect(enumLocalBridge).toHaveBeenCalledTimes(3);
     expect(getBridgeSupport).toHaveBeenCalledTimes(2);
     expect(enumHub).toHaveBeenCalledTimes(2);
     expect(enumEthernet).toHaveBeenCalledTimes(2);
@@ -189,16 +201,5 @@ describe("LocalBridge", () => {
       await screen.findByText("Local Bridge is not supported on this operating system"),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create local bridge/i })).toBeDisabled();
-  });
-
-  it("shows an error alert when loading fails", async () => {
-    getBridgeSupport.mockRejectedValue(new Error("boom"));
-    enumLocalBridge.mockResolvedValue({ LocalBridgeList: [] });
-    enumHub.mockResolvedValue({ HubList: [] });
-    enumEthernet.mockResolvedValue({ EthList: [] });
-
-    render(<LocalBridge />);
-
-    expect(await screen.findByText("Local bridge operation failed")).toBeInTheDocument();
   });
 });

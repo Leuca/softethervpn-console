@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubCertificates } from "./HubCertificates";
@@ -39,6 +39,29 @@ const caItem = {
 
 const bytesB64 = (bytes: number[]): string => btoa(String.fromCharCode(...bytes));
 
+const crlItem = {
+  Key_u32: 9,
+  CrlInfo_utf: "CN=revoked.example.com",
+};
+
+const crlDetails = {
+  Key_u32: 9,
+  CommonName_utf: "revoked.example.com",
+  Organization_utf: "",
+  Unit_utf: "",
+  Country_utf: "",
+  State_utf: "",
+  Local_utf: "",
+  Serial_bin: bytesB64([1]),
+  DigestMD5_bin: new Uint8Array(),
+  DigestSHA1_bin: bytesB64([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+};
+
+const setupCrl = () => {
+  enumCa.mockResolvedValue({ CAList: [] });
+  enumCrl.mockResolvedValue({ CRLList: [crlItem] });
+};
+
 describe("HubCertificates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,14 +76,6 @@ describe("HubCertificates", () => {
     expect(await screen.findAllByText("CN=Root CA")).toHaveLength(2);
     expect(enumCa.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT" });
     expect(enumCrl.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT" });
-  });
-
-  it("shows an empty state when no trusted CA certificates exist", async () => {
-    enumCa.mockResolvedValue({ CAList: [] });
-
-    render(<HubCertificates hub="DEFAULT" />);
-
-    expect(await screen.findByText("No trusted CA certificates")).toBeInTheDocument();
   });
 
   it("adds a trusted CA certificate and normalizes PEM uploads to DER", async () => {
@@ -160,22 +175,8 @@ describe("HubCertificates", () => {
   });
 
   it("edits and deletes a certificate revocation entry", async () => {
-    enumCa.mockResolvedValue({ CAList: [] });
-    enumCrl.mockResolvedValue({ CRLList: [{ Key_u32: 9, CrlInfo_utf: "CN=revoked.example.com" }] });
-    getCrl.mockResolvedValue({
-      Key_u32: 9,
-      CommonName_utf: "revoked.example.com",
-      Organization_utf: "",
-      Unit_utf: "",
-      Country_utf: "",
-      State_utf: "",
-      Local_utf: "",
-      Serial_bin: bytesB64([1]),
-      DigestMD5_bin: new Uint8Array(),
-      DigestSHA1_bin: bytesB64([
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-      ]),
-    });
+    setupCrl();
+    getCrl.mockResolvedValue(crlDetails);
     setCrl.mockResolvedValue({});
     delCrl.mockResolvedValue({});
     const user = userEvent.setup();
@@ -195,14 +196,11 @@ describe("HubCertificates", () => {
     );
     expect(save).toBeDisabled();
     const commonName = within(editDialog).getByLabelText("Common name");
-    await user.clear(commonName);
-    await user.type(commonName, "blocked.example.com");
+    fireEvent.change(commonName, { target: { value: "blocked.example.com" } });
     expect(save).toBeEnabled();
-    await user.clear(commonName);
-    await user.type(commonName, "revoked.example.com");
+    fireEvent.change(commonName, { target: { value: "revoked.example.com" } });
     expect(save).toBeDisabled();
-    await user.clear(commonName);
-    await user.type(commonName, "blocked.example.com");
+    fireEvent.change(commonName, { target: { value: "blocked.example.com" } });
     await user.click(save);
 
     await waitFor(() => expect(setCrl).toHaveBeenCalledOnce());

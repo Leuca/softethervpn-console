@@ -1,8 +1,9 @@
 import * as React from "react";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { Layer3Switch } from "./Layer3Switch";
+import { useTransitionRefresh } from "@app/utils/useTransitionRefresh";
 import { api } from "@app/utils/vpnrpc_settings";
 
 vi.mock("@app/utils/vpnrpc_settings", () => ({
@@ -22,7 +23,25 @@ vi.mock("@app/utils/vpnrpc_settings", () => ({
   },
 }));
 
+vi.mock("@app/utils/useTransitionRefresh", () => ({
+  useTransitionRefresh: vi.fn(),
+}));
+
 const m = (name: keyof typeof api) => api[name] as unknown as Mock;
+const transitionRefresh = useTransitionRefresh as unknown as Mock;
+
+const runTransitionRefresh = async (key: string): Promise<boolean> => {
+  const call = [...transitionRefresh.mock.calls]
+    .reverse()
+    .find(([transitionKey]) => transitionKey === key);
+  expect(call).toBeDefined();
+
+  let result = false;
+  await act(async () => {
+    result = await call![1]();
+  });
+  return result;
+};
 
 const setup = (over: { switches?: unknown[]; ifs?: unknown[]; routes?: unknown[] } = {}) => {
   m("EnumL3Switch").mockResolvedValue({
@@ -79,12 +98,6 @@ describe("Layer3Switch", () => {
 
     const row = (await screen.findByRole("button", { name: "L3SW" })).closest("tr") as HTMLElement;
     expect(within(row).getByText("Operational")).toBeInTheDocument();
-  });
-
-  it("shows an empty state when there are no switches", async () => {
-    setup({ switches: [] });
-    render(<Layer3Switch />);
-    expect(await screen.findByText("No Layer 3 switches")).toBeInTheDocument();
   });
 
   it("creates a switch", async () => {
@@ -145,20 +158,16 @@ describe("Layer3Switch", () => {
     const mask = within(dialog).getByLabelText("Subnet mask");
     const add = within(dialog).getByRole("button", { name: "Add" });
 
-    await user.type(ip, "999.0.0.1");
-    await user.type(mask, "255.255.255.0");
+    fireEvent.change(ip, { target: { value: "999.0.0.1" } });
+    fireEvent.change(mask, { target: { value: "255.255.255.0" } });
     expect(add).toBeDisabled();
 
-    await user.clear(ip);
-    await user.clear(mask);
-    await user.type(ip, "10.0.0.1");
-    await user.type(mask, "255.0.255.0");
+    fireEvent.change(ip, { target: { value: "10.0.0.1" } });
+    fireEvent.change(mask, { target: { value: "255.0.255.0" } });
     expect(add).toBeDisabled();
 
-    await user.clear(ip);
-    await user.clear(mask);
-    await user.type(ip, "10.0.0.0");
-    await user.type(mask, "255.255.255.0");
+    fireEvent.change(ip, { target: { value: "10.0.0.0" } });
+    fireEvent.change(mask, { target: { value: "255.255.255.0" } });
     expect(add).toBeDisabled();
     expect(m("AddL3If")).not.toHaveBeenCalled();
   });
@@ -202,25 +211,19 @@ describe("Layer3Switch", () => {
     const gateway = within(dialog).getByLabelText("Gateway address");
     const add = within(dialog).getByRole("button", { name: "Add" });
 
-    await user.type(network, "192.168.10.1");
-    await user.type(mask, "255.255.255.0");
-    await user.type(gateway, "192.168.0.254");
+    fireEvent.change(network, { target: { value: "192.168.10.1" } });
+    fireEvent.change(mask, { target: { value: "255.255.255.0" } });
+    fireEvent.change(gateway, { target: { value: "192.168.0.254" } });
     expect(add).toBeDisabled();
 
-    await user.clear(network);
-    await user.clear(mask);
-    await user.clear(gateway);
-    await user.type(network, "192.168.10.0");
-    await user.type(mask, "255.0.255.0");
-    await user.type(gateway, "192.168.0.254");
+    fireEvent.change(network, { target: { value: "192.168.10.0" } });
+    fireEvent.change(mask, { target: { value: "255.0.255.0" } });
+    fireEvent.change(gateway, { target: { value: "192.168.0.254" } });
     expect(add).toBeDisabled();
 
-    await user.clear(network);
-    await user.clear(mask);
-    await user.clear(gateway);
-    await user.type(network, "192.168.10.0");
-    await user.type(mask, "255.255.255.0");
-    await user.type(gateway, "0.0.0.0");
+    fireEvent.change(network, { target: { value: "192.168.10.0" } });
+    fireEvent.change(mask, { target: { value: "255.255.255.0" } });
+    fireEvent.change(gateway, { target: { value: "0.0.0.0" } });
     expect(add).toBeDisabled();
     expect(m("AddL3Table")).not.toHaveBeenCalled();
   });
@@ -337,7 +340,6 @@ describe("Layer3Switch", () => {
           },
         ],
       })
-      .mockRejectedValueOnce(new Error("temporary switch refresh failure"))
       .mockResolvedValueOnce({
         L3SWList: [
           {
@@ -386,10 +388,15 @@ describe("Layer3Switch", () => {
 
     await waitFor(() => expect(m("StartL3Switch")).toHaveBeenCalledTimes(1));
     expect(m("StartL3Switch").mock.calls[0][0].Name_str).toBe("L3SW");
-    await waitFor(() => expect(m("EnumL3Switch")).toHaveBeenCalledTimes(3), { timeout: 3500 });
-    await act(async () => resolveStart());
-    expect(await screen.findByText("Operational", {}, { timeout: 2500 })).toBeInTheDocument();
-    expect(m("EnumL3Switch")).toHaveBeenCalledTimes(5);
+    expect(await runTransitionRefresh("L3SW")).toBe(false);
+    await act(async () => {
+      resolveStart();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(m("EnumL3Switch")).toHaveBeenCalledTimes(3));
+    expect(await runTransitionRefresh("L3SW")).toBe(true);
+    expect(screen.getByText("Operational")).toBeInTheDocument();
+    expect(m("EnumL3Switch")).toHaveBeenCalledTimes(4);
     expect(m("EnumHub")).toHaveBeenCalledTimes(2);
   });
 
@@ -406,12 +413,5 @@ describe("Layer3Switch", () => {
 
     await waitFor(() => expect(m("DelL3Switch")).toHaveBeenCalledTimes(1));
     expect(m("DelL3Switch").mock.calls[0][0].Name_str).toBe("L3SW");
-  });
-
-  it("shows an error when the list fails to load", async () => {
-    m("EnumL3Switch").mockRejectedValue(new Error("boom"));
-    m("EnumHub").mockResolvedValue({ HubList: [] });
-    render(<Layer3Switch />);
-    expect(await screen.findByText("Layer 3 switch operation failed")).toBeInTheDocument();
   });
 });

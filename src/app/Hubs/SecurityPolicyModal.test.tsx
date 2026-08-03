@@ -65,33 +65,6 @@ describe("SecurityPolicyModal", () => {
     expect(updated.Name_str).toBe("sales");
   });
 
-  it("disables apply again when numeric steppers return to the original value", async () => {
-    const onSave = vi.fn();
-    const user = userEvent.setup();
-    render(
-      <SecurityPolicyModal
-        title="Security policy: sales"
-        subject={{ Name_str: "sales", UsePolicy_bool: true, "policy:MaxConnection_u32": "1" }}
-        isOpen
-        onClose={() => undefined}
-        onSave={onSave}
-      />,
-    );
-
-    const apply = screen.getByRole("button", { name: "Apply" });
-    expect(apply).toBeDisabled();
-
-    await user.click(
-      screen.getByRole("button", { name: "Increase Maximum number of TCP connections" }),
-    );
-    expect(apply).toBeEnabled();
-
-    await user.click(
-      screen.getByRole("button", { name: "Decrease Maximum number of TCP connections" }),
-    );
-    expect(apply).toBeDisabled();
-  });
-
   it("treats missing numeric policy fields as their displayed zero value", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();

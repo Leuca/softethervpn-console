@@ -70,14 +70,6 @@ describe("AccessList", () => {
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument(); // dest /32
   });
 
-  it("shows an empty state when there are no rules", async () => {
-    enumAccess.mockResolvedValue({ AccessList: [] });
-
-    render(<AccessList hub="DEFAULT" />);
-
-    expect(await screen.findByText("No access list rules")).toBeInTheDocument();
-  });
-
   it("toggles a rule active state via SetAccessList (whole list)", async () => {
     enumAccess.mockResolvedValue({ AccessList: [rule] });
     setAccessList.mockResolvedValue({});

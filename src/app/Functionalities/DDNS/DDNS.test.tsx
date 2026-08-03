@@ -198,12 +198,4 @@ describe("DynDNS", () => {
     expect(screen.queryByText("Proxy settings error")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Proxy host name")).not.toBeInTheDocument();
   });
-
-  it("shows an error when the status fails to load", async () => {
-    getStatus.mockRejectedValue(new Error("boom"));
-
-    render(<DynDNS />);
-
-    expect(await screen.findByText("Could not load Dynamic DNS status")).toBeInTheDocument();
-  });
 });

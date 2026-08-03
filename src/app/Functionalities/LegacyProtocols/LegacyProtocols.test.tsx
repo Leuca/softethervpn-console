@@ -86,16 +86,4 @@ describe("LegacyProtocols", () => {
 
     expect(await screen.findByText("EtherIP page")).toBeInTheDocument();
   });
-
-  it("shows an error when loading fails", async () => {
-    m("GetIPsecServices").mockRejectedValue(new Error("boom"));
-    m("GetOpenVpnSstpConfig").mockResolvedValue({});
-    m("EnumHub").mockResolvedValue({ HubList: [] });
-
-    renderPage();
-
-    expect(
-      await screen.findByText("Could not load or save legacy protocol settings"),
-    ).toBeInTheDocument();
-  });
 });

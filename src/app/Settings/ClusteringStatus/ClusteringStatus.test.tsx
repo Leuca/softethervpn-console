@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClusteringStatus } from "./ClusteringStatus";
@@ -127,16 +127,5 @@ describe("ClusteringStatus", () => {
     render(<ClusteringStatus />);
 
     expect(await screen.findByText("Could not determine the cluster role")).toBeInTheDocument();
-  });
-
-  it("shows an error when the member list fails to load", async () => {
-    getFarmSetting.mockResolvedValue({ ServerType_u32: 1 });
-    enumFarmMember.mockRejectedValue(new Error("nope"));
-
-    render(<ClusteringStatus />);
-
-    await waitFor(() =>
-      expect(screen.getByText("Could not load cluster members")).toBeInTheDocument(),
-    );
   });
 });

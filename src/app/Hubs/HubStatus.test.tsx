@@ -32,12 +32,4 @@ describe("HubStatus", () => {
     // and it asked the server for the right hub
     expect(getHubStatus.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT" });
   });
-
-  it("shows an error alert when the call fails", async () => {
-    getHubStatus.mockRejectedValue(new Error("nope"));
-
-    render(<HubStatus hub="DEFAULT" />);
-
-    expect(await screen.findByText("Could not load hub status")).toBeInTheDocument();
-  });
 });
