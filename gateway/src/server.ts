@@ -1,5 +1,5 @@
 import cookie from '@fastify/cookie';
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify, { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerFrontend } from './frontend.js';
 import { LoginProbe, createLoginProbe } from './loginProbe.js';
@@ -13,15 +13,38 @@ interface GatewayServerOptions {
   logger?: boolean;
   rpcForwarder?: RpcForwarder;
   sessions?: SessionStore;
-  trustProxy?: boolean | string;
+  trustProxy?: FastifyServerOptions['trustProxy'];
 }
 
-const parsePort = (value: string | undefined): number => {
+export const parsePort = (value: string | undefined): number => {
   const port = Number(value || 8080);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be an integer between 1 and 65535.');
   }
   return port;
+};
+
+export const parseTrustProxy = (value: string | undefined): FastifyServerOptions['trustProxy'] => {
+  const configuredValue = value?.trim();
+  if (!configuredValue) {
+    return '127.0.0.1';
+  }
+  if (configuredValue === 'true') {
+    return true;
+  }
+
+  const proxies = configuredValue
+    .split(',')
+    .map((proxy) => proxy.trim())
+    .filter(Boolean);
+
+  if (proxies.length === 0) {
+    throw new Error(
+      'TRUST_PROXY must be "true" or a comma-separated list of proxy addresses or CIDRs.',
+    );
+  }
+
+  return proxies.length === 1 ? proxies[0] : proxies;
 };
 
 export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyInstance => {
@@ -50,8 +73,9 @@ export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyI
 };
 
 export const startGatewayServer = async (): Promise<void> => {
-  const frontendRoot = process.env.FRONTEND_ROOT || fileURLToPath(new URL('../../dist', import.meta.url));
-  const trustProxy = process.env.TRUST_PROXY === 'true' ? true : process.env.TRUST_PROXY || '127.0.0.1';
+  const frontendRoot =
+    process.env.FRONTEND_ROOT || fileURLToPath(new URL('../../dist', import.meta.url));
+  const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
   const server = buildGatewayServer({ frontendRoot, logger: true, trustProxy });
   const host = process.env.HOST || '127.0.0.1';
   const port = parsePort(process.env.PORT);

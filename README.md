@@ -62,8 +62,11 @@ VPN_DEV_PASSWORD=your-admin-password
 Leave `VPN_DEV_HUB` empty for server administration. Set it to a Virtual Hub name
 when connecting with that hub's administrator credentials.
 
-Production supports two compile-time deployment modes. Build an integrated
-frontend for the VPN server's embedded web server with:
+Production mode is embedded in the frontend at build time and cannot be changed
+at runtime. Each build replaces `dist/`, so archive or deploy one mode before
+building the other.
+
+Build an integrated frontend for the VPN server's embedded web server with:
 
 ```sh
 npm run build:integrated
@@ -78,7 +81,9 @@ npm --prefix gateway run build
 npm --prefix gateway start
 ```
 
-The managed gateway handles server selection and login. See
+The integrated artifact calls the same-origin SoftEther `/api/` endpoint and
+does not include managed login behavior. The managed artifact requires the
+gateway, which handles server selection and login. See
 [`gateway/README.md`](gateway/README.md) for its deployment and TLS boundaries.
 
 ### Password manager custom fields
