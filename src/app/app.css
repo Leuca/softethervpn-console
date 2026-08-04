@@ -7,11 +7,8 @@ body,
 /* ============================================================
    SoftEther VPN Console - application design layer
 
-   Dark chrome (masthead + sidebar) around the selected light or dark
-   content theme, with SoftEther-blue (#0066cc, PatternFly blue-50)
-   accents. The generated theme-dark-chrome.css keeps the chrome dark
-   independently; this file only adds branding, the active navigation
-   accent, and the depth cues that separate it from the workspace.
+   Native PatternFly color-scheme and contrast themes with SoftEther
+   branding, an active-navigation accent, and workspace depth cues.
    ============================================================ */
 
 /* --- Brand lockup (masthead, left) --- */
@@ -29,6 +26,10 @@ body,
   height: 34px;
   width: 34px;
   display: block;
+  filter: brightness(0);
+}
+:root.pf-v6-theme-dark .se-brand__logo {
+  filter: none;
 }
 .se-brand__text {
   display: flex;
@@ -53,7 +54,6 @@ body,
 .se-user {
   display: inline-flex;
   align-items: center;
-  margin-inline-start: auto;
   gap: var(--pf-t--global--spacer--sm);
   padding-block: var(--pf-t--global--spacer--xs);
   padding-inline: var(--pf-t--global--spacer--md);
@@ -69,6 +69,12 @@ body,
 .se-user-menu {
   display: flex;
   justify-content: flex-end;
+}
+
+.se-masthead-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm);
   margin-inline-start: auto;
 }
 
@@ -76,15 +82,6 @@ body,
   display: inline-flex;
   align-items: center;
   gap: var(--pf-t--global--spacer--sm);
-}
-
-/* PatternFly paints the desktop sidebar with a "glass"/floating surface token
-   that the dark palette does not redefine, so it falls back to light. Pin the
-   sidebar background (all breakpoints) to the dark secondary surface - resolved
-   from the dark tokens scoped onto .se-sidebar - so it matches the masthead. */
-.se-sidebar {
-  --pf-v6-c-page__sidebar--BackgroundColor: var(--pf-t--global--background--color--secondary--default);
-  --pf-v6-c-page__sidebar--xl--BackgroundColor: var(--pf-t--global--background--color--secondary--default);
 }
 
 /* --- Sidebar navigation: SoftEther-blue active accent --- */
@@ -95,19 +92,19 @@ body,
     border-color 0.15s ease;
 }
 /* Replace PatternFly's default current-item indicator with a full-height
-   blue rail so it reads clearly on the dark sidebar. */
+   brand rail while retaining theme-aware semantic colors. */
 .se-sidebar .pf-v6-c-nav__link::before,
 .se-sidebar .pf-v6-c-nav__link::after {
   display: none;
 }
 .se-sidebar .pf-v6-c-nav__link.pf-m-current,
-.se-sidebar .pf-v6-c-nav__link[aria-current='page'] {
-  border-inline-start-color: var(--pf-t--color--blue--40);
-  background-color: rgba(67, 148, 229, 0.16);
+.se-sidebar .pf-v6-c-nav__link[aria-current="page"] {
+  border-inline-start-color: var(--pf-t--global--border--color--brand--default);
+  background-color: var(--pf-t--global--background--color--action--plain--clicked);
   font-weight: var(--pf-t--global--font--weight--body--bold);
 }
 
-/* --- Depth: lift the dark chrome above the light workspace --- */
+/* --- Depth: separate the masthead from the workspace --- */
 .se-masthead {
   box-shadow: var(--pf-t--global--box-shadow--md--bottom);
   z-index: var(--pf-t--global--z-index--md);

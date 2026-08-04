@@ -70,7 +70,11 @@ describe("ManagedSessionGate", () => {
     renderGate();
 
     expect(await screen.findByRole("button", { name: "Log in" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Switch to dark mode" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Appearance, color scheme: System, contrast: System",
+      }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Managed app")).not.toBeInTheDocument();
   });
 

@@ -25,7 +25,7 @@ import { BarsIcon, UserIcon } from "@patternfly/react-icons";
 import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from "@app/routes";
 import { useServer } from "@app/ServerContext";
 import { useManagedSession } from "@app/managed/ManagedSessionGate";
-import { ThemeToggle } from "@app/components/ThemeToggle";
+import { AppearanceMenu } from "@app/components/AppearanceMenu";
 import { accessibleRouteChangeHandler } from "@app/utils/utils";
 import logo from "@app/bgimages/icons8-softether-vpn.svg";
 
@@ -125,45 +125,47 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
         </MastheadBrand>
       </MastheadMain>
       <MastheadContent>
-        {managedSession ? (
-          <div className="se-user-menu">
-            <Dropdown
-              isOpen={isUserMenuOpen}
-              onOpenChange={setIsUserMenuOpen}
-              onSelect={() => setIsUserMenuOpen(false)}
-              popperProps={{ position: "right" }}
-              toggle={(toggleRef) => (
-                <MenuToggle
-                  ref={toggleRef}
-                  aria-label={`User menu for ${user}`}
-                  isExpanded={isUserMenuOpen}
-                  onClick={() => setIsUserMenuOpen((open) => !open)}
-                >
-                  <span className="se-user__content">
-                    <UserIcon />
-                    <span className="se-user__role">{user}</span>
-                  </span>
-                </MenuToggle>
-              )}
-            >
-              <DropdownList>
-                <DropdownItem
-                  key="logout"
-                  isDisabled={managedSession.isLoggingOut}
-                  onClick={managedSession.logout}
-                >
-                  Log out
-                </DropdownItem>
-              </DropdownList>
-            </Dropdown>
-          </div>
-        ) : (
-          <span className="se-user">
-            <UserIcon />
-            <span className="se-user__role">{user}</span>
-          </span>
-        )}
-        <ThemeToggle />
+        <div className="se-masthead-actions">
+          <AppearanceMenu />
+          {managedSession ? (
+            <div className="se-user-menu">
+              <Dropdown
+                isOpen={isUserMenuOpen}
+                onOpenChange={setIsUserMenuOpen}
+                onSelect={() => setIsUserMenuOpen(false)}
+                popperProps={{ position: "right" }}
+                toggle={(toggleRef) => (
+                  <MenuToggle
+                    ref={toggleRef}
+                    aria-label={`User menu for ${user}`}
+                    isExpanded={isUserMenuOpen}
+                    onClick={() => setIsUserMenuOpen((open) => !open)}
+                  >
+                    <span className="se-user__content">
+                      <UserIcon />
+                      <span className="se-user__role">{user}</span>
+                    </span>
+                  </MenuToggle>
+                )}
+              >
+                <DropdownList>
+                  <DropdownItem
+                    key="logout"
+                    isDisabled={managedSession.isLoggingOut}
+                    onClick={managedSession.logout}
+                  >
+                    Log out
+                  </DropdownItem>
+                </DropdownList>
+              </Dropdown>
+            </div>
+          ) : (
+            <span className="se-user">
+              <UserIcon />
+              <span className="se-user__role">{user}</span>
+            </span>
+          )}
+        </div>
       </MastheadContent>
     </Masthead>
   );

@@ -12,10 +12,11 @@
     linear-gradient(135deg, #fafafa 0%, #e7e9ea 52%, #f5f5f5 100%);
 }
 
-.se-managed-login__theme-toggle {
+.se-managed-login__appearance-menu {
   position: absolute;
   inset-block-start: var(--pf-t--global--spacer--md);
   inset-inline-end: var(--pf-t--global--spacer--md);
+  inline-size: max-content;
 }
 
 :root.pf-v6-theme-dark .se-managed-login {
@@ -43,6 +44,10 @@
 
 :root.pf-v6-theme-dark .se-managed-login__logo {
   filter: brightness(0) invert(1);
+}
+
+:root.pf-v6-theme-high-contrast .se-managed-login {
+  background: var(--pf-t--global--background--color--primary--default);
 }
 
 .se-managed-login__panel {

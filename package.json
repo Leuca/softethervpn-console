@@ -33,7 +33,6 @@
     "ci-checks": "npm run type-check:all && npm run lint && npm run test:coverage && npm run test:gateway",
     "build:bundle-profile": "webpack --config webpack.prod.js --profile --json > stats.json",
     "bundle-profile:analyze": "npm run build:bundle-profile && webpack-bundle-analyzer ./stats.json",
-    "theme:gen": "node scripts/gen-dark-chrome.mjs",
     "clean": "rimraf dist"
   },
   "devDependencies": {

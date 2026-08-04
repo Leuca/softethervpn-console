@@ -8,7 +8,6 @@ import { ServerProvider, useServer } from "@app/ServerContext";
 import { consoleMode } from "@app/consoleMode";
 import { ManagedSessionGate } from "@app/managed/ManagedSessionGate";
 import { ThemeProvider } from "@app/ThemeContext";
-import "@app/theme-dark-chrome.css";
 import "@app/app.css";
 
 const LoadingPage: React.FunctionComponent = () => (
