@@ -150,6 +150,77 @@ describe('gateway session routes', () => {
     }
   });
 
+  it('keeps sessions from independent browsers separate', async () => {
+    const server = buildGatewayServer({
+      loginProbe: vi.fn().mockResolvedValue(undefined),
+      upstreamResolver,
+    });
+
+    try {
+      const firstLogin = await server.inject({
+        method: 'POST',
+        url: '/login',
+        payload: loginPayload,
+      });
+      const secondLogin = await server.inject({
+        method: 'POST',
+        url: '/login',
+        payload: { ...loginPayload, hub: 'SECOND' },
+      });
+      const firstSession = await server.inject({
+        method: 'GET',
+        url: '/session',
+        headers: { cookie: firstLogin.headers['set-cookie'] as string },
+      });
+      const secondSession = await server.inject({
+        method: 'GET',
+        url: '/session',
+        headers: { cookie: secondLogin.headers['set-cookie'] as string },
+      });
+
+      expect(firstSession.json()).toEqual(firstLogin.json());
+      expect(secondSession.json()).toEqual(secondLogin.json());
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('preserves the current session when a replacement login fails', async () => {
+    const loginProbe = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(
+        new LoginProbeError('The server did not accept these login details.', 401),
+      );
+    const server = buildGatewayServer({ loginProbe, upstreamResolver });
+
+    try {
+      const firstLogin = await server.inject({
+        method: 'POST',
+        url: '/login',
+        payload: loginPayload,
+      });
+      const cookie = firstLogin.headers['set-cookie'] as string;
+      const failedLogin = await server.inject({
+        method: 'POST',
+        url: '/login',
+        headers: { cookie },
+        payload: { ...loginPayload, password: 'wrong' },
+      });
+      const currentSession = await server.inject({
+        method: 'GET',
+        url: '/session',
+        headers: { cookie },
+      });
+
+      expect(failedLogin.statusCode).toBe(401);
+      expect(failedLogin.body).not.toContain('wrong');
+      expect(currentSession.json()).toEqual(firstLogin.json());
+    } finally {
+      await server.close();
+    }
+  });
+
   it('limits failed login probes per client and resets the window over time', async () => {
     let now = 0;
     const loginRateLimiter = new LoginRateLimiter({ now: () => now });

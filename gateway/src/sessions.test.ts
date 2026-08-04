@@ -38,6 +38,24 @@ describe('SessionStore', () => {
     expect(store.get(id)).toBeUndefined();
   });
 
+  it('clears every session and expiry timer during shutdown', () => {
+    vi.useFakeTimers();
+
+    try {
+      const store = new SessionStore({ ttlMs: 5_000 });
+      const firstId = store.create(credentials);
+      const secondId = store.create({ ...credentials, password: 'another-secret' });
+
+      store.clear();
+
+      expect(store.get(firstId)).toBeUndefined();
+      expect(store.get(secondId)).toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('removes credentials when the session lifetime elapses without another read', () => {
     vi.useFakeTimers();
 

@@ -80,4 +80,12 @@ export class SessionStore {
     }
     return this.sessions.delete(id);
   }
+
+  clear(): void {
+    for (const expiryTimer of this.expiryTimers.values()) {
+      clearTimeout(expiryTimer);
+    }
+    this.expiryTimers.clear();
+    this.sessions.clear();
+  }
 }

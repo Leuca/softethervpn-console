@@ -16,8 +16,8 @@ Browser-facing HTTPS alone does not provide that access control.
 | Session fixation          | Login creates a new 256-bit random session ID and invalidates the previous cookie's session after a successful probe.                                                                                        |
 | CSRF                      | Cookies use `SameSite=Strict`; state-changing requests with a mismatched `Origin` are rejected. Requests without `Origin` remain available to non-browser clients.                                           |
 | Cookie settings           | The cookie is `HttpOnly`, `SameSite=Strict`, scoped to `/`, and marked `Secure` when the trusted connection metadata reports HTTPS.                                                                          |
-| Credential lifetime       | Passwords exist only in gateway memory. Logout, the fixed eight-hour expiry timer, or process exit removes the live session; JavaScript strings cannot be actively zeroed.                                   |
-| Logs                      | Default request logs contain request metadata, not bodies or authentication headers. Operators must not add body, cookie, or header logging.                                                                 |
+| Credential lifetime       | Passwords exist only in gateway memory. Logout, the fixed eight-hour expiry timer, or graceful/process exit removes the live session; JavaScript strings cannot be actively zeroed.                          |
+| Logs                      | Production logging redacts password, authorization, cookie, and `Set-Cookie` paths in addition to Fastify's metadata-only request serializer. Operators must not add unredacted custom logging.              |
 | Error disclosure          | Login and network failures return fixed messages. Authenticated SoftEther JSON-RPC responses are returned to the browser because the console needs them.                                                     |
 | TLS verification          | Upstream certificates are verified by default. Browser-facing TLS must terminate at the access-controlled reverse proxy.                                                                                     |
 | Self-signed option        | Enabling it disables all certificate verification for the selected upstream, so it is appropriate only when that network path is trusted.                                                                    |
@@ -25,3 +25,11 @@ Browser-facing HTTPS alone does not provide that access control.
 
 Review the administrator access boundary and gateway egress rules whenever the
 deployment or network boundaries change.
+
+Each browser cookie identifies an independent session. A successful login from
+an already authenticated browser replaces only that cookie's previous session;
+a failed replacement login leaves the working session intact. Post-login
+upstream failures return a fixed gateway error but do not remove the session,
+because a temporary server restart or network interruption should remain
+retryable. Sessions are not extended by activity and there is no shared or
+persistent session store.

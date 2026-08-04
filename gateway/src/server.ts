@@ -13,7 +13,7 @@ interface GatewayServerOptions {
   frontendRoot?: string;
   loginProbe?: LoginProbe;
   loginRateLimiter?: LoginRateLimiter;
-  logger?: boolean;
+  logger?: FastifyServerOptions['logger'];
   rpcForwarder?: RpcForwarder;
   sessions?: SessionStore;
   trustProxy?: FastifyServerOptions['trustProxy'];
@@ -21,6 +21,20 @@ interface GatewayServerOptions {
 }
 
 export const REQUEST_BODY_LIMIT_BYTES = 1024 * 1024;
+
+export const GATEWAY_LOGGER_OPTIONS = {
+  redact: {
+    paths: [
+      'req.headers.cookie',
+      'req.headers.authorization',
+      'req.headers["x-vpnadmin-password"]',
+      'req.body.password',
+      'body.password',
+      'res.headers["set-cookie"]',
+    ],
+    censor: '[REDACTED]',
+  },
+};
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -83,6 +97,10 @@ export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyI
   const rpcForwarder = options.rpcForwarder ?? forwardRpcRequest;
   const upstreamResolver = options.upstreamResolver ?? new UpstreamResolver();
 
+  server.addHook('onClose', async () => {
+    sessions.clear();
+  });
+
   server.addHook('onRequest', async (request, reply) => {
     if (!SAFE_METHODS.has(request.method) && !hasAllowedOrigin(request)) {
       return reply.code(403).send({ error: 'Cross-origin requests are not allowed.' });
@@ -112,7 +130,11 @@ export const startGatewayServer = async (): Promise<void> => {
   const frontendRoot =
     process.env.FRONTEND_ROOT || fileURLToPath(new URL('../../dist', import.meta.url));
   const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
-  const server = buildGatewayServer({ frontendRoot, logger: true, trustProxy });
+  const server = buildGatewayServer({
+    frontendRoot,
+    logger: GATEWAY_LOGGER_OPTIONS,
+    trustProxy,
+  });
   const host = process.env.HOST || '127.0.0.1';
   const port = parsePort(process.env.PORT);
 

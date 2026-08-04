@@ -83,6 +83,36 @@ describe('gateway RPC proxy', () => {
     }
   });
 
+  it('keeps the session available after a transient upstream failure', async () => {
+    const forward = vi.fn().mockRejectedValue(new Error('connection failed'));
+    const server = buildGatewayServer({
+      loginProbe: vi.fn().mockResolvedValue(undefined),
+      rpcForwarder: forward,
+      upstreamResolver,
+    });
+
+    try {
+      const login = await server.inject({ method: 'POST', url: '/login', payload: loginPayload });
+      const cookie = login.headers['set-cookie'] as string;
+      const failedRpc = await server.inject({
+        method: 'POST',
+        url: '/api/',
+        headers: { cookie },
+        payload: { jsonrpc: '2.0', method: 'Test', id: 1 },
+      });
+      const session = await server.inject({
+        method: 'GET',
+        url: '/session',
+        headers: { cookie },
+      });
+
+      expect(failedRpc.statusCode).toBe(502);
+      expect(session.json()).toEqual(login.json());
+    } finally {
+      await server.close();
+    }
+  });
+
   it('builds SoftEther authentication and TLS options without an empty hub header', () => {
     const options = buildRpcRequestOptions(storedSession, '{}');
 

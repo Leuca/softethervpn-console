@@ -1,12 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GATEWAY_LOGGER_OPTIONS,
   REQUEST_BODY_LIMIT_BYTES,
   buildGatewayServer,
   parsePort,
   parseTrustProxy,
 } from './server.js';
+import { SessionStore } from './sessions.js';
 
 describe('gateway configuration', () => {
+  it('redacts credentials and session cookies from production logs', async () => {
+    expect(GATEWAY_LOGGER_OPTIONS.redact).toMatchObject({
+      paths: expect.arrayContaining([
+        'req.headers.cookie',
+        'req.headers.authorization',
+        'req.headers["x-vpnadmin-password"]',
+        'req.body.password',
+        'body.password',
+        'res.headers["set-cookie"]',
+      ]),
+      censor: '[REDACTED]',
+    });
+
+    const server = buildGatewayServer({ logger: GATEWAY_LOGGER_OPTIONS });
+    await server.close();
+  });
+
   it('parses the listen port and rejects invalid values', () => {
     expect(parsePort(undefined)).toBe(8080);
     expect(parsePort('8443')).toBe(8443);
@@ -25,6 +44,23 @@ describe('gateway configuration', () => {
 });
 
 describe('gateway server', () => {
+  it('removes live session credentials when the server closes', async () => {
+    const sessions = new SessionStore();
+    const id = sessions.create({
+      host: 'vpn.example.com',
+      port: 443,
+      hub: '',
+      password: 'secret',
+      allowSelfSigned: false,
+      resolvedAddresses: [{ address: '192.0.2.10', family: 4 }],
+    });
+    const server = buildGatewayServer({ sessions });
+
+    await server.close();
+
+    expect(sessions.get(id)).toBeUndefined();
+  });
+
   it('reports health without binding a network port', async () => {
     const server = buildGatewayServer();
 

@@ -85,8 +85,17 @@ location / {
 Sessions use random opaque IDs in `HttpOnly`, `SameSite=Strict` cookies.
 Administrator passwords and session state remain in gateway memory. Sessions
 expire eight hours after login and are not extended by activity; logout,
-expiry, successful re-login, or any gateway restart invalidates the old session.
-Only one gateway process is supported because there is no shared session store.
+expiry, successful re-login from the same browser, or gateway shutdown
+invalidates the old session. Separate browsers have independent sessions, and a
+failed replacement login leaves the current session active. Post-login upstream
+failures do not invalidate a session so temporary outages can be retried. Only
+one gateway process is supported because there is no shared session store.
+
+Production logs use Fastify's metadata-only request serializer and defensively
+redact password, authorization, cookie, and `Set-Cookie` fields. Do not add
+unredacted request-body or header logging. Login, gateway, and TLS failures use
+fixed client-visible messages and do not include credentials or low-level error
+details.
 
 The gateway always connects to SoftEther over HTTPS. Certificate verification
 is strict by default. The login form's self-signed option disables certificate
