@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildGatewayServer } from './server.js';
 import { buildRpcRequestOptions } from './rpcProxy.js';
 import { GatewaySession } from './sessions.js';
+import { UpstreamResolver } from './upstreamResolution.js';
 
 const loginPayload = {
   host: 'vpn.example.com',
@@ -13,8 +14,14 @@ const loginPayload = {
 
 const storedSession: GatewaySession = {
   ...loginPayload,
+  resolvedAddresses: [
+    { address: '192.0.2.10', family: 4 },
+    { address: '2001:db8::10', family: 6 },
+  ],
   expiresAt: Date.now() + 60_000,
 };
+
+const upstreamResolver = new UpstreamResolver(async () => [{ address: '192.0.2.10', family: 4 }]);
 
 describe('gateway RPC proxy', () => {
   it('requires an authenticated session', async () => {
@@ -22,6 +29,7 @@ describe('gateway RPC proxy', () => {
     const server = buildGatewayServer({
       loginProbe: vi.fn().mockResolvedValue(undefined),
       rpcForwarder: forward,
+      upstreamResolver,
     });
 
     try {
@@ -47,6 +55,7 @@ describe('gateway RPC proxy', () => {
     const server = buildGatewayServer({
       loginProbe: vi.fn().mockResolvedValue(undefined),
       rpcForwarder: forward,
+      upstreamResolver,
     });
 
     try {
@@ -62,7 +71,13 @@ describe('gateway RPC proxy', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ jsonrpc: '2.0', result: { value: 1 }, id: 1 });
-      expect(forward).toHaveBeenCalledWith(expect.objectContaining(loginPayload), payload);
+      expect(forward).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...loginPayload,
+          resolvedAddresses: [{ address: '192.0.2.10', family: 4 }],
+        }),
+        payload,
+      );
     } finally {
       await server.close();
     }
@@ -71,10 +86,41 @@ describe('gateway RPC proxy', () => {
   it('builds SoftEther authentication and TLS options without an empty hub header', () => {
     const options = buildRpcRequestOptions(storedSession, '{}');
 
+    expect(options.agent).toBe(false);
     expect(options.rejectUnauthorized).toBe(false);
+    expect(options.hostname).toBe(loginPayload.host);
     expect(options.headers).toMatchObject({
       'X-VPNADMIN-PASSWORD': loginPayload.password,
     });
     expect(options.headers).not.toHaveProperty('X-VPNADMIN-HUBNAME');
+  });
+
+  it('defers every pinned lookup completion until request setup has finished', async () => {
+    const options = buildRpcRequestOptions(storedSession, '{}');
+    const ipv4OnlyOptions = buildRpcRequestOptions(
+      {
+        ...storedSession,
+        resolvedAddresses: [storedSession.resolvedAddresses[0]],
+      },
+      '{}',
+    );
+    const allCallback = vi.fn();
+    const singleCallback = vi.fn();
+    const missingFamilyCallback = vi.fn();
+
+    options.lookup?.(loginPayload.host, { all: true }, allCallback);
+    options.lookup?.(loginPayload.host, { all: false, family: 4 }, singleCallback);
+    ipv4OnlyOptions.lookup?.(loginPayload.host, { all: false, family: 6 }, missingFamilyCallback);
+
+    expect(allCallback).not.toHaveBeenCalled();
+    expect(singleCallback).not.toHaveBeenCalled();
+    expect(missingFamilyCallback).not.toHaveBeenCalled();
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(allCallback).toHaveBeenCalledWith(null, storedSession.resolvedAddresses);
+    expect(singleCallback).toHaveBeenCalledWith(null, '192.0.2.10', 4);
+    expect(missingFamilyCallback).toHaveBeenCalledWith(expect.any(Error), '', 0);
+    expect(missingFamilyCallback.mock.calls[0][0]).toMatchObject({ code: 'ENOTFOUND' });
   });
 });

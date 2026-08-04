@@ -7,6 +7,7 @@ const credentials: SessionCredentials = {
   hub: 'DEFAULT',
   password: 'secret',
   allowSelfSigned: false,
+  resolvedAddresses: [{ address: '192.0.2.10', family: 4 }],
 };
 
 describe('SessionStore', () => {

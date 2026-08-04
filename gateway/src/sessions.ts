@@ -2,12 +2,21 @@ import { randomBytes } from 'node:crypto';
 
 const DEFAULT_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
-export interface SessionCredentials {
+export interface LoginCredentials {
   host: string;
   port: number;
   hub: string;
   password: string;
   allowSelfSigned: boolean;
+}
+
+export interface ResolvedAddress {
+  address: string;
+  family: 4 | 6;
+}
+
+export interface SessionCredentials extends LoginCredentials {
+  resolvedAddresses: ResolvedAddress[];
 }
 
 export interface GatewaySession extends SessionCredentials {

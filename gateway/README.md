@@ -45,9 +45,15 @@ eight-hour session lifetime, and five-minute SoftEther timeout are fixed.
 
 ## HTTP and reverse proxy
 
-The gateway is HTTP-only and listens on loopback by default. Do not expose it
-directly to untrusted networks. Terminate public HTTPS at a trusted reverse
-proxy and redirect public HTTP to HTTPS there.
+The gateway is HTTP-only and listens on loopback by default. It has no independent
+user identity layer before the SoftEther login, and administrators may select
+any syntactically valid upstream host and port. Do not expose it to the public
+Internet without access control. Keep it on a private administrator network or
+place it behind a VPN, reverse-proxy SSO, mutual TLS, or an administrator IP
+allow rule. HTTPS by itself is not sufficient.
+
+Terminate browser-facing HTTPS at the access-controlled reverse proxy and
+redirect HTTP to HTTPS there.
 
 The proxy must preserve the original host and port in `Host` and
 `X-Forwarded-Host`, then set `X-Forwarded-For` and `X-Forwarded-Proto`. The
@@ -60,6 +66,11 @@ Example for Nginx on the same host:
 
 ```nginx
 location / {
+    # Replace this with the actual administrator network, or use auth_request
+    # or mutual TLS for administrator access control.
+    allow 10.0.0.0/8;
+    deny all;
+
     proxy_pass http://127.0.0.1:8080;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
@@ -83,6 +94,12 @@ verification for connections to the selected upstream and is safe only on a
 trusted path; it does not provide browser-facing TLS. Login probes and proxied
 JSON-RPC requests share a five-minute upstream timeout.
 
+At login, the gateway validates and normalizes the entered host, resolves a DNS
+name once, and stores the complete initial address set in the session. Every
+request in that session uses only those addresses; the hostname is not resolved
+again. Shared HTTPS socket pooling is disabled so a connection from another
+session cannot bypass this pin.
+
 ## Health and troubleshooting
 
 `GET /healthz` returns `{"status":"ok"}` when the gateway process can serve
@@ -102,7 +119,6 @@ curl http://127.0.0.1:8080/healthz
 - Login `429` responses include the remaining wait in `Retry-After`.
 - Gateway restarts intentionally invalidate every session.
 
-Managed mode is intended for trusted administrators and controlled networks.
-Do not expose its user-selected upstream address as an unrestricted public login
-service until the destination-policy work is complete. See the
-[security review](SECURITY.md) for mitigations and remaining responsibilities.
+Managed mode is intended for trusted administrators behind the access boundary
+described above. Network egress rules remain recommended as defense in depth.
+See the [security review](SECURITY.md) for the complete boundary.

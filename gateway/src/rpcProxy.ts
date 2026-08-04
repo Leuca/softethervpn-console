@@ -1,4 +1,5 @@
 import { RequestOptions, request as httpsRequest } from 'node:https';
+import { LookupFunction } from 'node:net';
 import { FastifyPluginAsync } from 'fastify';
 import { SESSION_COOKIE } from './sessionCookie.js';
 import { SessionCredentials, SessionStore } from './sessions.js';
@@ -18,8 +19,36 @@ interface RpcProxyOptions {
   forward?: RpcForwarder;
 }
 
-export const buildRpcRequestOptions = (session: SessionCredentials, body: string): RequestOptions => ({
+const createPinnedLookup =
+  (session: SessionCredentials): LookupFunction =>
+  (_hostname, options, callback) => {
+    const addresses = options.family
+      ? session.resolvedAddresses.filter(({ family }) => family === options.family)
+      : session.resolvedAddresses;
+
+    if (addresses.length === 0) {
+      const error = Object.assign(new Error('No pinned address matches the requested family.'), {
+        code: 'ENOTFOUND',
+      });
+      process.nextTick(() => callback(error, '', 0));
+      return;
+    }
+
+    if (options.all) {
+      process.nextTick(() => callback(null, addresses));
+      return;
+    }
+
+    process.nextTick(() => callback(null, addresses[0].address, addresses[0].family));
+  };
+
+export const buildRpcRequestOptions = (
+  session: SessionCredentials,
+  body: string,
+): RequestOptions => ({
+  agent: false,
   hostname: session.host,
+  lookup: createPinnedLookup(session),
   port: session.port,
   path: '/api/',
   method: 'POST',
@@ -41,14 +70,19 @@ export const forwardRpcRequest: RpcForwarder = (session, body) =>
       response.on('end', () => {
         resolve({
           statusCode: response.statusCode ?? 502,
-          contentType: typeof response.headers['content-type'] === 'string' ? response.headers['content-type'] : undefined,
+          contentType:
+            typeof response.headers['content-type'] === 'string'
+              ? response.headers['content-type']
+              : undefined,
           body: Buffer.concat(chunks).toString('utf8'),
         });
       });
       response.on('error', reject);
     });
 
-    upstream.setTimeout(RPC_TIMEOUT_MS, () => upstream.destroy(new Error('SoftEther JSON-RPC request timed out.')));
+    upstream.setTimeout(RPC_TIMEOUT_MS, () =>
+      upstream.destroy(new Error('SoftEther JSON-RPC request timed out.')),
+    );
     upstream.on('error', reject);
     upstream.end(body);
   });

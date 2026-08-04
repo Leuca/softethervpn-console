@@ -7,6 +7,7 @@ const credentials = {
   hub: '',
   password: 'secret',
   allowSelfSigned: false,
+  resolvedAddresses: [{ address: '192.0.2.10', family: 4 as const }],
 };
 
 describe('SoftEther login probe', () => {
@@ -42,10 +43,12 @@ describe('SoftEther login probe', () => {
   });
 
   it('distinguishes rejected credentials from an unreachable server', async () => {
-    const rejected = createLoginProbe(
-      vi.fn().mockResolvedValue({ statusCode: 403, body: '' }),
-    )(credentials);
-    const unreachable = createLoginProbe(vi.fn().mockRejectedValue(new Error('connect failed')))(credentials);
+    const rejected = createLoginProbe(vi.fn().mockResolvedValue({ statusCode: 403, body: '' }))(
+      credentials,
+    );
+    const unreachable = createLoginProbe(vi.fn().mockRejectedValue(new Error('connect failed')))(
+      credentials,
+    );
 
     await expect(rejected).rejects.toEqual(
       new LoginProbeError('The server did not accept these login details.', 401),

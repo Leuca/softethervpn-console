@@ -3,6 +3,7 @@ import { LoginProbeError } from './loginProbe.js';
 import { LoginRateLimiter } from './loginRateLimit.js';
 import { buildGatewayServer } from './server.js';
 import { SessionStore } from './sessions.js';
+import { UpstreamResolver } from './upstreamResolution.js';
 
 const loginPayload = {
   host: 'vpn.example.com',
@@ -12,11 +13,35 @@ const loginPayload = {
   allowSelfSigned: false,
 };
 
+const upstreamResolver = new UpstreamResolver(async () => [{ address: '192.0.2.10', family: 4 }]);
+
 describe('gateway session routes', () => {
+  it('rejects invalid server syntax before probing the network', async () => {
+    const loginProbe = vi.fn();
+    const server = buildGatewayServer({ loginProbe, upstreamResolver });
+
+    try {
+      const response = await server.inject({
+        method: 'POST',
+        url: '/login',
+        payload: { ...loginPayload, host: 'https://vpn.example.com' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: 'Server host must be an IP address or valid DNS name.',
+      });
+      expect(loginProbe).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
   it('creates a private session and returns only public server details', async () => {
     const server = buildGatewayServer({
       loginProbe: vi.fn().mockResolvedValue(undefined),
       trustProxy: true,
+      upstreamResolver,
     });
 
     try {
@@ -54,7 +79,10 @@ describe('gateway session routes', () => {
   });
 
   it('deletes the session during logout', async () => {
-    const server = buildGatewayServer({ loginProbe: vi.fn().mockResolvedValue(undefined) });
+    const server = buildGatewayServer({
+      loginProbe: vi.fn().mockResolvedValue(undefined),
+      upstreamResolver,
+    });
 
     try {
       const login = await server.inject({
@@ -86,6 +114,7 @@ describe('gateway session routes', () => {
     const server = buildGatewayServer({
       loginProbe: vi.fn().mockResolvedValue(undefined),
       sessions,
+      upstreamResolver,
     });
 
     try {
@@ -129,7 +158,7 @@ describe('gateway session routes', () => {
       .mockRejectedValue(
         new LoginProbeError('The server did not accept these login details.', 401),
       );
-    const server = buildGatewayServer({ loginProbe, loginRateLimiter });
+    const server = buildGatewayServer({ loginProbe, loginRateLimiter, upstreamResolver });
 
     try {
       for (let attempt = 0; attempt < 10; attempt += 1) {

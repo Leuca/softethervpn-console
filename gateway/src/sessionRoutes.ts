@@ -2,7 +2,8 @@ import { FastifyPluginAsync } from 'fastify';
 import { LoginProbe, LoginProbeError } from './loginProbe.js';
 import { LoginRateLimiter } from './loginRateLimit.js';
 import { SESSION_COOKIE } from './sessionCookie.js';
-import { SessionCredentials, SessionStore } from './sessions.js';
+import { LoginCredentials, SessionStore } from './sessions.js';
+import { UpstreamResolutionError, UpstreamResolver } from './upstreamResolution.js';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -15,6 +16,7 @@ interface SessionRoutesOptions {
   loginRateLimiter?: LoginRateLimiter;
   probe: LoginProbe;
   sessions: SessionStore;
+  upstreamResolver: UpstreamResolver;
 }
 
 const loginBodySchema = {
@@ -36,7 +38,7 @@ export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = a
 ) => {
   const loginRateLimiter = options.loginRateLimiter ?? new LoginRateLimiter();
 
-  server.post<{ Body: SessionCredentials }>(
+  server.post<{ Body: LoginCredentials }>(
     '/login',
     { schema: { body: loginBodySchema } },
     async (request, reply) => {
@@ -48,17 +50,29 @@ export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = a
           .send({ error: 'Too many login attempts. Try again later.' });
       }
 
-      const credentials = {
+      const loginCredentials = {
         ...request.body,
         host: request.body.host.trim(),
         hub: request.body.hub.trim(),
       };
 
-      if (!credentials.host) {
+      if (!loginCredentials.host) {
         return reply.code(400).send({ error: 'Server host is required.' });
       }
 
       loginRateLimiter.recordAttempt(request.ip);
+      let credentials;
+      try {
+        credentials = await options.upstreamResolver.resolve(loginCredentials);
+      } catch (error) {
+        if (error instanceof UpstreamResolutionError) {
+          return reply.code(error.statusCode).send({ error: error.message });
+        }
+        return reply
+          .code(502)
+          .send({ error: 'The selected server address could not be resolved.' });
+      }
+
       try {
         await options.probe(credentials);
       } catch (error) {

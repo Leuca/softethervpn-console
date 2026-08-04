@@ -7,6 +7,7 @@ import { LoginRateLimiter } from './loginRateLimit.js';
 import { RpcForwarder, forwardRpcRequest, registerRpcProxy } from './rpcProxy.js';
 import { registerSessionRoutes } from './sessionRoutes.js';
 import { SessionStore } from './sessions.js';
+import { UpstreamResolver } from './upstreamResolution.js';
 
 interface GatewayServerOptions {
   frontendRoot?: string;
@@ -16,6 +17,7 @@ interface GatewayServerOptions {
   rpcForwarder?: RpcForwarder;
   sessions?: SessionStore;
   trustProxy?: FastifyServerOptions['trustProxy'];
+  upstreamResolver?: UpstreamResolver;
 }
 
 export const REQUEST_BODY_LIMIT_BYTES = 1024 * 1024;
@@ -79,6 +81,7 @@ export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyI
   });
   const sessions = options.sessions ?? new SessionStore();
   const rpcForwarder = options.rpcForwarder ?? forwardRpcRequest;
+  const upstreamResolver = options.upstreamResolver ?? new UpstreamResolver();
 
   server.addHook('onRequest', async (request, reply) => {
     if (!SAFE_METHODS.has(request.method) && !hasAllowedOrigin(request)) {
@@ -92,6 +95,7 @@ export const buildGatewayServer = (options: GatewayServerOptions = {}): FastifyI
     loginRateLimiter: options.loginRateLimiter,
     sessions,
     probe: options.loginProbe ?? createLoginProbe(rpcForwarder),
+    upstreamResolver,
   });
   server.register(registerRpcProxy, {
     sessions,

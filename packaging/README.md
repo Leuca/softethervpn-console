@@ -59,8 +59,8 @@ mock -r fedora-rawhide-x86_64 --rebuild artifacts/*.src.rpm
 ## Runtime
 
 The service binds to `127.0.0.1:8080` by default. Review
-`/etc/sysconfig/softethervpn-console`, configure a trusted HTTPS reverse proxy,
-and then enable the service:
+`/etc/sysconfig/softethervpn-console`, configure a trusted HTTPS reverse proxy
+with administrator access control, and then enable the service:
 
 ```sh
 sudo systemctl enable --now softethervpn-console.service
@@ -70,3 +70,9 @@ The service uses a systemd dynamic user and has no persistent writable state.
 Managed sessions and administrator credentials remain in memory and are lost
 when the service restarts. The unit is intentionally not enabled automatically
 when the package is installed.
+
+The gateway has no independent user identity layer before its SoftEther login.
+Keep it on a private administrator network or require access through a VPN,
+reverse-proxy SSO, mutual TLS, or an administrator IP allow rule. HTTPS without
+access control is not sufficient. Network egress rules are also recommended as
+defense in depth.
