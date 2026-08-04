@@ -2,9 +2,14 @@
 // fields arrive as base64 strings rather than the Uint8Array their TS types
 // claim. Values we set locally (e.g. an uploaded certificate) are already
 // Uint8Array. Normalize either form to bytes, or null when empty/unreadable.
-export const binToBytes = (value: unknown): Uint8Array | null => {
+export const binToBytes = (value: unknown): Uint8Array<ArrayBuffer> | null => {
   if (value instanceof Uint8Array) {
-    return value.length > 0 ? value : null;
+    if (value.length === 0) {
+      return null;
+    }
+    return value.buffer instanceof ArrayBuffer
+      ? (value as Uint8Array<ArrayBuffer>)
+      : new Uint8Array(value);
   }
   if (typeof value === "string" && value.length > 0) {
     try {
@@ -18,7 +23,7 @@ export const binToBytes = (value: unknown): Uint8Array | null => {
 
 export const b64toBlob = (b64Data: string, contentType = "", sliceSize = 512) => {
   const byteCharacters = atob(b64Data);
-  const byteArrays: Uint8Array[] = [];
+  const byteArrays: Uint8Array<ArrayBuffer>[] = [];
 
   for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
     const slice = byteCharacters.slice(offset, offset + sliceSize);

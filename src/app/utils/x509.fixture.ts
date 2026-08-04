@@ -22,10 +22,11 @@ export const SELF_SIGNED_CERT_B64 =
   "jgZqOe6a7c2Lc8cDPtfw80d15jPTd9a/qdtjGqLZdQfR80mMkR44ory0aZuSlMgq" +
   "ISUWsjrzmFJuNlmx0qj2nvu31rnhK8ajiAuUyJl5ew==";
 
-export const derFromBase64 = (b64: string): Uint8Array =>
+export const derFromBase64 = (b64: string): Uint8Array<ArrayBuffer> =>
   Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
-export const SELF_SIGNED_CERT_DER = (): Uint8Array => derFromBase64(SELF_SIGNED_CERT_B64);
+export const SELF_SIGNED_CERT_DER = (): Uint8Array<ArrayBuffer> =>
+  derFromBase64(SELF_SIGNED_CERT_B64);
 
 export const SELF_SIGNED_CERT_PEM = (): string =>
   `-----BEGIN CERTIFICATE-----\n${SELF_SIGNED_CERT_B64.match(/.{1,64}/g)?.join("\n") ?? SELF_SIGNED_CERT_B64}\n-----END CERTIFICATE-----\n`;

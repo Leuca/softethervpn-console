@@ -68,7 +68,7 @@ const asCertificate = (bytes: Uint8Array): X509Certificate => {
       return new X509Certificate(text.slice(start, end + PEM_FOOTER.length));
     }
   }
-  return new X509Certificate(bytes);
+  return new X509Certificate(new Uint8Array(bytes));
 };
 
 // Normalize a PEM or DER certificate to raw DER bytes. Several SoftEther RPC

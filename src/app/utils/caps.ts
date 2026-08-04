@@ -8,8 +8,7 @@ import * as VPN from "vpnrpc/dist/vpnrpc";
 
 export const capValue = (capsList: unknown[], name: string): number => {
   const cap = capsList.find((item) => (item as VPN.VpnCaps).CapsName_str === name) as
-    | VPN.VpnCaps
-    | undefined;
+    VPN.VpnCaps | undefined;
   return cap ? cap.CapsValue_u32 : 0;
 };
 

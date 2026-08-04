@@ -13,6 +13,16 @@ describe("binToBytes", () => {
     expect(binToBytes(input)).toBe(input);
   });
 
+  it("copies shared-buffer input into Blob-compatible bytes", () => {
+    const input = new Uint8Array(new SharedArrayBuffer(3));
+    input.set([1, 2, 3]);
+
+    const bytes = binToBytes(input);
+
+    expect(bytes).toEqual(new Uint8Array([1, 2, 3]));
+    expect(bytes?.buffer).toBeInstanceOf(ArrayBuffer);
+  });
+
   it("returns null for empty, missing or non-binary values", () => {
     expect(binToBytes("")).toBeNull();
     expect(binToBytes(new Uint8Array())).toBeNull();

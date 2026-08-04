@@ -26,7 +26,7 @@ const MAX_RETRIES = 12;
 
 // SoftEther config files are UTF-8 with a byte-order mark.
 const BOM = [0xef, 0xbb, 0xbf];
-const toConfigBytes = (text: string): Uint8Array => {
+const toConfigBytes = (text: string): Uint8Array<ArrayBuffer> => {
   const body = new TextEncoder().encode(text);
   const out = new Uint8Array(BOM.length + body.length);
   out.set(BOM, 0);

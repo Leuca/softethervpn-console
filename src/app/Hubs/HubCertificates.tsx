@@ -46,8 +46,7 @@ interface CrlFormState {
 }
 
 type PendingDelete =
-  | { kind: "ca"; item: VPN.VpnRpcHubEnumCAItem }
-  | { kind: "crl"; item: VPN.VpnRpcEnumCrlItem };
+  { kind: "ca"; item: VPN.VpnRpcHubEnumCAItem } | { kind: "crl"; item: VPN.VpnRpcEnumCrlItem };
 
 const emptyCrlForm = (): CrlFormState => ({
   key: null,

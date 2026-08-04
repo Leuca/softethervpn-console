@@ -80,7 +80,7 @@ const safeLogFileName = (file: VPN.VpnRpcEnumLogFileItem): string =>
     "_",
   );
 
-type LogReadChunkHandler = (chunk: Uint8Array) => void;
+type LogReadChunkHandler = (chunk: Uint8Array<ArrayBuffer>) => void;
 
 interface LogReadOptions {
   maxBytes?: number;
