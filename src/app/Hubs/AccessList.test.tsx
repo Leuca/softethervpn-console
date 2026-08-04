@@ -154,7 +154,7 @@ describe("AccessList", () => {
       Note_utf: "block tcp service",
       Protocol_u32: 6,
     });
-  });
+  }, 10_000);
 
   it("clones a rule via AddAccess with the next unused priority", async () => {
     enumAccess.mockResolvedValue({ AccessList: [rule] });

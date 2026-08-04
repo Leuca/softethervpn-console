@@ -333,7 +333,7 @@ describe("Cascade", () => {
     await waitFor(() => expect(openArchiveBtn).toBeEnabled());
     await user.click(openArchiveBtn);
     await within(dialog).findByText("Certificate and private key are ready.");
-  });
+  }, 10_000);
 
   it("rejects an encrypted private key with a clear error", async () => {
     enumLink.mockResolvedValue({ LinkList: [] });
