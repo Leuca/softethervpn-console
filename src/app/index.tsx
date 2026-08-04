@@ -13,7 +13,7 @@ import "@app/app.css";
 
 const LoadingPage: React.FunctionComponent = () => (
   <Bullseye>
-    <Spinner size="xl" />
+    <Spinner size="xl" aria-label="Loading server information" />
   </Bullseye>
 );
 

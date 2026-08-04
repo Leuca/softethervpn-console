@@ -47,6 +47,12 @@ vi.mock("@app/utils/vpnrpc_settings", () => {
   };
 });
 
+// Shell navigation does not need the deferred feature implementation. Avoid
+// importing and instrumenting every page when this suite first visits Hubs.
+vi.mock("@app/routePages", () => ({
+  Hubs: () => null,
+}));
+
 // PatternFly decides mobile vs desktop from the page element's clientWidth,
 // which jsdom reports as 0 (-> "mobile"); the layout also seeds the initial
 // sidebar state from window.innerWidth. Stub a desktop width for both for the
@@ -203,7 +209,10 @@ describe("App tests", () => {
       render(<App />);
 
       await user.click(await screen.findByRole("link", { name: "Hubs" }));
-      expect(screen.getByRole("link", { name: "Hubs" })).toHaveAttribute("aria-current", "page");
+      expect(window.location.hash).toBe("#/hubs");
+      await waitFor(() =>
+        expect(screen.getByRole("link", { name: "Hubs" })).toHaveAttribute("aria-current", "page"),
+      );
 
       act(() => window.history.back());
       await waitFor(() =>

@@ -1,25 +1,51 @@
 import * as React from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Bullseye, Spinner } from "@patternfly/react-core";
 import { Dashboard } from "@app/Dashboard/Dashboard";
-import { Hubs } from "@app/Hubs/Hubs";
-import { LocalBridge } from "@app/Functionalities/LocalBridge/LocalBridge";
-import { Layer3Switch } from "@app/Functionalities/Layer3Switch/Layer3Switch";
-import { LegacyProtocols } from "@app/Functionalities/LegacyProtocols/LegacyProtocols";
-import { EtherIPDetailed } from "@app/Functionalities/LegacyProtocols/EtherIP";
-import { DynDNS } from "@app/Functionalities/DDNS/DDNS";
-import { VpnAzure } from "@app/Functionalities/VPNAzure/VPNAzure";
-import { Listeners } from "@app/Settings/Listeners/Listeners";
-import { EncryptionNetwork } from "@app/Settings/EncryptionAndNetwork/EncryptionAndNetwork";
-import { ClusterConfig } from "@app/Settings/ClusterConfiguration/ClusterConfiguration";
-import { ClusteringStatus } from "@app/Settings/ClusteringStatus/ClusteringStatus";
-import { EditConfig } from "@app/Settings/EditConfig/EditConfig";
-import { ConnectionsList } from "@app/Settings/ConnectionsList/ConnectionsList";
-import { ServerStatus } from "@app/Settings/ServerStatus/ServerStatus";
-import { About } from "@app/Settings/About/AboutThisServer";
 import { PermissionNotice } from "@app/PermissionNotice/PermissionNotice";
 import { NotFound } from "@app/NotFound/NotFound";
 import { useServer } from "@app/ServerContext";
 import { useDocumentTitle } from "@app/utils/useDocumentTitle";
+
+const loadRoutePages = () => import("@app/routePages");
+
+const Hubs = React.lazy(() => loadRoutePages().then(({ Hubs }) => ({ default: Hubs })));
+const LocalBridge = React.lazy(() =>
+  loadRoutePages().then(({ LocalBridge }) => ({ default: LocalBridge })),
+);
+const Layer3Switch = React.lazy(() =>
+  loadRoutePages().then(({ Layer3Switch }) => ({ default: Layer3Switch })),
+);
+const LegacyProtocols = React.lazy(() =>
+  loadRoutePages().then(({ LegacyProtocols }) => ({ default: LegacyProtocols })),
+);
+const EtherIPDetailed = React.lazy(() =>
+  loadRoutePages().then(({ EtherIPDetailed }) => ({ default: EtherIPDetailed })),
+);
+const DynDNS = React.lazy(() => loadRoutePages().then(({ DynDNS }) => ({ default: DynDNS })));
+const VpnAzure = React.lazy(() => loadRoutePages().then(({ VpnAzure }) => ({ default: VpnAzure })));
+const Listeners = React.lazy(() =>
+  loadRoutePages().then(({ Listeners }) => ({ default: Listeners })),
+);
+const EncryptionNetwork = React.lazy(() =>
+  loadRoutePages().then(({ EncryptionNetwork }) => ({ default: EncryptionNetwork })),
+);
+const ClusterConfig = React.lazy(() =>
+  loadRoutePages().then(({ ClusterConfig }) => ({ default: ClusterConfig })),
+);
+const ClusteringStatus = React.lazy(() =>
+  loadRoutePages().then(({ ClusteringStatus }) => ({ default: ClusteringStatus })),
+);
+const EditConfig = React.lazy(() =>
+  loadRoutePages().then(({ EditConfig }) => ({ default: EditConfig })),
+);
+const ConnectionsList = React.lazy(() =>
+  loadRoutePages().then(({ ConnectionsList }) => ({ default: ConnectionsList })),
+);
+const ServerStatus = React.lazy(() =>
+  loadRoutePages().then(({ ServerStatus }) => ({ default: ServerStatus })),
+);
+const About = React.lazy(() => loadRoutePages().then(({ About }) => ({ default: About })));
 
 export interface IAppRoute {
   label?: string; // Excluding the label will exclude the route from the nav sidebar in AppLayout
@@ -272,20 +298,28 @@ const flattenedRoutes: IAppRoute[] = routes.reduce(
 );
 
 const AppRoutes = (): React.ReactElement => (
-  <Routes>
-    {flattenedRoutes.map((route, idx) => (
-      <Route
-        path={route.path}
-        element={
-          <RouteGate route={route}>
-            <TitledRoute title={route.title}>{route.element}</TitledRoute>
-          </RouteGate>
-        }
-        key={idx}
-      />
-    ))}
-    <Route path="*" element={<NotFound />} />
-  </Routes>
+  <React.Suspense
+    fallback={
+      <Bullseye>
+        <Spinner size="xl" aria-label="Loading page" />
+      </Bullseye>
+    }
+  >
+    <Routes>
+      {flattenedRoutes.map((route, idx) => (
+        <Route
+          path={route.path}
+          element={
+            <RouteGate route={route}>
+              <TitledRoute title={route.title}>{route.element}</TitledRoute>
+            </RouteGate>
+          }
+          key={idx}
+        />
+      ))}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  </React.Suspense>
 );
 
 export { AppRoutes, routes };
