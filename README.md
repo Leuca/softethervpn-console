@@ -81,6 +81,11 @@ npm --prefix gateway run build
 npm --prefix gateway start
 ```
 
+For a local managed run, `npm start` performs a non-minified production-mode
+frontend build, compiles the gateway, and starts it. The first run populates a
+filesystem cache; later starts reuse unchanged frontend modules. Use the regular
+`build:managed` command above for release artifacts and final validation.
+
 The integrated artifact calls the same-origin SoftEther `/api/` endpoint and
 does not include managed login behavior. The managed artifact requires the
 gateway, which handles server selection and login. See
@@ -113,6 +118,9 @@ npm install --prefix gateway
 
 # Start the development server
 npm run start:dev
+
+# Build and run the managed frontend and gateway locally
+npm start
 
 # Build the integrated frontend (outputs to the "dist" directory)
 npm run build:integrated

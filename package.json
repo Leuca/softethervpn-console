@@ -14,7 +14,8 @@
     "build": "webpack --config webpack.prod.js",
     "build:integrated": "CONSOLE_MODE=integrated npm run build",
     "build:managed": "CONSOLE_MODE=managed npm run build",
-    "start": "sirv dist --single --host --port 8080",
+    "build:managed:local": "npm run clean && CONSOLE_MODE=managed webpack --env local --config webpack.prod.js",
+    "start": "npm run build:managed:local && npm --prefix gateway run build && npm --prefix gateway run start",
     "start:dev": "webpack serve --color --progress --config webpack.dev.js",
     "test": "vitest run",
     "test:gateway": "npm --prefix gateway test",
@@ -91,7 +92,6 @@
     "react": "^18",
     "react-dom": "^18",
     "reflect-metadata": "^0.2.2",
-    "sirv-cli": "^3.0.1",
     "vpnrpc": "^1.0.1"
   },
   "author": "Luca Magrone"
