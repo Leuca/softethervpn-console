@@ -22,3 +22,5 @@ private servers. The 1.0 managed gateway is intended for controlled networks.
 Compatibility reports should include the console artifact and version,
 SoftEther edition/build and mode, administrator role, browser, and managed host
 details when applicable. Never publish credentials, cookies, or private keys.
+See the [real-server validation record](REAL_SERVER_VALIDATION.md) for current
+release evidence and untested matrix rows.
