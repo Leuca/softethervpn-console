@@ -33,15 +33,51 @@ The following checks passed:
   test RPC, logged out, and then reported an unauthenticated session.
 - Invalid administrator credentials returned HTTP 401 directly and the
   managed gateway returned its fixed login error without leaking server detail.
+- An isolated temporary Virtual Hub was created, read, updated, and deleted.
+  The post-check confirmed that no validation Hub remained on the server.
+- An established managed session returned the fixed HTTP 502 response while a
+  local relay to the server was offline, remained authenticated, and resumed
+  RPC traffic through the same session when the relay returned.
 
 Known build behavior: `GetCaps` advertises DDNS proxy support, but
 `GetDDnsInternetSettng` returns SoftEther error 33. The Dynamic DNS page handles
-this as an informational unsupported-feature state.
+this as an informational unsupported-feature state. A nonzero session limit
+was ignored during Virtual Hub creation but accepted by `SetHub`; the console
+already creates a Hub with the server's unlimited default and applies later
+changes through `SetHub`.
+
+## 2026-08-05: Stable 4.44 Build 9807
+
+| Area             | Value                                                    |
+| ---------------- | -------------------------------------------------------- |
+| Console revision | `4832847`                                                |
+| SoftEther        | Stable 4.44 Build 9807, official ARM64 package           |
+| Server           | Standalone in an isolated Fedora Linux 44 container      |
+| Roles            | Whole-server administrator and Virtual Hub administrator |
+| Console paths    | Integrated development proxy and local managed gateway   |
+| Browser          | Chromium 150                                             |
+
+The following checks passed:
+
+- The official ARM64 package passed its environment check and reported the
+  expected product, version, build, and standalone mode through JSON-RPC.
+- Server-administrator bootstrap and core read-only RPCs succeeded. The server
+  advertised Local Bridge as unavailable and returned error 84 for its RPC;
+  the console omitted the corresponding route and dashboard card.
+- Hub administration returned error 52 for the server-only role probe, and the
+  console identified the role as Hub Administrator. It showed only the assigned
+  Hub, omitted server-administrator creation and deletion actions, and denied a
+  direct Dynamic DNS route with the expected permission message.
+- The Hub administrator's online toggle succeeded both offline and online.
+  Hub-scoped status, session, table, user, group, access, certificate, cascade,
+  logging, message, RADIUS, and option RPCs also succeeded.
+- Managed login and RPC proxying succeeded for both roles. After the VPN Server
+  process restarted, the existing managed session resumed RPC traffic and the
+  configured Hubs remained present.
 
 ## Remaining release matrix
 
-- Stable 4.44 Build 9807 and Developer 5.02 Build 5188.
-- VPN Bridge, cluster controller, cluster member, and Virtual Hub administrator.
-- A certificate trusted by the gateway host, large collections, reversible
-  configuration changes, server restart, and temporary outage recovery.
-- Capability and route visibility comparisons for every mode and role above.
+- Developer 5.02 Build 5188.
+- VPN Bridge, cluster controller, and cluster member.
+- A certificate trusted by the gateway host and large collections.
+- Capability and route visibility comparisons for every remaining mode above.
