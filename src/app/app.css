@@ -12,9 +12,14 @@ body,
    ============================================================ */
 
 /* --- Brand lockup (masthead, left) --- */
+.se-masthead .pf-v6-c-masthead__logo {
+  display: flex;
+}
+
 .se-brand {
   display: flex;
   align-items: center;
+  inline-size: 100%;
   gap: var(--pf-t--global--spacer--sm);
   text-decoration: none;
   cursor: pointer;
@@ -23,8 +28,8 @@ body,
   padding: 0;
 }
 .se-brand__logo {
-  height: 34px;
-  width: 34px;
+  height: var(--pf-v6-c-masthead__logo--MaxHeight);
+  width: var(--pf-v6-c-masthead__logo--MaxHeight);
   display: block;
   filter: brightness(0);
 }
@@ -74,7 +79,7 @@ body,
 .se-masthead-actions {
   display: flex;
   align-items: center;
-  gap: var(--pf-t--global--spacer--sm);
+  gap: var(--pf-t--global--spacer--md);
   margin-inline-start: auto;
 }
 
@@ -104,9 +109,8 @@ body,
   font-weight: var(--pf-t--global--font--weight--body--bold);
 }
 
-/* --- Depth: separate the masthead from the workspace --- */
+/* Keep masthead menus above the workspace without extending the bar visually. */
 .se-masthead {
-  box-shadow: var(--pf-t--global--box-shadow--md--bottom);
   z-index: var(--pf-t--global--z-index--md);
 }
 
