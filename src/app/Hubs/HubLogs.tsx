@@ -106,7 +106,6 @@ const readLogFile = async (
 
   while (!done) {
     if (endOffset !== undefined && offset >= endOffset) {
-      done = true;
       break;
     }
     const response = await api.ReadLogFile(
@@ -124,7 +123,6 @@ const readLogFile = async (
         endOffset === undefined ? bytes.length : Math.max(0, endOffset - offset);
       const chunk = bytes.slice(0, remainingToEnd);
       if (chunk.length === 0) {
-        done = true;
         break;
       }
       if (maxBytes !== undefined && totalBytes + chunk.length > maxBytes) {

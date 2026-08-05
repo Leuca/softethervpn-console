@@ -4,8 +4,6 @@ import * as VPN from "vpnrpc/dist/vpnrpc";
 // Output JSON-RPC request / reply strings to the debug console.
 VPN.VpnServerRpc.SetDebugMode(process.env.NODE_ENV === "development");
 
-export let api: VPN.VpnServerRpc;
-
 const isTransientLoadFailure = (error: unknown): boolean => {
   const message = String(error);
   return (
@@ -43,8 +41,7 @@ const retryTransientLoadFailure = <T>(method: string, request: () => Promise<T>)
 // sent, and vpnrpc's empty X-VPNADMIN-HUBNAME header (sent when administering
 // the whole server) makes SoftEther's HTTP parser drop the connection with no
 // response. The proxy avoids both.
-const rpc = new VPN.VpnServerRpc();
-api = new Proxy(rpc, {
+export const api = new Proxy(new VPN.VpnServerRpc(), {
   get(target, property, receiver) {
     const value = Reflect.get(target, property, receiver);
 

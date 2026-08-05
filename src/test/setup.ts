@@ -21,13 +21,15 @@ global.ResizeObserver = class ResizeObserver {
   observe = vi.fn();
   unobserve = vi.fn();
   disconnect = vi.fn();
-  constructor(callback: ResizeObserverCallback) {}
 };
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
+  readonly root = null;
+  readonly rootMargin = "";
+  readonly thresholds = [];
   observe = vi.fn();
   unobserve = vi.fn();
   disconnect = vi.fn();
-  constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {}
-} as any;
+  takeRecords = vi.fn(() => []);
+};
