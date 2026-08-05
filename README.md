@@ -45,7 +45,7 @@ and TLS boundaries.
 ```bash
 git clone https://github.com/Leuca/softethervpn-console
 cd softethervpn-console
-npm install
+npm ci
 npm run start:dev
 ```
 
@@ -75,7 +75,7 @@ npm run build:integrated
 Build and start the managed frontend and Node gateway with:
 
 ```sh
-npm install --prefix gateway
+npm ci --prefix gateway
 npm run build:managed
 npm --prefix gateway run build
 npm --prefix gateway start
@@ -111,10 +111,10 @@ matching is password-manager-specific; the password itself uses the standard
 
 ```sh
 # Install frontend development/build dependencies
-npm install
+npm ci
 
 # Install gateway dependencies when working on managed deployments
-npm install --prefix gateway
+npm ci --prefix gateway
 
 # Start the development server
 npm run start:dev

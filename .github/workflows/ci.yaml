@@ -12,13 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
+          cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Run lint checks
         run: npm run lint
   test:
@@ -26,13 +27,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
+          cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Run tests
         run: npm run test:coverage
   build:
@@ -45,13 +47,14 @@ jobs:
           - managed
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
+          cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Build frontend
         run: npm run build:${{ matrix.mode }}
   gateway:
@@ -62,16 +65,72 @@ jobs:
         working-directory: gateway
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
+          cache: npm
+          cache-dependency-path: gateway/package-lock.json
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Run type-check
         run: npm run type-check
       - name: Run tests
         run: npm test
       - name: Build gateway
         run: npm run build
+
+  packaging:
+    name: Packaging inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            gateway/package-lock.json
+      - name: Check source package script
+        run: bash -n packaging/build-srpm.sh
+      - name: Check bundled dependency metadata
+        run: >-
+          node packaging/generate-bundled-provides.mjs
+          package-lock.json
+          gateway/package-lock.json
+          > "$RUNNER_TEMP/bundled-provides.inc"
+      - name: Check npm package inputs
+        run: |
+          npm pack --dry-run --ignore-scripts --silent
+          npm pack --dry-run --ignore-scripts --silent ./gateway
+
+  node-22:
+    name: Node.js 22 compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            gateway/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Install gateway dependencies
+        run: npm ci --prefix gateway
+      - name: Run checks
+        run: npm run ci-checks
+      - name: Build integrated frontend
+        run: npm run build:integrated
+      - name: Build managed frontend
+        run: npm run build:managed
+      - name: Build gateway
+        run: npm --prefix gateway run build

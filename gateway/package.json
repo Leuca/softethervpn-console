@@ -4,6 +4,9 @@
   "description": "HTTP gateway for managed SoftEther VPN Console deployments",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "^22.0.0 || ^24.0.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/server.ts",
