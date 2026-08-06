@@ -6,7 +6,7 @@ unsupported unless stated otherwise.
 
 | Area                  | Supported for 1.0                                                                                                        | Best effort or unsupported                                                                                 |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| SoftEther             | Stable 4.44 Build 9807 and Developer 5.02 Build 5188, including later compatible builds in those lines                   | Other JSON-RPC builds from 4.30 Build 9696 are best effort; older builds are unsupported                   |
+| SoftEther             | Stable 4.44 Build 9807 and Developer 5.02 Build 5187, including later compatible builds in those lines                   | Other JSON-RPC builds from 4.30 Build 9696 are best effort; older builds are unsupported                   |
 | Modes and roles       | Standalone server, VPN Bridge, cluster controller/member, server administrator, and standalone Virtual Hub administrator | Anonymous, client-user, and operating-system account access are unsupported                                |
 | Browsers              | Latest two major Chrome, Firefox, Safari, and Edge versions at release time                                              | Other modern browsers and mobile browsers are best effort; legacy browsers are unsupported                 |
 | Integrated deployment | `build:integrated` artifact served by SoftEther with the correct `ASSET_PATH`; host OS and CPU are unrestricted          | Modified artifacts, cross-origin RPC, and unrelated web servers are unsupported                            |
@@ -14,6 +14,10 @@ unsupported unless stated otherwise.
 
 Feature visibility follows the authenticated role and SoftEther's `GetCaps`
 response. A supported server may therefore expose only a subset of the console.
+
+The upstream `5.2.5188` tag, source defaults, and published Windows binaries
+retain the embedded Build 5187 number. Build 5187 is therefore the Developer
+baseline tested for 1.0; a locally relabelled build is not required.
 
 Integrated mode must remain same-origin. Managed mode should verify the
 SoftEther certificate; its explicit self-signed option is supported for trusted

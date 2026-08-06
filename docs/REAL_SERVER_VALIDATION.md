@@ -16,8 +16,9 @@ cookies, private keys, or private endpoint details here.
 | Console paths    | Integrated development proxy and local managed gateway |
 | Browser          | Chromium 150                                           |
 
-Build 5187 is a best-effort target under the support policy, not the supported
-Developer 5.02 Build 5188 baseline.
+Build 5187 is the Developer baseline under the support policy. The upstream
+`5.2.5188` release retains 5187 in its source defaults and published Windows
+binary names, so no separately identified default Build 5188 is required.
 
 The following checks passed:
 
@@ -45,6 +46,40 @@ this as an informational unsupported-feature state. A nonzero session limit
 was ignored during Virtual Hub creation but accepted by `SetHub`; the console
 already creates a Hub with the server's unlimited default and applies later
 changes through `SetHub`.
+
+## 2026-08-06: Large user collection on Developer 5.02 Build 5187
+
+| Area             | Value                                            |
+| ---------------- | ------------------------------------------------ |
+| Console revision | `335db07`                                        |
+| SoftEther        | Developer 5.02 Build 5187                        |
+| Test data        | 100 anonymous users in an isolated offline Hub   |
+| Console path     | Integrated development proxy                     |
+| Browser          | Chromium 150 at 1440x1200 and 390x1500 viewports |
+
+The Users page loaded and rendered all 100 records without an operation error.
+The desktop table remained scrollable and the narrow layout kept row actions
+reachable without horizontal page overflow. The temporary Hub was deleted after
+the browser checks, and a final Hub enumeration confirmed cleanup.
+
+## 2026-08-06: Trusted upstream certificate
+
+| Area             | Value                                                  |
+| ---------------- | ------------------------------------------------------ |
+| Console revision | `335db07`                                              |
+| SoftEther        | Developer 5.02 Build 5187                              |
+| Console path     | Local managed gateway                                  |
+| Trust setup      | Temporary private CA loaded through `NODE_EXTRA_CA_CERTS` |
+
+Managed login succeeded with the certificate's exact hostname and the
+self-signed-certificate option disabled. The Dashboard and About pages loaded
+live server data through the authenticated JSON-RPC session, and logout
+invalidated that session.
+
+The negative controls also behaved correctly: without the additional CA, login
+failed with the certificate-verification message; with the CA present, using a
+name not covered by the certificate also failed. No certificate, private key,
+credential, cookie, or private endpoint detail is retained in this repository.
 
 ## 2026-08-05: Stable 4.44 Build 9807
 
@@ -102,7 +137,5 @@ The following checks passed:
 
 ## Remaining release matrix
 
-- Developer 5.02 Build 5188.
 - Cluster controller and cluster member.
-- A certificate trusted by the gateway host and large collections.
 - Capability and route visibility comparisons for every remaining mode above.
