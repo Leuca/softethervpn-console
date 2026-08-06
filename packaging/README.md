@@ -7,7 +7,8 @@ frontend remains part of SoftEther VPN Server and is not installed by this RPM.
 
 ## Release flow
 
-The `srpm` release job runs only after the GitHub Release job succeeds. It:
+The `srpm` release job runs after the frontend bundles are uploaded to a draft
+GitHub release. It:
 
 1. Downloads the tagged GitHub source archive used by `Source0`.
 2. Uses Fedora's `nodejs-packaging-bundler` to create production and
@@ -16,8 +17,9 @@ The `srpm` release job runs only after the GitHub Release job succeeds. It:
    and includes the bundler-generated production license report for review.
 4. Injects the release version, RPM-compatible version, repository owner,
    bundled provides, and changelog entry into the spec.
-5. Builds and checks the SRPM, creates its SHA-256 checksum, and uploads both as
-   assets of the existing GitHub release.
+5. Builds and checks the SRPM, creates its SHA-256 checksum, and uploads both to
+   the draft release. A final job publishes the release only after every upload
+   succeeds.
 
 The resulting SRPM is self-contained. Binary RPM builds use the bundled sources
 and do not contact the npm registry.

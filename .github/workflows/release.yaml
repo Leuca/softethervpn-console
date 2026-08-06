@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    name: Build and publish release
+    name: Build release bundles
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,12 +32,19 @@ jobs:
 
       - name: Check release version
         run: |
-          package_version="$(node -p "require('./package.json').version")"
           tag_version="${GITHUB_REF_NAME#v}"
-          if [ "$package_version" != "$tag_version" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package version $package_version" >&2
-            exit 1
-          fi
+          for manifest in \
+            package.json \
+            package-lock.json \
+            gateway/package.json \
+            gateway/package-lock.json
+          do
+            package_version="$(node -p "require('./$manifest').version")"
+            if [ "$package_version" != "$tag_version" ]; then
+              echo "Tag $GITHUB_REF_NAME does not match $manifest version $package_version" >&2
+              exit 1
+            fi
+          done
 
       - name: Run checks
         run: npm run ci-checks
@@ -62,28 +69,38 @@ jobs:
             gateway/README.md
           sha256sum "$artifact" > "$artifact.sha256"
 
-      - name: Publish GitHub release
+      - name: Upload bundles to draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           artifact="softethervpn-console-${GITHUB_REF_NAME}.tar.gz"
           managed_artifact="softethervpn-console-managed-${GITHUB_REF_NAME}.tar.gz"
-          prerelease_args=()
-          if [[ "${GITHUB_REF_NAME#v}" == *-* ]]; then
-            prerelease_args+=(--prerelease)
+          sha256sum --check "$artifact.sha256" "$managed_artifact.sha256"
+
+          if release_is_draft="$(
+            gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null
+          )"; then
+            if [[ "$release_is_draft" != true ]]; then
+              echo "Release $GITHUB_REF_NAME is already published; refusing to replace its assets." >&2
+              exit 1
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --generate-notes \
+              --title "SoftEther VPN Console $GITHUB_REF_NAME" \
+              --verify-tag
           fi
 
-          gh release create "$GITHUB_REF_NAME" \
-            --title "SoftEther VPN Console $GITHUB_REF_NAME" \
-            --generate-notes \
-            "${prerelease_args[@]}" \
+          gh release upload "$GITHUB_REF_NAME" \
+            --clobber \
             "$artifact" \
             "$artifact.sha256" \
             "$managed_artifact" \
             "$managed_artifact.sha256"
 
   srpm:
-    name: Build and publish source RPM
+    name: Build source RPM
     needs: release
     runs-on: ubuntu-latest
     container: fedora:latest
@@ -107,11 +124,33 @@ jobs:
         run: |
           packaging/build-srpm.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/srpm"
 
-      - name: Publish source RPM
+      - name: Upload source RPM to draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release upload "$GITHUB_REF_NAME"
-          --repo "$GITHUB_REPOSITORY"
-          --clobber
-          "$RUNNER_TEMP"/srpm/*
+        run: |
+          (
+            cd "$RUNNER_TEMP/srpm"
+            sha256sum --check -- *.sha256
+          )
+          gh release upload "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber \
+            "$RUNNER_TEMP"/srpm/*
+
+  publish:
+    name: Publish release
+    needs: srpm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=false
+          if [[ "${GITHUB_REF_NAME#v}" == *-* ]]; then
+            prerelease=true
+          fi
+          gh release edit "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --prerelease="$prerelease"
