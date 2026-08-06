@@ -52,6 +52,23 @@ const mockSuccessfulProbes = () => {
   getServerInfo.mockResolvedValue({ ServerType_u32: 0 });
 };
 
+const mockAllCapabilities = () =>
+  getCaps.mockResolvedValue({
+    CapsList: [],
+    caps_b_local_bridge_u32: 1,
+    caps_b_support_cluster_u32: 1,
+    caps_b_support_layer3_u32: 1,
+    caps_b_support_azure_u32: 1,
+    caps_b_support_ddns_u32: 1,
+    caps_b_support_ipsec_u32: 1,
+    caps_b_support_openvpn_u32: 1,
+    caps_b_support_sstp_u32: 1,
+    caps_b_tap_supported_u32: 1,
+    caps_b_bridge_u32: 0,
+    caps_b_vpn4_u32: 0,
+    caps_b_support_ddns_proxy_u32: 0,
+  });
+
 describe("ServerProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,6 +120,32 @@ describe("ServerProvider", () => {
     await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("ready"));
     expect(screen.getByTestId("hide-non-cluster")).toHaveTextContent("hidden");
     expect(screen.getByTestId("hidden-labels")).toHaveTextContent("Hubs");
+  });
+
+  it("distinguishes cluster controller visibility", async () => {
+    mockAllCapabilities();
+    getFarmSetting.mockResolvedValue({ ServerType_u32: 1 });
+    getServerInfo.mockResolvedValue({ ServerType_u32: 1 });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("ready"));
+    expect(screen.getByTestId("hide-non-cluster")).toHaveTextContent("hidden");
+    expect(screen.getByTestId("hidden-labels")).not.toHaveTextContent("Hubs");
+    expect(screen.getByTestId("hidden-labels")).not.toHaveTextContent("Clustering Status");
+  });
+
+  it("distinguishes cluster member visibility", async () => {
+    mockAllCapabilities();
+    getFarmSetting.mockResolvedValue({ ServerType_u32: 2 });
+    getServerInfo.mockResolvedValue({ ServerType_u32: 2 });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("ready"));
+    expect(screen.getByTestId("hide-non-cluster")).toHaveTextContent("hidden");
+    expect(screen.getByTestId("hidden-labels")).toHaveTextContent("Hubs");
+    expect(screen.getByTestId("hidden-labels")).not.toHaveTextContent("Clustering Status");
   });
 
   it("settles when a probe rejects with a non-object reason", async () => {

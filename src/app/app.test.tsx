@@ -255,6 +255,20 @@ describe("App tests", () => {
     ).toBeVisible();
   });
 
+  it("shows capability-based route-denial reason for VPN Azure", async () => {
+    getCaps.mockResolvedValueOnce({
+      ...defaultCaps,
+      caps_b_support_azure_u32: 0,
+    });
+    window.history.pushState({}, "", "/#/functionalities/vpnazure");
+
+    render(<App />);
+
+    expect(
+      await screen.findByText(/VPN Azure is not available with this server's capabilities/i),
+    ).toBeVisible();
+  });
+
   it("denies functionalities pages to hub administrators on direct URLs", async () => {
     enumConnection.mockRejectedValueOnce(
       new Error("Error: Code=52, Message=Error code 52: Not enough privileges."),
