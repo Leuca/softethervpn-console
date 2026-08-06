@@ -81,6 +81,38 @@ failed with the certificate-verification message; with the CA present, using a
 name not covered by the certificate also failed. No certificate, private key,
 credential, cookie, or private endpoint detail is retained in this repository.
 
+## 2026-08-06: Patched Developer cluster
+
+| Area             | Value                                                        |
+| ---------------- | ------------------------------------------------------------ |
+| Console revision | `416106d`                                                    |
+| SoftEther        | Developer 5.02 Build 5187, built from `af94a048`             |
+| Servers          | Controller and member in an isolated Podman network          |
+| Role             | Whole-server administrator                                   |
+| Console paths    | Integrated development proxy and local managed gateway       |
+| Browser          | Chromium 150                                                  |
+
+The local SoftEther build includes the pointer-key hashing, remote IP-table
+deletion, and clustered Secure NAT session-list fixes in commits `04bb775b`,
+`f476c170`, and `af94a048`.
+
+The following checks passed:
+
+- The controller reported two members with distinct IDs, and the console listed
+  their roles, connection state, usage counts, member details, and certificate
+  action.
+- The member reported an online controller connection. Its navigation omitted
+  Hubs, retained Clustering Configuration and Clustering Status, and denied a
+  direct Hubs URL with the capability message.
+- Integrated and managed modes rendered the correct controller and member
+  status views. Managed login rejected an invalid password and accepted the
+  explicit self-signed-certificate option.
+- Restarting either container preserved the managed session and restored the
+  member's online state. IDs remained distinct after reconnection.
+- The managed UI moved the member to standalone mode and back into the cluster,
+  waited through both server restarts, reloaded its capabilities, and returned
+  to an online member state.
+
 ## 2026-08-05: Stable 4.44 Build 9807
 
 | Area             | Value                                                    |
@@ -135,7 +167,5 @@ The following checks passed:
 - Managed login with the explicit self-signed option, a proxied read-only RPC,
   and logout succeeded.
 
-## Remaining release matrix
-
-- Cluster controller and cluster member.
-- Capability and route visibility comparisons for every remaining mode above.
+All supported server modes and administrator roles in the 1.0 matrix now have
+representative real-server and capability evidence.
