@@ -75,9 +75,34 @@ The following checks passed:
   process restarted, the existing managed session resumed RPC traffic and the
   configured Hubs remained present.
 
+## 2026-08-05: VPN Bridge 4.44 Build 9807
+
+| Area             | Value                                                        |
+| ---------------- | ------------------------------------------------------------ |
+| Console baseline | `a7d7a02`, plus the Bridge tab correction in this change     |
+| SoftEther        | Stable 4.44 Build 9807, official ARM64 VPN Bridge package    |
+| Server           | VPN Bridge in an isolated Fedora Linux 44 container          |
+| Role             | Whole-server administrator                                   |
+| Console paths    | Integrated development proxy and local managed gateway       |
+| Browser          | Chromium 150                                                 |
+
+The following checks passed:
+
+- The Bridge reported its product, version, build, mode, capability list, and
+  default `BRIDGE` Hub correctly. Core server, status, session, table, cascade,
+  Secure NAT, and log RPCs succeeded.
+- The dashboard identified Bridge mode and omitted unsupported functionality.
+  A direct Layer 3 Switch URL was denied by the route guard.
+- Real RPC results showed that Properties, Users, Groups, Access List, Trusted
+  CA, and RADIUS are unavailable on VPN Bridge. The Hub detail now omits those
+  tabs and falls back to Status when an old direct tab URL selects one. Status,
+  Sessions, Tables, Cascade, Secure NAT, and Logs remain available.
+- Managed login with the explicit self-signed option, a proxied read-only RPC,
+  and logout succeeded.
+
 ## Remaining release matrix
 
 - Developer 5.02 Build 5188.
-- VPN Bridge, cluster controller, and cluster member.
+- Cluster controller and cluster member.
 - A certificate trusted by the gateway host and large collections.
 - Capability and route visibility comparisons for every remaining mode above.

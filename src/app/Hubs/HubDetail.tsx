@@ -33,14 +33,25 @@ const hubTabKeys = new Set([
   "logs",
   "radius",
 ]);
+const bridgeUnsupportedTabKeys = new Set([
+  "properties",
+  "users",
+  "groups",
+  "accesslist",
+  "certificates",
+  "radius",
+]);
 
 const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
-  const { hideNonCluster } = useServer();
+  const { hideNonCluster, isBridgeMode } = useServer();
   const activeTabRef = React.useRef<HTMLButtonElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab =
-    tabParam && hubTabKeys.has(tabParam) && !(hideNonCluster && tabParam === "securenat")
+    tabParam &&
+    hubTabKeys.has(tabParam) &&
+    !(hideNonCluster && tabParam === "securenat") &&
+    !(isBridgeMode && bridgeUnsupportedTabKeys.has(tabParam))
       ? tabParam
       : "status";
   const selectedTabRef = (key: string) => (activeTab === key ? activeTabRef : undefined);
@@ -159,34 +170,42 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
           >
             <Cascade hub={name} />
           </Tab>
-          <Tab
-            ref={selectedTabRef("properties")}
-            eventKey="properties"
-            title={<TabTitleText>Properties</TabTitleText>}
-          >
-            <Properties hub={name} />
-          </Tab>
-          <Tab
-            ref={selectedTabRef("users")}
-            eventKey="users"
-            title={<TabTitleText>Users</TabTitleText>}
-          >
-            <Users hub={name} />
-          </Tab>
-          <Tab
-            ref={selectedTabRef("groups")}
-            eventKey="groups"
-            title={<TabTitleText>Groups</TabTitleText>}
-          >
-            <Groups hub={name} />
-          </Tab>
-          <Tab
-            ref={selectedTabRef("accesslist")}
-            eventKey="accesslist"
-            title={<TabTitleText>Access List</TabTitleText>}
-          >
-            <AccessList hub={name} />
-          </Tab>
+          {!isBridgeMode && (
+            <Tab
+              ref={selectedTabRef("properties")}
+              eventKey="properties"
+              title={<TabTitleText>Properties</TabTitleText>}
+            >
+              <Properties hub={name} />
+            </Tab>
+          )}
+          {!isBridgeMode && (
+            <Tab
+              ref={selectedTabRef("users")}
+              eventKey="users"
+              title={<TabTitleText>Users</TabTitleText>}
+            >
+              <Users hub={name} />
+            </Tab>
+          )}
+          {!isBridgeMode && (
+            <Tab
+              ref={selectedTabRef("groups")}
+              eventKey="groups"
+              title={<TabTitleText>Groups</TabTitleText>}
+            >
+              <Groups hub={name} />
+            </Tab>
+          )}
+          {!isBridgeMode && (
+            <Tab
+              ref={selectedTabRef("accesslist")}
+              eventKey="accesslist"
+              title={<TabTitleText>Access List</TabTitleText>}
+            >
+              <AccessList hub={name} />
+            </Tab>
+          )}
           {!hideNonCluster && (
             <Tab
               ref={selectedTabRef("securenat")}
@@ -196,13 +215,15 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
               <SecureNAT hub={name} />
             </Tab>
           )}
-          <Tab
-            ref={selectedTabRef("certificates")}
-            eventKey="certificates"
-            title={<TabTitleText>Trusted CA</TabTitleText>}
-          >
-            <HubCertificates hub={name} />
-          </Tab>
+          {!isBridgeMode && (
+            <Tab
+              ref={selectedTabRef("certificates")}
+              eventKey="certificates"
+              title={<TabTitleText>Trusted CA</TabTitleText>}
+            >
+              <HubCertificates hub={name} />
+            </Tab>
+          )}
           <Tab
             ref={selectedTabRef("logs")}
             eventKey="logs"
@@ -210,13 +231,15 @@ const HubDetail: React.FunctionComponent<{ name: string }> = ({ name }) => {
           >
             <HubLogs hub={name} />
           </Tab>
-          <Tab
-            ref={selectedTabRef("radius")}
-            eventKey="radius"
-            title={<TabTitleText>RADIUS</TabTitleText>}
-          >
-            <Radius hub={name} />
-          </Tab>
+          {!isBridgeMode && (
+            <Tab
+              ref={selectedTabRef("radius")}
+              eventKey="radius"
+              title={<TabTitleText>RADIUS</TabTitleText>}
+            >
+              <Radius hub={name} />
+            </Tab>
+          )}
         </Tabs>
       </AppPage>
     </>

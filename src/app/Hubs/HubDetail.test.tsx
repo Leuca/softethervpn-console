@@ -5,7 +5,7 @@ import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubDetail } from "./HubDetail";
 import { api } from "@app/utils/vpnrpc_settings";
 
-const serverState = { hideNonCluster: false };
+const serverState = { hideNonCluster: false, isBridgeMode: false };
 
 vi.mock("@app/ServerContext", () => ({
   useServer: () => serverState,
@@ -25,6 +25,7 @@ describe("HubDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     serverState.hideNonCluster = false;
+    serverState.isBridgeMode = false;
     getHubStatus.mockResolvedValue({ HubName_str: "DEFAULT", Online_bool: true, HubType_u32: 0 });
   });
 
@@ -91,5 +92,25 @@ describe("HubDetail", () => {
     expect(await screen.findByText("Standalone")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Status" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("tab", { name: "Secure NAT" })).not.toBeInTheDocument();
+  });
+
+  it("hides unsupported VPN Bridge tabs and falls back to Status", async () => {
+    serverState.isBridgeMode = true;
+
+    render(
+      <MemoryRouter initialEntries={["/?tab=users"]}>
+        <HubDetail name="BRIDGE" />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Standalone")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Status" })).toHaveAttribute("aria-selected", "true");
+
+    for (const name of ["Properties", "Users", "Groups", "Access List", "Trusted CA", "RADIUS"]) {
+      expect(screen.queryByRole("tab", { name })).not.toBeInTheDocument();
+    }
+    for (const name of ["Sessions", "Tables", "Cascade", "Secure NAT", "Logs"]) {
+      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
+    }
   });
 });
