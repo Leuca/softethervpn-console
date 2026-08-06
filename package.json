@@ -12,6 +12,9 @@
   "engines": {
     "node": "^22.13.0 || ^24.0.0"
   },
+  "allowScripts": {
+    "esbuild@0.25.11": true
+  },
   "scripts": {
     "prebuild": "npm run type-check && npm run clean",
     "build": "webpack --config webpack.prod.js",

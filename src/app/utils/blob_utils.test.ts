@@ -36,11 +36,15 @@ describe("binToBytes", () => {
     const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     const appendChild = vi.spyOn(document.body, "appendChild");
     const removeChild = vi.spyOn(document.body, "removeChild");
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
 
     downloadBlob(blob, "payload.txt");
 
     expect(createObjectURL).toHaveBeenCalledWith(blob);
     expect(appendChild).toHaveBeenCalled();
+    expect(click).toHaveBeenCalledOnce();
     expect(removeChild).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:test");
   });
