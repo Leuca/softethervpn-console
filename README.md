@@ -11,7 +11,7 @@ TypeScript 5 / react-router 7).
 
 Before deploying, review the [support](docs/SUPPORT.md) and
 [versioning](docs/VERSIONING.md) policies. The
-[1.0.0 release notes](docs/RELEASE_NOTES_1.0.md) summarize operational changes
+[1.0.0 release notes](RELEASE_NOTES_1.0.0.md) summarize operational changes
 since the 0.2 series.
 
 ## Releases

@@ -1,8 +1,8 @@
 # SoftEther VPN Console 1.0.0
 
-Version 1.0.0 establishes the first stable support, deployment, and versioning
-baseline for SoftEther VPN Console. There is no server-side console database or
-persistent gateway state to migrate.
+SoftEther VPN Console 1.0.0 establishes the first stable support, deployment,
+and versioning baseline. There is no server-side console database or persistent
+gateway state to migrate.
 
 ## Highlights
 
@@ -34,7 +34,8 @@ persistent gateway state to migrate.
 ## Compatibility and known limits
 
 The supported server versions, roles, browsers, and deployment environments are
-listed in the [support policy](SUPPORT.md). Managed mode is a single-process
+listed in the [support policy](https://github.com/Leuca/softethervpn-console/blob/main/docs/SUPPORT.md).
+Managed mode is a single-process
 service for trusted administrators and must remain on a controlled network or
 behind a VPN, reverse-proxy SSO, mutual TLS, or an administrator IP allow rule;
 HTTPS alone is not sufficient access control. Self-signed SoftEther
@@ -48,6 +49,8 @@ browser opens the archive before sending the key pair. User-certificate
 registration sends only the public certificate and discards any private key
 extracted from a PKCS #12 archive.
 
-See the [managed gateway guide](../gateway/README.md) for deployment details and
-the [versioning policy](VERSIONING.md) for the stable behavior beginning with
-this release.
+See the
+[managed gateway guide](https://github.com/Leuca/softethervpn-console/blob/main/gateway/README.md)
+for deployment details and the
+[versioning policy](https://github.com/Leuca/softethervpn-console/blob/main/docs/VERSIONING.md)
+for the stable behavior beginning with this release.

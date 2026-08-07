@@ -85,9 +85,16 @@ jobs:
               exit 1
             fi
           else
+            release_version="${GITHUB_REF_NAME#v}"
+            release_notes="RELEASE_NOTES_${release_version%%-*}.md"
+            notes_option=(--generate-notes)
+            if [[ -f "$release_notes" ]]; then
+              notes_option=(--notes-file "$release_notes")
+            fi
+
             gh release create "$GITHUB_REF_NAME" \
               --draft \
-              --generate-notes \
+              "${notes_option[@]}" \
               --title "SoftEther VPN Console $GITHUB_REF_NAME" \
               --verify-tag
           fi
