@@ -42,7 +42,7 @@
     "clean": "rimraf dist"
   },
   "devDependencies": {
-    "@eslint-react/eslint-plugin": "^5.18.2",
+    "@eslint-react/eslint-plugin": "^5.18.3",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
@@ -61,7 +61,7 @@
     "html-webpack-plugin": "^5.6.8",
     "jsdom": "^25.0.1",
     "mini-css-extract-plugin": "^2.10.2",
-    "postcss": "^8.5.25",
+    "postcss": "^8.5.26",
     "prettier": "^3.9.6",
     "raw-loader": "^4.0.2",
     "rimraf": "^6.1.3",
