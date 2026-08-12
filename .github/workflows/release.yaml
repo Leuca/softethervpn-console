@@ -51,7 +51,7 @@ jobs:
 
       - name: Build and package integrated release bundle
         run: |
-          npm run build:integrated
+          npm run build:integrated:release
           artifact="softethervpn-console-${GITHUB_REF_NAME}.tar.gz"
           tar -czf "$artifact" -C dist .
           sha256sum "$artifact" > "$artifact.sha256"

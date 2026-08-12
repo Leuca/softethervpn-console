@@ -30,6 +30,21 @@ directory and verify an archive before extracting it:
 sha256sum -c softethervpn-console-vX.Y.Z.tar.gz.sha256
 ```
 
+The published integrated archive uses the stable `/admin/manager/` URL.
+Extract it into the external `hamcore` override directory beside the
+`vpnserver` executable, then restart the server:
+
+```sh
+vpnserver_dir=/usr/local/bin
+install -d "$vpnserver_dir/hamcore/wwwroot/admin/manager"
+tar -xzf softethervpn-console-vX.Y.Z.tar.gz \
+  -C "$vpnserver_dir/hamcore/wwwroot/admin/manager"
+```
+
+Open `https://vpn.example.com:5555/admin/manager/` and authenticate
+as the server or Virtual Hub administrator. Adjust `vpnserver_dir` to the
+directory containing the installed executable.
+
 After extracting a managed archive, install the gateway's production
 dependencies and start it with:
 
@@ -127,6 +142,9 @@ npm start
 # Build the integrated frontend (outputs to the "dist" directory)
 npm run build:integrated
 
+# Build the integrated frontend at the published release path
+npm run build:integrated:release
+
 # Build the managed frontend and gateway
 npm run build:managed
 npm --prefix gateway run build
@@ -154,9 +172,9 @@ npm run bundle-profile:analyze
 
 ## Integrating the console with SoftEther VPN Server
 
-The embedded web server exposes the console below a URL prefix rather than at the
-site root. Set `ASSET_PATH` to that prefix when building the integrated bundle.
-For example:
+The embedded web server exposes the console below a URL prefix rather than at
+the site root. Published archives use `/admin/manager/`. Set `ASSET_PATH` when
+building for another prefix. For example:
 
 ```sh
 ASSET_PATH=/admin/default/ npm run build:integrated

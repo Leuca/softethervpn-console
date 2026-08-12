@@ -19,6 +19,7 @@
     "prebuild": "npm run type-check && npm run clean",
     "build": "webpack --config webpack.prod.js",
     "build:integrated": "CONSOLE_MODE=integrated npm run build",
+    "build:integrated:release": "ASSET_PATH=/admin/manager/ npm run build:integrated",
     "build:managed": "CONSOLE_MODE=managed npm run build",
     "build:managed:local": "npm run clean && CONSOLE_MODE=managed webpack --env local --config webpack.prod.js",
     "start": "npm run build:managed:local && npm --prefix gateway run build && npm --prefix gateway run start",

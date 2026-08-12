@@ -5,6 +5,32 @@ listed SoftEther build, operating mode, role, and console path; it does not
 stand in for an untested row of the support matrix. Never record credentials,
 cookies, private keys, or private endpoint details here.
 
+## 2026-08-10: Published 1.0.0-rc.1 artifacts
+
+| Area             | Value                                               |
+| ---------------- | --------------------------------------------------- |
+| Console revision | `101b57a`, signed tag `v1.0.0-rc.1`                 |
+| SoftEther        | Developer 5.02 Build 5187                           |
+| Artifacts        | Published integrated and managed release archives   |
+| Runtime          | Node.js 22.23.1 and production-only gateway install |
+| Browser          | Chromium 151                                         |
+
+The published archive checksums passed before extraction. The managed archive
+installed with `npm ci --omit=dev`, reported no production dependency
+vulnerabilities, served its health endpoint and login UI, authenticated through
+the self-signed-certificate option, proxied `GetServerInfo`, and invalidated the
+session on logout.
+
+The integrated archive was served unchanged from the site root in a
+same-origin evaluation harness. Its direct `GetServerInfo` request and rendered
+Dashboard passed. An actual embedded deployment then exposed a release blocker:
+the archive referenced `/main.bundle.js` while SoftEther served its files below
+`/admin/softethervpn-console/`, so the browser received 404 for the entrypoint.
+The corrected main-branch build uses the stable `/admin/manager/` embedded
+prefix. Mounted through SoftEther's external `hamcore` override in an official
+5.02 container, its entrypoint, live `GetServerInfo`, and Chromium Dashboard
+passed. A new candidate must publish and validate the corrected archive.
+
 ## 2026-08-05: Developer 5.02 Build 5187
 
 | Area             | Value                                                  |

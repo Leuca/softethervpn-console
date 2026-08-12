@@ -130,7 +130,7 @@ jobs:
       - name: Run checks
         run: npm run ci-checks
       - name: Build integrated frontend
-        run: npm run build:integrated
+        run: npm run build:integrated:release
       - name: Build managed frontend
         run: npm run build:managed
       - name: Build gateway

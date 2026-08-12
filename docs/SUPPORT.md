@@ -9,7 +9,7 @@ unsupported unless stated otherwise.
 | SoftEther             | Stable 4.44 Build 9807 and Developer 5.02 Build 5187, including later compatible builds in those lines                   | Other JSON-RPC builds from 4.30 Build 9696 are best effort; older builds are unsupported                   |
 | Modes and roles       | Standalone server, VPN Bridge, cluster controller/member, server administrator, and standalone Virtual Hub administrator | Anonymous, client-user, and operating-system account access are unsupported                                |
 | Browsers              | Latest two major Chrome, Firefox, Safari, and Edge versions at release time                                              | Other modern browsers and mobile browsers are best effort; legacy browsers are unsupported                 |
-| Integrated deployment | `build:integrated` artifact served by SoftEther with the correct `ASSET_PATH`; host OS and CPU are unrestricted          | Modified artifacts, cross-origin RPC, and unrelated web servers are unsupported                            |
+| Integrated deployment | Published archive at `/admin/manager/`, or `build:integrated` with the matching `ASSET_PATH`; host OS and CPU are unrestricted | Modified artifacts, cross-origin RPC, and unrelated web servers are unsupported                            |
 | Managed deployment    | Maintained Linux on x86-64 or ARM64, Node.js 22 or 24, one gateway process, and a trusted HTTPS reverse proxy            | Other platforms and proxies are best effort; multi-instance and high-availability gateways are unsupported |
 
 Feature visibility follows the authenticated role and SoftEther's `GetCaps`
