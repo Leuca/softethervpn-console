@@ -11,11 +11,10 @@ import {
   FormGroup,
   FormSelect,
   FormSelectOption,
+  Gallery,
   HelperText,
   HelperTextItem,
   Spinner,
-  Stack,
-  StackItem,
   Switch,
   TextInput,
 } from "@patternfly/react-core";
@@ -116,121 +115,112 @@ const LegacyProtocols: React.FunctionComponent = () => {
           <Spinner size="xl" aria-label="Loading legacy protocol settings" />
         </Bullseye>
       ) : (
-        <Stack hasGutter>
-          <StackItem>
-            <Card>
-              <CardTitle>L2TP / IPsec VPN server</CardTitle>
-              <CardBody>
-                <Form>
-                  <Switch
-                    id="l2tp-ipsec"
-                    label="Enable L2TP over IPsec"
-                    isChecked={ipsec.L2TP_IPsec_bool === true}
-                    onChange={(_event, checked) => setIpsecField("L2TP_IPsec_bool", checked)}
+        <Gallery hasGutter minWidths={{ default: "100%", sm: "320px" }}>
+          <Card isFullHeight>
+            <CardTitle>L2TP / IPsec VPN server</CardTitle>
+            <CardBody>
+              <Form>
+                <Switch
+                  id="l2tp-ipsec"
+                  label="Enable L2TP over IPsec"
+                  isChecked={ipsec.L2TP_IPsec_bool === true}
+                  onChange={(_event, checked) => setIpsecField("L2TP_IPsec_bool", checked)}
+                />
+                <Switch
+                  id="l2tp-raw"
+                  label="Enable L2TP without IPsec (raw, no encryption)"
+                  isChecked={ipsec.L2TP_Raw_bool === true}
+                  onChange={(_event, checked) => setIpsecField("L2TP_Raw_bool", checked)}
+                />
+                <Switch
+                  id="etherip-ipsec"
+                  label="Enable EtherIP / L2TPv3 over IPsec"
+                  isChecked={ipsec.EtherIP_IPsec_bool === true}
+                  onChange={(_event, checked) => setIpsecField("EtherIP_IPsec_bool", checked)}
+                />
+                <FormGroup label="IPsec pre-shared key" fieldId="ipsec-secret">
+                  <TextInput
+                    id="ipsec-secret"
+                    value={String(ipsec.IPsec_Secret_str ?? "")}
+                    onChange={(_event, value) => setIpsecField("IPsec_Secret_str", value)}
+                    aria-label="IPsec pre-shared key"
                   />
-                  <Switch
-                    id="l2tp-raw"
-                    label="Enable L2TP without IPsec (raw, no encryption)"
-                    isChecked={ipsec.L2TP_Raw_bool === true}
-                    onChange={(_event, checked) => setIpsecField("L2TP_Raw_bool", checked)}
-                  />
-                  <Switch
-                    id="etherip-ipsec"
-                    label="Enable EtherIP / L2TPv3 over IPsec"
-                    isChecked={ipsec.EtherIP_IPsec_bool === true}
-                    onChange={(_event, checked) => setIpsecField("EtherIP_IPsec_bool", checked)}
-                  />
-                  <FormGroup label="IPsec pre-shared key" fieldId="ipsec-secret">
-                    <TextInput
-                      id="ipsec-secret"
-                      value={String(ipsec.IPsec_Secret_str ?? "")}
-                      onChange={(_event, value) => setIpsecField("IPsec_Secret_str", value)}
-                      aria-label="IPsec pre-shared key"
-                    />
-                    <HelperText>
-                      <HelperTextItem>
-                        Keep it to 9 characters or fewer for compatibility with some L2TP clients.
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormGroup>
-                  <FormGroup label="Default Virtual Hub for L2TP" fieldId="l2tp-hub">
-                    <FormSelect
-                      id="l2tp-hub"
-                      value={String(ipsec.L2TP_DefaultHub_str ?? "")}
-                      onChange={(_event, value) => setIpsecField("L2TP_DefaultHub_str", value)}
-                      aria-label="Default Virtual Hub for L2TP"
-                    >
-                      {hubs.map((h) => (
-                        <FormSelectOption key={h} value={h} label={h} />
-                      ))}
-                    </FormSelect>
-                  </FormGroup>
-                </Form>
-              </CardBody>
-            </Card>
-          </StackItem>
+                  <HelperText>
+                    <HelperTextItem>
+                      Keep it to 9 characters or fewer for compatibility with some L2TP clients.
+                    </HelperTextItem>
+                  </HelperText>
+                </FormGroup>
+                <FormGroup label="Default Virtual Hub for L2TP" fieldId="l2tp-hub">
+                  <FormSelect
+                    id="l2tp-hub"
+                    value={String(ipsec.L2TP_DefaultHub_str ?? "")}
+                    onChange={(_event, value) => setIpsecField("L2TP_DefaultHub_str", value)}
+                    aria-label="Default Virtual Hub for L2TP"
+                  >
+                    {hubs.map((h) => (
+                      <FormSelectOption key={h} value={h} label={h} />
+                    ))}
+                  </FormSelect>
+                </FormGroup>
+              </Form>
+            </CardBody>
+          </Card>
 
-          <StackItem>
-            <Card>
-              <CardTitle>EtherIP / L2TPv3 server (site-to-site)</CardTitle>
-              <CardBody>
-                <Content
-                  component="p"
-                  style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}
-                >
-                  Routers that support EtherIP / L2TPv3 over IPsec can bridge a remote site into a
-                  Virtual Hub. Each client router is identified by its IPsec Phase 1 ID.
-                </Content>
-                <Button
-                  variant="secondary"
-                  onClick={() => navigate("/functionalities/legacyprotocols/etherip")}
-                >
-                  EtherIP / L2TPv3 detailed settings
-                </Button>
-              </CardBody>
-            </Card>
-          </StackItem>
+          <Card isFullHeight>
+            <CardTitle>EtherIP / L2TPv3 server (site-to-site)</CardTitle>
+            <CardBody>
+              <Content component="p" style={{ marginBlockEnd: "var(--pf-t--global--spacer--md)" }}>
+                Routers that support EtherIP / L2TPv3 over IPsec can bridge a remote site into a
+                Virtual Hub. Each client router is identified by its IPsec Phase 1 ID.
+              </Content>
+              <Button
+                variant="secondary"
+                onClick={() => navigate("/functionalities/legacyprotocols/etherip")}
+              >
+                EtherIP / L2TPv3 detailed settings
+              </Button>
+            </CardBody>
+          </Card>
 
-          <StackItem>
-            <Card>
-              <CardTitle>OpenVPN and SSTP</CardTitle>
-              <CardBody>
-                <Form>
-                  <Switch
-                    id="openvpn"
-                    label="Enable OpenVPN clone server function"
-                    isChecked={ovpn.EnableOpenVPN_bool === true}
-                    onChange={(_event, checked) => setOvpnField("EnableOpenVPN_bool", checked)}
+          <Card isFullHeight>
+            <CardTitle>OpenVPN and SSTP</CardTitle>
+            <CardBody>
+              <Form>
+                <Switch
+                  id="openvpn"
+                  label="Enable OpenVPN clone server function"
+                  isChecked={ovpn.EnableOpenVPN_bool === true}
+                  onChange={(_event, checked) => setOvpnField("EnableOpenVPN_bool", checked)}
+                />
+                <FormGroup label="OpenVPN UDP ports" fieldId="openvpn-ports">
+                  <TextInput
+                    id="openvpn-ports"
+                    value={String(ovpn.OpenVPNPortList_str ?? "")}
+                    onChange={(_event, value) => setOvpnField("OpenVPNPortList_str", value)}
+                    aria-label="OpenVPN UDP ports"
                   />
-                  <FormGroup label="OpenVPN UDP ports" fieldId="openvpn-ports">
-                    <TextInput
-                      id="openvpn-ports"
-                      value={String(ovpn.OpenVPNPortList_str ?? "")}
-                      onChange={(_event, value) => setOvpnField("OpenVPNPortList_str", value)}
-                      aria-label="OpenVPN UDP ports"
-                    />
-                    <HelperText>
-                      <HelperTextItem>
-                        Comma-separated UDP port numbers (for example 1194).
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormGroup>
-                  <Switch
-                    id="sstp"
-                    label="Enable Microsoft SSTP VPN clone server function"
-                    isChecked={ovpn.EnableSSTP_bool === true}
-                    onChange={(_event, checked) => setOvpnField("EnableSSTP_bool", checked)}
-                  />
-                  <FormGroup label="OpenVPN sample configuration" fieldId="openvpn-config">
-                    <Button variant="secondary" onClick={downloadConfig}>
-                      Download OpenVPN sample config
-                    </Button>
-                  </FormGroup>
-                </Form>
-              </CardBody>
-            </Card>
-          </StackItem>
-        </Stack>
+                  <HelperText>
+                    <HelperTextItem>
+                      Comma-separated UDP port numbers (for example 1194).
+                    </HelperTextItem>
+                  </HelperText>
+                </FormGroup>
+                <Switch
+                  id="sstp"
+                  label="Enable Microsoft SSTP VPN clone server function"
+                  isChecked={ovpn.EnableSSTP_bool === true}
+                  onChange={(_event, checked) => setOvpnField("EnableSSTP_bool", checked)}
+                />
+                <FormGroup label="OpenVPN sample configuration" fieldId="openvpn-config">
+                  <Button variant="secondary" onClick={downloadConfig}>
+                    Download OpenVPN sample config
+                  </Button>
+                </FormGroup>
+              </Form>
+            </CardBody>
+          </Card>
+        </Gallery>
       )}
     </AppPage>
   );

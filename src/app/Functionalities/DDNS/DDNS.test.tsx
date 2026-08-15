@@ -184,17 +184,15 @@ describe("DynDNS", () => {
     expect(param.ProxyHostName_str).toBe("proxy.local");
   });
 
-  it("degrades to an info note when the proxy RPC is unsupported (code 33)", async () => {
+  it("hides proxy settings when the proxy RPC is unsupported (code 33)", async () => {
     ddnsProxy = true;
     getStatus.mockResolvedValue(status());
     getProxy.mockRejectedValue(new Error("Error: Code=33, Message=Error code 33: Unsupported."));
 
     render(<DynDNS />);
 
-    expect(
-      await screen.findByText("Proxy configuration is not supported by this server"),
-    ).toBeInTheDocument();
-    // no danger alert, and no proxy form fields
+    await waitFor(() => expect(getProxy).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("Proxy for the DDNS client")).not.toBeInTheDocument();
     expect(screen.queryByText("Proxy settings error")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Proxy host name")).not.toBeInTheDocument();
   });

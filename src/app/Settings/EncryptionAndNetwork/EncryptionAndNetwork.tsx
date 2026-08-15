@@ -13,6 +13,7 @@ import {
   FormHelperText,
   FormSelect,
   FormSelectOption,
+  Gallery,
   HelperText,
   HelperTextItem,
   Modal,
@@ -93,7 +94,7 @@ const AdminPasswordCard: React.FunctionComponent = () => {
   };
 
   return (
-    <Card>
+    <Card isFullHeight>
       <CardTitle>Server administrator password</CardTitle>
       <CardBody>
         {status && (
@@ -232,7 +233,7 @@ const ServerCertCard: React.FunctionComponent = () => {
   };
 
   return (
-    <Card>
+    <Card isFullHeight>
       <CardTitle>Server SSL certificate</CardTitle>
       <CardBody>
         {error && (
@@ -457,7 +458,7 @@ const CipherCard: React.FunctionComponent = () => {
   };
 
   return (
-    <Card>
+    <Card isFullHeight>
       <CardTitle>Encryption algorithm</CardTitle>
       <CardBody>
         {error && (
@@ -536,7 +537,7 @@ const KeepAliveCard: React.FunctionComponent = () => {
   const enabled = keep?.UseKeepConnect_bool === true;
 
   return (
-    <Card>
+    <Card isFullHeight>
       <CardTitle>Keep alive internet connection</CardTitle>
       <CardBody>
         {error && (
@@ -667,7 +668,7 @@ const SyslogCard: React.FunctionComponent = () => {
   };
 
   return (
-    <Card>
+    <Card isFullHeight>
       <CardTitle>Syslog</CardTitle>
       <CardBody>
         {error && (
@@ -793,7 +794,7 @@ const SpecialListenerCard: React.FunctionComponent = () => {
   };
 
   return (
-    <Card>
+    <Card isFullHeight>
       <CardTitle>VPN over ICMP / DNS</CardTitle>
       <CardBody>
         {error && (
@@ -839,26 +840,14 @@ const EncryptionNetwork: React.FunctionComponent = () => (
     title="Encryption And Network"
     description="Server administrator password, SSL certificate and cipher, and the network options that reach clients behind restrictive firewalls."
   >
-    <Stack hasGutter>
-      <StackItem>
-        <AdminPasswordCard />
-      </StackItem>
-      <StackItem>
-        <ServerCertCard />
-      </StackItem>
-      <StackItem>
-        <CipherCard />
-      </StackItem>
-      <StackItem>
-        <KeepAliveCard />
-      </StackItem>
-      <StackItem>
-        <SyslogCard />
-      </StackItem>
-      <StackItem>
-        <SpecialListenerCard />
-      </StackItem>
-    </Stack>
+    <Gallery hasGutter minWidths={{ default: "100%", sm: "320px" }}>
+      <AdminPasswordCard />
+      <ServerCertCard />
+      <CipherCard />
+      <KeepAliveCard />
+      <SyslogCard />
+      <SpecialListenerCard />
+    </Gallery>
   </AppPage>
 );
 

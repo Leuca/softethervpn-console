@@ -53,12 +53,13 @@ const isValidHostname = (value: string): boolean =>
 const errorSummary = (value: string): string => value.split(".")[0];
 
 // Some builds advertise the DDNS proxy capability but reject the proxy RPCs
-// with error code 33 (Unsupported); handled as an informational note.
+// with error code 33 (Unsupported).
 const isUnsupportedError = (error: string): boolean =>
   /code[=\s]*33\b/i.test(error) || /unsupported/i.test(error);
 
 // This server's connection to the SoftEther DDNS service, plus a change form.
 const DdnsSection: React.FunctionComponent = () => {
+  const { ddnsProxy } = useServer();
   const [status, setStatus] = React.useState<VPN.VpnDDnsClientStatus | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [hostname, setHostname] = React.useState("");
@@ -182,7 +183,7 @@ const DdnsSection: React.FunctionComponent = () => {
   }
 
   return (
-    <Gallery hasGutter minWidths={{ default: "320px" }}>
+    <Gallery hasGutter minWidths={{ default: "100%", sm: "320px" }}>
       <Card isFullHeight>
         <CardTitle>Assigned hostname</CardTitle>
         <CardBody>
@@ -286,6 +287,8 @@ const DdnsSection: React.FunctionComponent = () => {
           </Form>
         </CardBody>
       </Card>
+
+      {ddnsProxy && <ProxySection />}
 
       <Modal
         variant={ModalVariant.small}
@@ -391,8 +394,12 @@ const ProxySection: React.FunctionComponent = () => {
 
   const isDirect = proxyType === VPN.VpnRpcProxyType.Direct;
 
+  if (unsupported || (!loaded && !error)) {
+    return null;
+  }
+
   return (
-    <Card>
+    <Card isFullHeight>
       <CardTitle>Proxy for the DDNS client</CardTitle>
       <CardBody>
         {error && (
@@ -405,19 +412,7 @@ const ProxySection: React.FunctionComponent = () => {
             {error}
           </Alert>
         )}
-        {unsupported ? (
-          <Alert
-            variant="info"
-            title="Proxy configuration is not supported by this server"
-            isInline
-          >
-            This server reports the Dynamic DNS client cannot be configured to use a proxy.
-          </Alert>
-        ) : !loaded ? (
-          <Bullseye>
-            <Spinner size="lg" aria-label="Loading proxy settings" />
-          </Bullseye>
-        ) : (
+        {loaded && (
           <Form>
             <FormGroup label="Connection" role="radiogroup" fieldId="ddns-proxy-type">
               <Radio
@@ -507,19 +502,12 @@ const ProxySection: React.FunctionComponent = () => {
 };
 
 const DynDNS: React.FunctionComponent = () => {
-  const { ddnsProxy } = useServer();
-
   return (
     <AppPage
       title="Dynamic DNS"
       description="A free, permanent DNS hostname for this server, updated automatically when its global IP address changes."
     >
       <DdnsSection />
-      {ddnsProxy && (
-        <div style={{ marginBlockStart: "var(--pf-t--global--spacer--lg)" }}>
-          <ProxySection />
-        </div>
-      )}
     </AppPage>
   );
 };
