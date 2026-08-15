@@ -5,6 +5,12 @@ listed SoftEther build, operating mode, role, and console path; it does not
 stand in for an untested row of the support matrix. Never record credentials,
 cookies, private keys, or private endpoint details here.
 
+## 2026-08-15: Published 1.0.0-rc.2 artifacts
+
+Signed tag `v1.0.0-rc.2` publishes revision `8172a78`. The release workflow completed all checks, built the integrated and managed archives and source RPM, verified their checksums, and published all six assets with the version-specific release notes.
+
+The published managed archive passed installation and representative login, navigation, read, write, logout, and restart-recovery checks. The integrated frontend was rebuilt from the tagged revision with `ASSET_PATH=/admin/default/` and passed the corresponding embedded-server checks at that path. This validates the supported custom-prefix build rather than the unchanged `/admin/manager/` release archive; the maintainer accepted that path-specific evidence for final release preparation. No security, data-loss, installation, compatibility, or core-workflow blocker remains from candidate evaluation.
+
 ## 2026-08-10: Published 1.0.0-rc.1 artifacts
 
 | Area             | Value                                               |
@@ -29,7 +35,7 @@ the archive referenced `/main.bundle.js` while SoftEther served its files below
 The corrected main-branch build uses the stable `/admin/manager/` embedded
 prefix. Mounted through SoftEther's external `hamcore` override in an official
 5.02 container, its entrypoint, live `GetServerInfo`, and Chromium Dashboard
-passed. A new candidate must publish and validate the corrected archive.
+passed. The RC2 follow-up is recorded above.
 
 ## 2026-08-05: Developer 5.02 Build 5187
 
