@@ -6,7 +6,7 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -31,8 +33,10 @@ jobs:
           npm ci --prefix gateway
 
       - name: Check release version
+        id: version
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
+          [[ "$tag_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
           for manifest in \
             package.json \
             package-lock.json \
@@ -45,6 +49,7 @@ jobs:
               exit 1
             fi
           done
+          printf 'notes=RELEASE_NOTES_%s.md\n' "${tag_version%%-*}" >> "$GITHUB_OUTPUT"
 
       - name: Run checks
         run: npm run ci-checks
@@ -69,13 +74,101 @@ jobs:
             gateway/README.md
           sha256sum "$artifact" > "$artifact.sha256"
 
-      - name: Upload bundles to draft release
+      - name: Stage release bundles and optional notes
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-bundles
+          if-no-files-found: error
+          path: |
+            softethervpn-console-${{ github.ref_name }}.tar.gz
+            softethervpn-console-${{ github.ref_name }}.tar.gz.sha256
+            softethervpn-console-managed-${{ github.ref_name }}.tar.gz
+            softethervpn-console-managed-${{ github.ref_name }}.tar.gz.sha256
+            ${{ steps.version.outputs.notes }}
+
+  srpm:
+    name: Build source RPM
+    needs: release
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    outputs:
+      filename: ${{ steps.build.outputs.filename }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install Fedora packaging tools
+        run: >-
+          dnf install -y
+          git-core
+          nodejs-packaging-bundler
+          rpm-build
+          rpmlint
+          systemd-rpm-macros
+
+      - name: Build source RPM
+        id: build
+        shell: bash
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          packaging/build-srpm.sh "$version" srpm
+          filename="softethervpn-console-${version/-/.}-1$(rpm --eval '%{?dist}').src.rpm"
+          printf 'filename=%s\n' "$filename" >> "$GITHUB_OUTPUT"
+
+      - name: Stage source RPM
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-srpm
+          if-no-files-found: error
+          path: |
+            srpm/${{ steps.build.outputs.filename }}
+            srpm/${{ steps.build.outputs.filename }}.sha256
+
+  publish:
+    name: Publish release
+    needs: [release, srpm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release bundles and notes
+        uses: actions/download-artifact@v7
+        with:
+          name: release-bundles
+          path: ${{ runner.temp }}/release-bundles
+
+      - name: Download source RPM
+        uses: actions/download-artifact@v7
+        with:
+          name: release-srpm
+          path: ${{ runner.temp }}/release-srpm
+
+      - name: Publish release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SRPM_NAME: ${{ needs.srpm.outputs.filename }}
         run: |
-          artifact="softethervpn-console-${GITHUB_REF_NAME}.tar.gz"
-          managed_artifact="softethervpn-console-managed-${GITHUB_REF_NAME}.tar.gz"
-          sha256sum --check "$artifact.sha256" "$managed_artifact.sha256"
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+          [[ "$SRPM_NAME" =~ ^"softethervpn-console-${version/-/.}-1"(\.fc[0-9]+)?\.src\.rpm$ ]]
+          bundles="$RUNNER_TEMP/release-bundles"
+          assets=()
+          for path in \
+            "$bundles/softethervpn-console-${GITHUB_REF_NAME}.tar.gz" \
+            "$bundles/softethervpn-console-managed-${GITHUB_REF_NAME}.tar.gz" \
+            "$RUNNER_TEMP/release-srpm/$SRPM_NAME"
+          do
+            [[ -f "$path" && ! -L "$path" && -f "$path.sha256" && ! -L "$path.sha256" ]]
+            # Compare bytes so the sidecar cannot select a file for the publisher to read.
+            (cd "${path%/*}" && sha256sum -- "${path##*/}") | cmp - "$path.sha256"
+            assets+=("$path" "$path.sha256")
+          done
 
           if release_is_draft="$(
             gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null
@@ -85,13 +178,12 @@ jobs:
               exit 1
             fi
           else
-            release_version="${GITHUB_REF_NAME#v}"
-            release_notes="RELEASE_NOTES_${release_version%%-*}.md"
+            release_notes="$bundles/RELEASE_NOTES_${version%%-*}.md"
+            [[ ! -L "$release_notes" ]]
             notes_option=(--generate-notes)
             if [[ -f "$release_notes" ]]; then
               notes_option=(--notes-file "$release_notes")
             fi
-
             gh release create "$GITHUB_REF_NAME" \
               --draft \
               "${notes_option[@]}" \
@@ -99,65 +191,11 @@ jobs:
               --verify-tag
           fi
 
-          gh release upload "$GITHUB_REF_NAME" \
-            --clobber \
-            "$artifact" \
-            "$artifact.sha256" \
-            "$managed_artifact" \
-            "$managed_artifact.sha256"
-
-  srpm:
-    name: Build source RPM
-    needs: release
-    runs-on: ubuntu-latest
-    container: fedora:latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install Fedora packaging tools
-        run: >-
-          dnf install -y
-          gh
-          git-core
-          nodejs-packaging-bundler
-          rpm-build
-          rpmlint
-          systemd-rpm-macros
-
-      - name: Build source RPM
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          packaging/build-srpm.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/srpm"
-
-      - name: Upload source RPM to draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          (
-            cd "$RUNNER_TEMP/srpm"
-            sha256sum --check -- *.sha256
-          )
-          gh release upload "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber \
-            "$RUNNER_TEMP"/srpm/*
-
-  publish:
-    name: Publish release
-    needs: srpm
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
+          gh release upload "$GITHUB_REF_NAME" --clobber "${assets[@]}"
           prerelease=false
           if [[ "${GITHUB_REF_NAME#v}" == *-* ]]; then
             prerelease=true
           fi
           gh release edit "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
             --draft=false \
             --prerelease="$prerelease"
