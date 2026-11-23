@@ -5,7 +5,11 @@ import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { Users } from "./Users";
 import { extractPkcs12KeyPair } from "@app/utils/pkcs12";
 import { api } from "@app/utils/vpnrpc_settings";
-import { SELF_SIGNED_CERT_B64, SELF_SIGNED_CERT_DER } from "@app/utils/x509.fixture";
+import {
+  SELF_SIGNED_CERT_B64,
+  SELF_SIGNED_CERT_DER,
+  SELF_SIGNED_CERT_PEM,
+} from "@app/utils/x509.fixture";
 
 vi.mock("@app/utils/vpnrpc_settings", () => ({
   api: {
@@ -28,6 +32,11 @@ const deleteUser = api.DeleteUser as unknown as Mock;
 const getUser = api.GetUser as unknown as Mock;
 const setUser = api.SetUser as unknown as Mock;
 const extractPkcs12 = extractPkcs12KeyPair as unknown as Mock;
+
+const markedPemFile = () =>
+  new File([SELF_SIGNED_CERT_PEM(), "Test note outside the certificate\n"], "user.pem", {
+    type: "application/x-x509-ca-cert",
+  });
 
 const alice = {
   Name_str: "alice",
@@ -104,7 +113,10 @@ describe("Users", () => {
     });
   });
 
-  it("creates a user authenticated by a registered certificate", async () => {
+  it.each([
+    markedPemFile(),
+    new File([SELF_SIGNED_CERT_DER()], "user.cer", { type: "application/x-x509-ca-cert" }),
+  ])("creates a user with only the DER certificate from $name", async (file) => {
     enumUser.mockResolvedValue({ UserList: [alice] });
     createUser.mockResolvedValue({});
     const user = userEvent.setup();
@@ -119,10 +131,7 @@ describe("Users", () => {
     expect(within(dialog).getByRole("button", { name: "Create" })).toBeDisabled();
 
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(
-      fileInput,
-      new File([SELF_SIGNED_CERT_DER()], "user.cer", { type: "application/x-x509-ca-cert" }),
-    );
+    await user.upload(fileInput, file);
     expect(
       await within(dialog).findByRole("button", { name: "View registered certificate" }),
     ).toBeInTheDocument();
@@ -131,7 +140,7 @@ describe("Users", () => {
     const sent = createUser.mock.calls[0][0];
     expect(sent).toMatchObject({ Name_str: "cert-user", AuthType_u32: 2 });
     expect(sent.UserX_bin).toBeInstanceOf(Uint8Array);
-    expect(sent.UserX_bin.length).toBeGreaterThan(0);
+    expect(sent.UserX_bin).toEqual(SELF_SIGNED_CERT_DER());
   });
 
   it.each([
@@ -384,7 +393,7 @@ describe("Users", () => {
     expect(sent.UserX_bin.length).toBe(SELF_SIGNED_CERT_DER().length);
   });
 
-  it("uploads a certificate and sends its bytes on save", async () => {
+  it("rejects an invalid upload and saves only the DER certificate from a PEM file", async () => {
     enumUser.mockResolvedValue({ UserList: [alice] });
     getUser.mockResolvedValue({
       HubName_str: "DEFAULT",
@@ -406,10 +415,13 @@ describe("Users", () => {
     ).not.toBeInTheDocument();
 
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File([SELF_SIGNED_CERT_DER()], "user.cer", {
-      type: "application/x-x509-ca-cert",
-    });
-    await user.upload(fileInput, file);
+    await user.upload(fileInput, new File(["Not a certificate"], "invalid.pem"));
+    expect(
+      await within(dialog).findByText("The file is not a valid certificate (PEM or DER)."),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(setUser).not.toHaveBeenCalled();
+    await user.upload(fileInput, markedPemFile());
 
     // parse succeeded: the view button appears once bytes are staged
     expect(
@@ -420,7 +432,7 @@ describe("Users", () => {
 
     const sent = setUser.mock.calls[0][0];
     expect(sent.UserX_bin).toBeInstanceOf(Uint8Array);
-    expect(sent.UserX_bin.length).toBeGreaterThan(0);
+    expect(sent.UserX_bin).toEqual(SELF_SIGNED_CERT_DER());
   });
 
   it("extracts a user certificate from a password-protected PKCS #12 archive", async () => {

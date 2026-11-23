@@ -39,7 +39,7 @@ import { binToBytes } from "@app/utils/blob_utils";
 import { recordChanged } from "@app/utils/dirty";
 import { formatOptionalDate, userAuthTypeLabel } from "@app/utils/format";
 import { extractPkcs12KeyPair, isPkcs12File } from "@app/utils/pkcs12";
-import { parseCertificate } from "@app/utils/x509";
+import { certificateBytesToDer, parseCertificate } from "@app/utils/x509";
 
 const ALL_AUTH_TYPES = [
   { value: VPN.VpnRpcUserAuthType.Anonymous, label: "Anonymous" },
@@ -762,8 +762,7 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     reader.onload = () => {
       try {
         const bytes = new Uint8Array(reader.result as ArrayBuffer);
-        parseCertificate(bytes); // throws if not a certificate
-        setBytes(bytes);
+        setBytes(certificateBytesToDer(bytes));
       } catch {
         setFieldError("The file is not a valid certificate (PEM or DER).");
         setBytes(new Uint8Array());
@@ -778,8 +777,6 @@ const Users: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       setCreateField("UserX_bin", bytes),
     );
 
-  // Read an uploaded certificate file, validate it parses, and stage its bytes
-  // as the user's UserX_bin (the server accepts DER or PEM).
   const onEditCertSelected = (_event: unknown, file: File) =>
     readUserCertificate(file, setEditCertFilename, setEditCertError, (bytes) =>
       setEditField("UserX_bin", bytes),
