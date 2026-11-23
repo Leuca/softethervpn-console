@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { LoginProbe, LoginProbeError } from './loginProbe.js';
 import { LoginRateLimiter } from './loginRateLimit.js';
 import { SESSION_COOKIE } from './sessionCookie.js';
-import { LoginCredentials, SessionStore } from './sessions.js';
+import { LoginCredentials, SessionCapacityError, SessionStore } from './sessions.js';
 import { UpstreamResolutionError, UpstreamResolver } from './upstreamResolution.js';
 
 const cookieOptions = (id: string) => ({
@@ -81,7 +81,16 @@ export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = a
         return reply.code(502).send({ error: 'The selected server could not be reached.' });
       }
 
-      const { owner, id } = options.sessions.create(credentials);
+      let connection;
+      try {
+        connection = options.sessions.create(credentials);
+      } catch (error) {
+        if (error instanceof SessionCapacityError) {
+          return reply.header('Retry-After', '60').code(503).send({ error: error.message });
+        }
+        throw error;
+      }
+      const { owner, id } = connection;
       reply.setCookie(SESSION_COOKIE, owner, cookieOptions(id));
 
       return {

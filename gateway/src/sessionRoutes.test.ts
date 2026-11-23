@@ -187,14 +187,51 @@ describe('gateway session routes', () => {
     }
   });
 
-  it('preserves the current session when a replacement login fails', async () => {
+  it('admits only one of two concurrent successful probes into the last slot', async () => {
+    const pending: Array<() => void> = [];
+    const loginProbe = () => new Promise<void>((resolve) => {
+      pending.push(resolve);
+      if (pending.length === 2) pending.forEach((finish) => finish());
+    });
+    const server = buildGatewayServer({
+      loginProbe,
+      sessions: new SessionStore({ maxSessions: 1 }),
+      upstreamResolver,
+    });
+    const login = () => server.inject({ method: 'POST', url: '/login', payload: loginPayload });
+
+    try {
+      const results = await Promise.all([login(), login()]);
+      const [accepted, denied] = results.sort((a, b) => a.statusCode - b.statusCode);
+      expect(accepted.statusCode).toBe(200);
+      expect(denied.statusCode).toBe(503);
+      expect(denied.headers['retry-after']).toBe('60');
+      expect(denied.headers['set-cookie']).toBeUndefined();
+      expect(denied.json()).toEqual({ error: 'Gateway session limit reached. Try again later.' });
+
+      const session = await server.inject({
+        method: 'GET',
+        url: `/api/connections/${accepted.json().connectionId}/session`,
+        headers: { cookie: accepted.headers['set-cookie'] as string },
+      });
+      expect(session.json()).toEqual(accepted.json());
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('preserves the current session when a replacement login fails authentication at capacity', async () => {
     const loginProbe = vi
       .fn()
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(
         new LoginProbeError('The server did not accept these login details.', 401),
       );
-    const server = buildGatewayServer({ loginProbe, upstreamResolver });
+    const server = buildGatewayServer({
+      loginProbe,
+      sessions: new SessionStore({ maxSessions: 1 }),
+      upstreamResolver,
+    });
 
     try {
       const firstLogin = await server.inject({

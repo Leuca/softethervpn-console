@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SessionCredentials, SessionStore } from './sessions.js';
+import { SessionCapacityError, SessionCredentials, SessionStore } from './sessions.js';
 
 const credentials: SessionCredentials = {
   host: 'vpn.example.com',
@@ -11,6 +11,33 @@ const credentials: SessionCredentials = {
 };
 
 describe('SessionStore', () => {
+  it.each([0, 1.5, Infinity])('rejects invalid session capacity %s', (maxSessions) => {
+    expect(() => new SessionStore({ maxSessions })).toThrow('positive integer');
+  });
+
+  it('preserves a live slot and reuses it after expiry or revocation', () => {
+    vi.useFakeTimers();
+    let now = 0;
+    const store = new SessionStore({ maxSessions: 1, now: () => now, ttlMs: 100 });
+    try {
+      const first = store.create(credentials);
+      expect(() => store.create(credentials)).toThrow(SessionCapacityError);
+      expect(store.owned(first.owner, first.id)?.expiresAt).toBe(100);
+      expect(vi.getTimerCount()).toBe(1);
+
+      now = 100; // Leave the expiry timer pending.
+      const second = store.create(credentials);
+      expect(store.delete(first.id)).toBe(false);
+      expect(vi.getTimerCount()).toBe(1);
+      expect(store.delete(second.id)).toBe(true);
+      const third = store.create(credentials);
+      expect(store.owned(third.owner, third.id)?.expiresAt).toBe(200);
+    } finally {
+      store.clear();
+      vi.useRealTimers();
+    }
+  });
+
   it('stores credentials under an opaque random ID', () => {
     const store = new SessionStore({ now: () => 1_000, ttlMs: 5_000 });
 
