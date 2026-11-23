@@ -132,6 +132,9 @@ jobs:
     name: Publish release
     needs: [release, srpm]
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-publish-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -153,7 +156,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           SRPM_NAME: ${{ needs.srpm.outputs.filename }}
+          IMMUTABLE_RELEASES_CONFIRMED: ${{ vars.IMMUTABLE_RELEASES_CONFIRMED }}
         run: |
+          if [[ "$IMMUTABLE_RELEASES_CONFIRMED" != true ]]; then
+            echo "Repository immutable releases must be enabled and confirmed (docs/VERSIONING.md)." >&2
+            exit 1
+          fi
           version="${GITHUB_REF_NAME#v}"
           [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
           [[ "$SRPM_NAME" =~ ^"softethervpn-console-${version/-/.}-1"(\.fc[0-9]+)?\.src\.rpm$ ]]
@@ -170,32 +178,66 @@ jobs:
             assets+=("$path" "$path.sha256")
           done
 
-          if release_is_draft="$(
-            gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null
-          )"; then
-            if [[ "$release_is_draft" != true ]]; then
-              echo "Release $GITHUB_REF_NAME is already published; refusing to replace its assets." >&2
-              exit 1
-            fi
-          else
+          expected='{}'
+          for path in "${assets[@]}"; do
+            digest="$(sha256sum -- "$path")"
+            expected="$(jq -c --arg name "${path##*/}" --arg digest "sha256:${digest%% *}" \
+              '.[$name] = $digest' <<< "$expected")"
+          done
+
+          # A successful listing includes drafts for this writer. A failed lookup is never absence.
+          releases="repos/$GH_REPO/releases"
+          lookup_draft() {
+            gh api --paginate --slurp "$releases?per_page=100" | jq -er --arg tag "$GITHUB_REF_NAME" '
+              if length == 0 or any(.[]; type != "array") or any(.[][]; (.tag_name | type) != "string")
+              then error("invalid release listing") end |
+              map(.[]) | map(select(.tag_name == $tag)) |
+              if length == 0 then "missing"
+              elif length == 1 and .[0].draft == true then .[0].id | numbers
+              else error("published or ambiguous release for " + $tag) end'
+          }
+          id="$(lookup_draft)"
+          prerelease=false
+          if [[ "$version" == *-* ]]; then prerelease=true; fi
+          if [[ "$id" == missing ]]; then
             release_notes="$bundles/RELEASE_NOTES_${version%%-*}.md"
             [[ ! -L "$release_notes" ]]
-            notes_option=(--generate-notes)
+            notes_option=(-F generate_release_notes=true)
             if [[ -f "$release_notes" ]]; then
-              notes_option=(--notes-file "$release_notes")
+              notes_option=(-F "body=@$release_notes")
             fi
-            gh release create "$GITHUB_REF_NAME" \
-              --draft \
-              "${notes_option[@]}" \
-              --title "SoftEther VPN Console $GITHUB_REF_NAME" \
-              --verify-tag
+            gh api "repos/$GH_REPO/git/ref/tags/$GITHUB_REF_NAME" --silent
+            id="$(gh api "$releases" -f tag_name="$GITHUB_REF_NAME" -F draft=true \
+              -F prerelease="$prerelease" -f name="SoftEther VPN Console $GITHUB_REF_NAME" \
+              "${notes_option[@]}" | jq -er '.id')"
+            current="$(lookup_draft)"
+            [[ "$current" == "$id" ]]
           fi
+          [[ "$id" =~ ^[1-9][0-9]*$ ]]
 
-          gh release upload "$GITHUB_REF_NAME" --clobber "${assets[@]}"
-          prerelease=false
-          if [[ "${GITHUB_REF_NAME#v}" == *-* ]]; then
-            prerelease=true
-          fi
-          gh release edit "$GITHUB_REF_NAME" \
-            --draft=false \
-            --prerelease="$prerelease"
+          draft_assets() {
+            gh api "$releases/$id" | jq -ce --arg tag "$GITHUB_REF_NAME" --argjson expected "$expected" '
+              if .draft != true or .tag_name != $tag or (.assets | type) != "array"
+              then error("not the expected draft") end |
+              reduce .assets[] as $a ({};
+                if has($a.name) or ($expected | has($a.name) | not) or
+                   $a.state != "uploaded" or $a.digest != $expected[$a.name]
+                then error("unexpected or mismatched asset: " + $a.name)
+                else .[$a.name] = $a.digest end)'
+          }
+
+          for path in "${assets[@]}"; do
+            present="$(draft_assets)"
+            name="${path##*/}"
+            exists="$(jq --arg name "$name" 'has($name)' <<< "$present")"
+            if [[ "$exists" == true ]]; then continue; fi
+            [[ "$exists" == false ]]
+            # Names are allowlisted above. A concurrent duplicate POST must fail, never replace.
+            gh api --method POST "https://uploads.github.com/$releases/$id/assets?name=$name" \
+              -H 'Content-Type: application/octet-stream' --input "$path" --silent
+          done
+          current="$(lookup_draft)"
+          [[ "$current" == "$id" ]]
+          present="$(draft_assets)"
+          jq -e --argjson expected "$expected" '. == $expected' <<< "$present" > /dev/null
+          gh api --method PATCH "$releases/$id" -F draft=false -F prerelease="$prerelease" --silent

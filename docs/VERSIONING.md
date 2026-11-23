@@ -33,3 +33,14 @@ major release. Urgent security or upstream compatibility fixes are exempt.
 Release notes must describe operator-visible changes, required migration or
 restart steps, session impact, and rollback. Tagged artifacts are immutable;
 fixes and release-candidate updates are published as new versions.
+
+Before publishing, an administrator must enable GitHub immutable releases for
+the repository and set the Actions variable `IMMUTABLE_RELEASES_CONFIRMED` to
+`true`. This variable records the setting; it does not enable it. The workflow
+token cannot read administration settings. Keep the setting enabled: only
+GitHub can reject an upload racing with publication between API calls.
+
+Leave draft assets and publication to the publisher. It resumes a draft only
+when every existing asset has its expected SHA-256 digest. After an interrupted
+upload, retry the publish job with the original build artifacts. A conflicting
+asset, missing digest, or already published tag stops the job without repair.
