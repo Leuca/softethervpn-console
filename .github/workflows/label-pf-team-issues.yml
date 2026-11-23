@@ -5,5 +5,35 @@ on:
       - opened
 jobs:
   label:
-    uses: patternfly/.github/.github/workflows/add-pf-team-label-workflow.yml@main
-    secrets: inherit
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: Check PatternFly team membership
+        id: membership
+        env:
+          # Optional: PatternFly organization Members (read), with visibility of the team.
+          GH_TOKEN: ${{ secrets.GH_READ_ORG_TOKEN }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::notice::Skipping PF Team labeling: no team membership token configured."
+            exit 0
+          fi
+          if response=$(gh api --include --jq '.state' "orgs/patternfly/teams/frequent-flyers/memberships/$ISSUE_AUTHOR"); then
+            if [[ ${response##*$'\n'} == active ]]; then
+              echo "active=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            # A missing membership returns 404; surface other lookup failures.
+            read -r _ status _ <<< "$response"
+            [[ "$status" == 404 ]] || exit 1
+          fi
+
+      - name: Add PF Team label
+        if: steps.membership.outputs.active == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/labels" -f 'labels[]=PF Team' --silent
