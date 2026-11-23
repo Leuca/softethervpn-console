@@ -88,6 +88,9 @@ const describeLoginFailure = (error: unknown, hubLogin: boolean): LoginFailure =
 
 const validPort = (port: number): boolean => Number.isInteger(port) && port >= 1 && port <= 65535;
 
+const tlsEndpoint = ({ host, port }: Pick<ManagedLoginPayload, "host" | "port">): string | null =>
+  host.trim() && validPort(port) ? `${port}:${host.trim()}` : null;
+
 const loadLoginHints = (): ManagedLoginHints | null => {
   try {
     const value = JSON.parse(
@@ -131,9 +134,8 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
   const [initialHints] = React.useState(loadLoginHints);
   const [hubLogin, setHubLogin] = React.useState(Boolean(initialHints?.hub.trim()));
   const [hubDraft, setHubDraft] = React.useState(initialHints?.hub ?? "");
-  const [allowSelfSigned, setAllowSelfSigned] = React.useState(
-    initialHints?.allowSelfSigned ?? false,
-  );
+  const rememberedConsent = initialHints?.allowSelfSigned ? tlsEndpoint(initialHints) : null;
+  const [consentEndpoint, setConsentEndpoint] = React.useState(rememberedConsent);
   const [rememberServer, setRememberServer] = React.useState(initialHints !== null);
   const [advancedOpen, setAdvancedOpen] = React.useState(initialHints?.allowSelfSigned ?? false);
   const [submitting, setSubmitting] = React.useState(false);
@@ -164,7 +166,7 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
         hubLogin !== Boolean(initialHints?.hub.trim()) ||
         (hubRef.current?.value ?? hubDraft) !== (initialHints?.hub ?? "") ||
         !!passwordRef.current?.value ||
-        allowSelfSigned !== (initialHints?.allowSelfSigned ?? false)),
+        consentEndpoint !== rememberedConsent),
   );
   const [invalid, setInvalid] = React.useState<
     ReturnType<typeof readLoginFields>["invalid"] | null
@@ -185,6 +187,8 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
 
     // Password managers can fill the native fields without a React change event.
     const { fields, invalid: invalidFields } = readLoginFields();
+    const allowSelfSigned = consentEndpoint !== null && consentEndpoint === tlsEndpoint(fields);
+    if (!allowSelfSigned) setConsentEndpoint(null);
     setInvalid(invalidFields);
 
     const firstInvalid = [
@@ -222,8 +226,12 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
   };
 
   const revalidate = () => {
+    const { fields, invalid: invalidFields } = readLoginFields();
+    if (consentEndpoint !== null && consentEndpoint !== tlsEndpoint(fields)) {
+      setConsentEndpoint(null);
+    }
     if (invalid && !submitting) {
-      setInvalid(readLoginFields().invalid);
+      setInvalid(invalidFields);
     }
   };
 
@@ -381,15 +389,24 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
           <Checkbox
             id="managed-login-allow-self-signed"
             label="Allow a self-signed SoftEther server certificate"
-            isChecked={allowSelfSigned}
-            onChange={(_event, checked) => setAllowSelfSigned(checked)}
+            isChecked={consentEndpoint !== null}
+            onChange={(_event, checked) => {
+              const endpoint = checked ? tlsEndpoint(readLoginFields().fields) : null;
+              setConsentEndpoint(endpoint);
+              if (checked && endpoint === null) {
+                setError({
+                  title: "Server details required",
+                  message: "Enter a server host and valid port before allowing an exception.",
+                });
+              }
+            }}
             isDisabled={submitting}
           />
           <FormHelperText>
             <HelperText>
               <HelperTextItem>
-                Certificate verification will be disabled. Use this only for a trusted private
-                server.
+                This disables certificate verification for the current host and port. Use it only
+                for a trusted private server.
               </HelperTextItem>
             </HelperText>
           </FormHelperText>

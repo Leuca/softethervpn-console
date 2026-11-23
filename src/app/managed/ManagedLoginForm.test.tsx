@@ -203,6 +203,59 @@ describe("ManagedLoginForm", () => {
     );
   });
 
+  it.each([
+    ["Server host", "other.example"],
+    ["Port", "8443"],
+  ])("requires fresh certificate consent after editing %s", async (label, value) => {
+    loginMock.mockResolvedValue({ authenticated: true });
+    const user = userEvent.setup();
+    render(<ManagedLoginForm onLogin={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Advanced connection options" }));
+    const consent = screen.getByLabelText("Allow a self-signed SoftEther server certificate");
+    await user.click(consent);
+    expect(consent).not.toBeChecked();
+    expect(screen.getByText("Server details required")).toBeVisible();
+
+    await user.type(screen.getByLabelText("Server host"), "original.example");
+    await user.click(consent);
+    expect(consent).toBeChecked();
+    const field = screen.getByLabelText(label);
+    await user.clear(field);
+    await user.type(field, value);
+    expect(consent).not.toBeChecked();
+
+    await user.type(screen.getByLabelText("Password"), "test-password");
+    const submit = screen.getByRole("button", { name: "Log in" });
+    await user.click(submit);
+    expect(loginMock).toHaveBeenLastCalledWith(expect.objectContaining({ allowSelfSigned: false }));
+    await user.click(consent);
+    await user.click(submit);
+    expect(loginMock).toHaveBeenLastCalledWith(expect.objectContaining({ allowSelfSigned: true }));
+  });
+
+  it.each([
+    { host: "other.example", port: "443", allowed: false },
+    { host: "original.example", port: "8443", allowed: false },
+    { host: " original.example ", port: "0443", allowed: true },
+  ])("checks remembered consent for autofilled $host:$port", async ({ host, port, allowed }) => {
+    const hints = { host: "original.example", port: 443, hub: "", allowSelfSigned: true };
+    window.localStorage.setItem(MANAGED_LOGIN_HINTS_KEY, JSON.stringify(hints));
+    loginMock.mockResolvedValue({ authenticated: true });
+    const user = userEvent.setup();
+    render(<ManagedLoginForm onLogin={vi.fn()} />);
+
+    screen.getByLabelText<HTMLInputElement>("Server host").value = host;
+    screen.getByLabelText<HTMLInputElement>("Port").value = port;
+    screen.getByLabelText<HTMLInputElement>("Password").value = "test-password";
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+
+    const expected = { host: host.trim(), port: Number(port), hub: "", allowSelfSigned: allowed };
+    expect(loginMock).toHaveBeenCalledWith({ ...expected, password: "test-password" });
+    expect(JSON.parse(window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY) ?? "{}")).toEqual(
+      expected,
+    );
+  });
+
   it("shows accessible field validation before contacting the gateway", async () => {
     const user = userEvent.setup();
 
