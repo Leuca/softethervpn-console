@@ -125,7 +125,19 @@ support custom fields:
 Configure those fields on the same password-manager entry as the administrator
 password. Prefer the `id` when the password manager supports it. Custom-field
 matching is password-manager-specific; the password itself uses the standard
-`current-password` autocomplete field.
+`current-password` autocomplete field. Select **Virtual Hub** under
+**Administrator scope** before autofilling a hub login.
+
+For [Bitwarden AutoFill on iOS](https://bitwarden.com/help/auto-fill-ios/), enable
+Bitwarden in iOS AutoFill & Passwords and add the managed console URL as a URI
+on the vault item. Safari matches the page it has open, so the URI should point
+to the gateway that serves the form. Mobile AutoFill does not fill custom
+fields. For **Server** scope, save the server administrator password. For
+**Virtual Hub** scope, save the hub name as the vault item's **Username** and
+the hub password as **Password**. Use **Remember server details on this
+browser** to prefill the host and port, then select the matching vault item
+from the password field. Check the server details before submitting,
+especially when several entries match the same console URL.
 
 ## Development scripts
 

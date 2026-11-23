@@ -16,6 +16,8 @@ import {
   Stack,
   StackItem,
   TextInput,
+  ToggleGroup,
+  ToggleGroupItem,
 } from "@patternfly/react-core";
 import {
   ManagedLoginPayload,
@@ -39,7 +41,7 @@ interface LoginFailure {
   message: string;
 }
 
-const describeLoginFailure = (error: unknown): LoginFailure => {
+const describeLoginFailure = (error: unknown, hubLogin: boolean): LoginFailure => {
   if (!(error instanceof ManagedSessionApiError)) {
     return {
       title: "Console unavailable",
@@ -51,7 +53,9 @@ const describeLoginFailure = (error: unknown): LoginFailure => {
   if (error.status === 401) {
     return {
       title: "Login details rejected",
-      message: "Check the administrator password and Virtual Hub, then try again.",
+      message: hubLogin
+        ? "Check the Virtual Hub name and administrator password, then try again."
+        : "Check the server administrator password, then try again.",
     };
   }
   if (error.status === 400) {
@@ -83,8 +87,6 @@ const describeLoginFailure = (error: unknown): LoginFailure => {
 
   return { title: "Login failed", message: error.message };
 };
-
-const parsePort = (port: string): number => Number(port);
 
 const validPort = (port: number): boolean => Number.isInteger(port) && port >= 1 && port <= 65535;
 
@@ -129,22 +131,35 @@ const clearLoginHints = (): void => {
 
 const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLogin }) => {
   const [initialHints] = React.useState(loadLoginHints);
-  const [host, setHost] = React.useState(initialHints?.host ?? "");
-  const [port, setPort] = React.useState(String(initialHints?.port ?? DEFAULT_PORT));
-  const [hub, setHub] = React.useState(initialHints?.hub ?? "");
-  const [password, setPassword] = React.useState("");
+  const [hubLogin, setHubLogin] = React.useState(Boolean(initialHints?.hub.trim()));
+  const [hubDraft, setHubDraft] = React.useState(initialHints?.hub ?? "");
   const [allowSelfSigned, setAllowSelfSigned] = React.useState(
     initialHints?.allowSelfSigned ?? false,
   );
   const [rememberServer, setRememberServer] = React.useState(initialHints !== null);
   const [advancedOpen, setAdvancedOpen] = React.useState(initialHints?.allowSelfSigned ?? false);
-  const [submitted, setSubmitted] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<LoginFailure | null>(null);
   const hostRef = React.useRef<HTMLInputElement>(null);
   const portRef = React.useRef<HTMLInputElement>(null);
+  const hubRef = React.useRef<HTMLInputElement>(null);
   const passwordRef = React.useRef<HTMLInputElement>(null);
   const errorRef = React.useRef<HTMLDivElement>(null);
+
+  const readLoginFields = () => {
+    const host = hostRef.current?.value.trim() ?? "";
+    const port = Number(portRef.current?.value);
+    const hub = hubLogin ? (hubRef.current?.value.trim() ?? "") : "";
+    const password = passwordRef.current?.value ?? "";
+
+    return {
+      fields: { host, port, hub, password },
+      invalid: { host: !host, port: !validPort(port), hub: hubLogin && !hub, password: !password },
+    };
+  };
+  const [invalid, setInvalid] = React.useState<
+    ReturnType<typeof readLoginFields>["invalid"] | null
+  >(null);
 
   React.useEffect(() => {
     if (error) {
@@ -152,39 +167,29 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
     }
   }, [error]);
 
-  const normalizedHost = host.trim();
-  const normalizedHub = hub.trim();
-  const portNumber = parsePort(port);
-  const hostValid = normalizedHost.length > 0;
-  const portIsValid = validPort(portNumber);
-  const passwordValid = password.length > 0;
-  const canSubmit = hostValid && portIsValid && passwordValid && !submitting;
-
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
+    if (submitting) {
+      return;
+    }
     setError(null);
 
-    if (!canSubmit) {
-      if (!submitting) {
-        const firstInvalid = !hostValid
-          ? hostRef.current
-          : !portIsValid
-            ? portRef.current
-            : passwordRef.current;
-        firstInvalid?.focus();
-      }
+    // Password managers can fill the native fields without a React change event.
+    const { fields, invalid: invalidFields } = readLoginFields();
+    setInvalid(invalidFields);
+
+    const firstInvalid = [
+      invalidFields.host && hostRef,
+      invalidFields.port && portRef,
+      invalidFields.hub && hubRef,
+      invalidFields.password && passwordRef,
+    ].find(Boolean);
+    if (firstInvalid) {
+      firstInvalid.current?.focus();
       return;
     }
 
-    const payload: ManagedLoginPayload = {
-      host: normalizedHost,
-      port: portNumber,
-      hub: normalizedHub,
-      password,
-      allowSelfSigned,
-    };
-
+    const payload: ManagedLoginPayload = { ...fields, allowSelfSigned };
     setSubmitting(true);
     submitManagedLogin(payload)
       .then((session) => {
@@ -202,8 +207,25 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
           });
         }
       })
-      .catch((e) => setError(describeLoginFailure(e)))
+      .catch((e) => setError(describeLoginFailure(e, hubLogin)))
       .finally(() => setSubmitting(false));
+  };
+
+  const revalidate = () => {
+    if (invalid && !submitting) {
+      setInvalid(readLoginFields().invalid);
+    }
+  };
+
+  const selectScope = (nextHubLogin: boolean) => {
+    if (nextHubLogin !== hubLogin) {
+      if (hubRef.current) {
+        setHubDraft(hubRef.current.value);
+      }
+      setHubLogin(nextHubLogin);
+      setInvalid(null);
+      setError(null);
+    }
   };
 
   return (
@@ -221,9 +243,12 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
             </StackItem>
           )}
           <StackItem>
+            {/* Keep connection details out of Safari's password autofill form. */}
             <Form
-              aria-label="SoftEther server login"
+              aria-label="SoftEther server details"
+              method="post"
               onSubmit={handleSubmit}
+              onChange={revalidate}
               aria-busy={submitting}
             >
               <div className="se-managed-login__target-fields">
@@ -232,19 +257,18 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                     id="managed-login-host"
                     name="host"
                     autoComplete="url"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     ref={hostRef}
-                    value={host}
+                    defaultValue={initialHints?.host ?? ""}
                     placeholder="vpn.example.com"
-                    onChange={(_event, value) => setHost(value)}
-                    validated={submitted && !hostValid ? "error" : "default"}
+                    validated={invalid?.host ? "error" : "default"}
                     aria-label="Server host"
-                    aria-describedby={
-                      submitted && !hostValid ? "managed-login-host-error" : undefined
-                    }
-                    aria-invalid={submitted && !hostValid}
+                    aria-describedby={invalid?.host ? "managed-login-host-error" : undefined}
+                    aria-invalid={invalid?.host ?? false}
                     isDisabled={submitting}
                   />
-                  {submitted && !hostValid && (
+                  {invalid?.host && (
                     <FormHelperText>
                       <HelperText>
                         <HelperTextItem id="managed-login-host-error" variant="error">
@@ -262,17 +286,14 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                     ref={portRef}
                     min={1}
                     max={65535}
-                    value={port}
-                    onChange={(_event, value) => setPort(value)}
-                    validated={submitted && !portIsValid ? "error" : "default"}
+                    defaultValue={String(initialHints?.port ?? DEFAULT_PORT)}
+                    validated={invalid?.port ? "error" : "default"}
                     aria-label="Port"
-                    aria-describedby={
-                      submitted && !portIsValid ? "managed-login-port-error" : undefined
-                    }
-                    aria-invalid={submitted && !portIsValid}
+                    aria-describedby={invalid?.port ? "managed-login-port-error" : undefined}
+                    aria-invalid={invalid?.port ?? false}
                     isDisabled={submitting}
                   />
-                  {submitted && !portIsValid && (
+                  {invalid?.port && (
                     <FormHelperText>
                       <HelperText>
                         <HelperTextItem id="managed-login-port-error" variant="error">
@@ -283,16 +304,60 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   )}
                 </FormGroup>
               </div>
-              <FormGroup label="Virtual Hub" labelInfo="Optional" fieldId="managed-login-hub">
-                <TextInput
-                  id="managed-login-hub"
-                  name="hub"
-                  value={hub}
-                  onChange={(_event, value) => setHub(value)}
-                  aria-label="Virtual Hub"
-                  isDisabled={submitting}
-                />
+              <FormGroup label="Administrator scope" fieldId="managed-login-scope" role="group">
+                <ToggleGroup role="presentation" areAllGroupsDisabled={submitting}>
+                  <ToggleGroupItem
+                    text="Server"
+                    isSelected={!hubLogin}
+                    onChange={() => selectScope(false)}
+                  />
+                  <ToggleGroupItem
+                    text="Virtual Hub"
+                    isSelected={hubLogin}
+                    onChange={() => selectScope(true)}
+                  />
+                </ToggleGroup>
               </FormGroup>
+              <button type="submit" hidden disabled={submitting} />
+            </Form>
+          </StackItem>
+          <StackItem>
+            {/* A new form keeps the previous scope's password out of the new scope. */}
+            <Form
+              key={hubLogin ? "hub" : "server"}
+              aria-label={hubLogin ? "SoftEther Virtual Hub login" : "SoftEther server login"}
+              method="post"
+              onSubmit={handleSubmit}
+              onChange={revalidate}
+              aria-busy={submitting}
+            >
+              {hubLogin && (
+                <FormGroup label="Virtual Hub" fieldId="managed-login-hub" isRequired>
+                  <TextInput
+                    id="managed-login-hub"
+                    name="hub"
+                    ref={hubRef}
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    defaultValue={hubDraft}
+                    isRequired
+                    validated={invalid?.hub ? "error" : "default"}
+                    aria-describedby={invalid?.hub ? "managed-login-hub-error" : undefined}
+                    aria-invalid={invalid?.hub ?? false}
+                    isDisabled={submitting}
+                  />
+                  {invalid?.hub && (
+                    <FormHelperText>
+                      <HelperText>
+                        <HelperTextItem id="managed-login-hub-error" variant="error">
+                          Enter the Virtual Hub name.
+                        </HelperTextItem>
+                      </HelperText>
+                    </FormHelperText>
+                  )}
+                </FormGroup>
+              )}
               <FormGroup label="Password" fieldId="managed-login-password" isRequired>
                 <TextInput
                   type="password"
@@ -300,17 +365,13 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
                   name="password"
                   ref={passwordRef}
                   autoComplete="current-password"
-                  value={password}
-                  onChange={(_event, value) => setPassword(value)}
-                  validated={submitted && !passwordValid ? "error" : "default"}
+                  validated={invalid?.password ? "error" : "default"}
                   aria-label="Password"
-                  aria-describedby={
-                    submitted && !passwordValid ? "managed-login-password-error" : undefined
-                  }
-                  aria-invalid={submitted && !passwordValid}
+                  aria-describedby={invalid?.password ? "managed-login-password-error" : undefined}
+                  aria-invalid={invalid?.password ?? false}
                   isDisabled={submitting}
                 />
-                {submitted && !passwordValid && (
+                {invalid?.password && (
                   <FormHelperText>
                     <HelperText>
                       <HelperTextItem id="managed-login-password-error" variant="error">

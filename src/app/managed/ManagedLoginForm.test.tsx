@@ -42,6 +42,92 @@ describe("ManagedLoginForm", () => {
     expect(onLogin).toHaveBeenCalledWith(session);
   });
 
+  it("preserves and submits a password autofilled without a change event", async () => {
+    const details = { host: "vpn.example.com", port: 5555, hub: "DEFAULT", allowSelfSigned: false };
+    window.localStorage.setItem(MANAGED_LOGIN_HINTS_KEY, JSON.stringify(details));
+    loginMock.mockResolvedValue({ authenticated: true, ...details });
+    const user = userEvent.setup();
+
+    render(<ManagedLoginForm onLogin={vi.fn()} />);
+
+    const password = screen.getByLabelText<HTMLInputElement>("Password");
+    password.value = "autofilled-secret";
+    await user.click(screen.getByRole("button", { name: "Advanced connection options" }));
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+
+    expect(loginMock).toHaveBeenCalledWith({ ...details, password: "autofilled-secret" });
+    expect(JSON.parse(window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY) ?? "{}")).toEqual(
+      details,
+    );
+  });
+
+  it("offers the hub as a username only for Virtual Hub login", async () => {
+    loginMock.mockResolvedValue({ authenticated: true });
+    const user = userEvent.setup();
+    render(<ManagedLoginForm onLogin={vi.fn()} />);
+
+    const password = screen.getByLabelText<HTMLInputElement>("Password");
+    const host = screen.getByLabelText<HTMLInputElement>("Server host");
+    const port = screen.getByLabelText<HTMLInputElement>("Port");
+    expect(screen.getByRole("button", { name: "Server" })).toHaveAttribute("aria-pressed", "true");
+    expect(password.form).toBe(screen.getByRole("form", { name: "SoftEther server login" }));
+    expect(host.form).toBe(screen.getByRole("form", { name: "SoftEther server details" }));
+    expect(port.form).toBe(host.form);
+    expect(screen.queryByRole("textbox", { name: "Virtual Hub" })).not.toBeInTheDocument();
+
+    await user.type(host, "vpn.example.com");
+    password.value = "server-secret";
+    await user.click(screen.getByRole("button", { name: "Virtual Hub" }));
+    const hub = screen.getByRole<HTMLInputElement>("textbox", { name: "Virtual Hub" });
+    const hubPassword = screen.getByLabelText<HTMLInputElement>("Password");
+    expect(hub).toHaveAttribute("autocomplete", "username");
+    expect(hub).toHaveAttribute("required");
+    expect(hub.form).toBe(screen.getByRole("form", { name: "SoftEther Virtual Hub login" }));
+    expect(hubPassword.form).toBe(hub.form);
+    expect(hubPassword).toHaveValue("");
+
+    hubPassword.value = "hub-secret";
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+    expect(hub).toHaveFocus();
+    expect(hub).toHaveAccessibleDescription(/Enter the Virtual Hub name\./);
+    expect(loginMock).not.toHaveBeenCalled();
+
+    hub.value = "DEFAULT";
+    await user.keyboard("{Enter}");
+
+    expect(loginMock).toHaveBeenCalledWith({
+      host: "vpn.example.com",
+      port: 443,
+      hub: "DEFAULT",
+      password: "hub-secret",
+      allowSelfSigned: false,
+    });
+  });
+
+  it.each(["STAGING", ""])(
+    "keeps the edited hub %j but not passwords across scopes",
+    async (name) => {
+      const details = { host: "vpn.example.com", port: 443, hub: "PROD", allowSelfSigned: false };
+      window.localStorage.setItem(MANAGED_LOGIN_HINTS_KEY, JSON.stringify(details));
+      const user = userEvent.setup();
+      render(<ManagedLoginForm onLogin={vi.fn()} />);
+
+      const hub = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Virtual Hub" });
+      const password = () => screen.getByLabelText<HTMLInputElement>("Password");
+      expect(hub()).toHaveValue("PROD");
+      hub().value = name;
+      password().value = "hub-secret";
+      await user.click(screen.getByRole("button", { name: "Server" }));
+      expect(password()).toHaveValue("");
+
+      password().value = "server-secret";
+      await user.click(screen.getByRole("button", { name: "Virtual Hub" }));
+      expect(hub()).toHaveValue(name);
+      expect(password()).toHaveValue("");
+      expect(window.localStorage.getItem(MANAGED_LOGIN_HINTS_KEY)).toBe(JSON.stringify(details));
+    },
+  );
+
   it("keeps one stable login action while authenticating", async () => {
     loginMock.mockImplementation(() => new Promise(() => undefined));
     const user = userEvent.setup();
@@ -54,12 +140,13 @@ describe("ManagedLoginForm", () => {
     await user.click(submit);
 
     expect(submit).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Virtual Hub" })).toBeDisabled();
     expect(submit.closest("form")).toHaveAttribute("aria-busy", "true");
     expect(screen.getAllByRole("progressbar")).toHaveLength(1);
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuetext", "Logging in");
   });
 
-  it("submits optional hub and self-signed certificate settings", async () => {
+  it("submits hub and self-signed certificate settings", async () => {
     const session = { authenticated: true, host: "vpn.example.com", port: 5555, hub: "DEFAULT" };
     loginMock.mockResolvedValue(session);
     const user = userEvent.setup();
@@ -69,7 +156,8 @@ describe("ManagedLoginForm", () => {
     await user.type(screen.getByLabelText("Server host"), "vpn.example.com");
     await user.clear(screen.getByLabelText("Port"));
     await user.type(screen.getByLabelText("Port"), "5555");
-    await user.type(screen.getByLabelText("Virtual Hub"), "DEFAULT");
+    await user.click(screen.getByRole("button", { name: "Virtual Hub" }));
+    await user.type(screen.getByRole("textbox", { name: "Virtual Hub" }), "DEFAULT");
     await user.type(screen.getByLabelText("Password"), "secret");
     await user.click(screen.getByRole("button", { name: "Advanced connection options" }));
     await user.click(screen.getByLabelText("Allow a self-signed SoftEther server certificate"));
@@ -117,7 +205,7 @@ describe("ManagedLoginForm", () => {
     [
       new ManagedSessionApiError("The server did not accept these login details.", 401),
       "Login details rejected",
-      "Check the administrator password and Virtual Hub, then try again.",
+      "Check the server administrator password, then try again.",
     ],
     [
       new ManagedSessionApiError("The server certificate could not be verified.", 502),
@@ -154,7 +242,8 @@ describe("ManagedLoginForm", () => {
     await user.type(screen.getByLabelText("Server host"), "vpn.example.com");
     await user.clear(screen.getByLabelText("Port"));
     await user.type(screen.getByLabelText("Port"), "5555");
-    await user.type(screen.getByLabelText("Virtual Hub"), "DEFAULT");
+    await user.click(screen.getByRole("button", { name: "Virtual Hub" }));
+    await user.type(screen.getByRole("textbox", { name: "Virtual Hub" }), "DEFAULT");
     await user.type(screen.getByLabelText("Password"), "secret");
     await user.click(screen.getByRole("button", { name: "Advanced connection options" }));
     await user.click(screen.getByLabelText("Allow a self-signed SoftEther server certificate"));
@@ -176,7 +265,7 @@ describe("ManagedLoginForm", () => {
 
     expect(screen.getByLabelText("Server host")).toHaveValue("vpn.example.com");
     expect(screen.getByLabelText("Port")).toHaveValue(5555);
-    expect(screen.getByLabelText("Virtual Hub")).toHaveValue("DEFAULT");
+    expect(screen.getByRole("textbox", { name: "Virtual Hub" })).toHaveValue("DEFAULT");
     expect(screen.getByLabelText("Password")).toHaveValue("");
     expect(screen.getByLabelText("Allow a self-signed SoftEther server certificate")).toBeChecked();
     expect(screen.getByLabelText("Remember server details on this browser")).toBeChecked();

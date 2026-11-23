@@ -152,3 +152,10 @@ body,
   margin-inline-start: var(--pf-t--global--spacer--xs);
   font-size: var(--pf-v6-c-form__group-label-help--FontSize);
 }
+
+/* iOS Safari zooms when focusing fields with text smaller than 16px. */
+@media (any-pointer: coarse) {
+  .pf-v6-c-form-control {
+    --pf-v6-c-form-control--FontSize: max(16px, var(--pf-t--global--font--size--body--default));
+  }
+}
