@@ -1,8 +1,22 @@
-import { forgetPosition, validId } from "./connection";
+import { forgetPosition, positionPrefix, validId } from "./connection";
 import { getSession, ManagedSession } from "./sessionApi";
 
 export type Connection = Extract<ManagedSession, { authenticated: true }>;
 export const directoryPrefix = "softether-vpn-console.connection.";
+
+export const forgetUnindexedPositions = () => {
+  try {
+    for (const key of Object.keys(sessionStorage)) {
+      if (!key.startsWith(positionPrefix)) continue;
+      const id = key.slice(positionPrefix.length);
+      if (validId.test(id) && localStorage.getItem(directoryPrefix + id) === null) {
+        forgetPosition(id);
+      }
+    }
+  } catch {
+    // An unreadable directory is not evidence that a connection was removed.
+  }
+};
 
 // One key per ID avoids lost updates between tabs. Labels and credentials stay out of storage.
 export const indexConnection = (id: string, active: boolean) => {

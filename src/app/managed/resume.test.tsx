@@ -5,7 +5,7 @@ import { Modal } from "@patternfly/react-core";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { connectionUrl, rememberPosition } from "./connection";
-import { indexConnection } from "./connectionDirectory";
+import { forgetUnindexedPositions, indexConnection } from "./connectionDirectory";
 import { PendingDraftsProvider, useDraftState, useEditorDismiss } from "./pendingDrafts";
 import { RouteDraftGuard } from "./RouteDraftGuard";
 
@@ -25,6 +25,16 @@ it("resumes each connection at its own page and hub tab; removing A does not res
   indexConnection(a, false);
   expect(new URL(connectionUrl(a)).hash).toBe("");
   expect(new URL(connectionUrl(b)).hash).toBe("#/settings/about");
+});
+
+it("keeps saved locations when the shared directory cannot be read", () => {
+  const id = "a".repeat(43);
+  rememberPosition(id, "/settings/about", "");
+  vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+    throw new DOMException("Storage is unavailable", "SecurityError");
+  });
+  forgetUnindexedPositions();
+  expect(new URL(connectionUrl(id)).hash).toBe("#/settings/about");
 });
 
 it("blocks links and browser Back without losing the draft; explicit discard continues", async () => {

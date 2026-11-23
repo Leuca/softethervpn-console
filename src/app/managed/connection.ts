@@ -7,7 +7,8 @@ export const connectionPath = (id: string) => {
   return `/api/connections/${id}`;
 };
 
-const positionKey = (id: string) => "softether-vpn-console.position." + id;
+export const positionPrefix = "softether-vpn-console.position.";
+const positionKey = (id: string) => positionPrefix + id;
 
 export const rememberPosition = (id: string, pathname: string, search: string) => {
   if (!validId.test(id)) return;

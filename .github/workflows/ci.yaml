@@ -139,3 +139,5 @@ jobs:
         run: npm run build:managed
       - name: Build gateway
         run: npm --prefix gateway run build
+      - name: Test cross-tab connection cleanup
+        run: node --test gateway/e2e/connection-locations.mjs

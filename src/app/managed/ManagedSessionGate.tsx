@@ -10,8 +10,8 @@ import {
   StackItem,
 } from "@patternfly/react-core";
 import { ManagedLoginForm } from "./ManagedLoginForm";
-import { connectionId, forgetPosition, openConnection } from "./connection";
-import { directoryPrefix, indexConnection } from "./connectionDirectory";
+import { connectionId, forgetPosition, openConnection, validId } from "./connection";
+import { directoryPrefix, forgetUnindexedPositions, indexConnection } from "./connectionDirectory";
 import { ConnectionSwitcher } from "./ConnectionSwitcher";
 import { ManagedSession, getSession, logout } from "./sessionApi";
 import logo from "@app/bgimages/icons8-softether-vpn.svg";
@@ -86,14 +86,20 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
   };
 
   React.useEffect(() => {
-    if (!session?.authenticated) return;
     let live = true;
     const removed = (event: StorageEvent) => {
-      if (event.key !== directoryPrefix + session.connectionId || event.newValue !== null) return;
+      if (event.newValue !== null || !event.key?.startsWith(directoryPrefix)) return;
+      if (event.storageArea !== window.localStorage) return;
+      const id = event.key.slice(directoryPrefix.length);
+      if (!validId.test(id)) return;
+      // Each tab has its own resume history, regardless of the connection it is showing.
+      forgetPosition(id);
+      if (!session?.authenticated || session.connectionId !== id) return;
       void getSession()
         .then((next) => {
           if (live && !next.authenticated) {
-            forgetPosition(session.connectionId);
+            // Navigation may have saved a newer location while the session check was pending.
+            forgetPosition(id);
             setSession(next);
           }
         })
@@ -102,9 +108,12 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
         });
     };
     window.addEventListener("storage", removed);
+    window.addEventListener("pageshow", forgetUnindexedPositions);
+    forgetUnindexedPositions();
     return () => {
       live = false;
       window.removeEventListener("storage", removed);
+      window.removeEventListener("pageshow", forgetUnindexedPositions);
     };
   }, [session]);
 

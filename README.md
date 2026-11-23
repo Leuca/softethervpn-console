@@ -120,6 +120,8 @@ returns to an existing connection. Open a connection link in a new tab to work
 side by side. Switching back in the same browser tab restores that connection's
 last page, hub, and URL-backed tab. Data is fetched again from the selected
 server. Only the location is kept in tab storage, never a form draft.
+When the shared connection directory is available, disconnecting a connection
+removes its saved location from all open console tabs.
 Leaving a page with pending edits prompts before discarding them.
 The browser indexes opaque connection IDs only. Server and hub names are
 retrieved using each connection's private cookie, not written to the index.

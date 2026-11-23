@@ -4,9 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
 import { ManagedSessionGate, useManagedSession } from "./ManagedSessionGate";
 import { ManagedSession, getSession, login, logout } from "./sessionApi";
-import { openConnection } from "./connection";
+import { connectionUrl, openConnection, rememberPosition } from "./connection";
 import { ConnectionSwitcher } from "./ConnectionSwitcher";
-import { indexConnection, knownIds } from "./connectionDirectory";
+import { directoryPrefix, indexConnection, knownIds } from "./connectionDirectory";
 import { ThemeProvider } from "@app/ThemeContext";
 
 vi.mock("./connection", async (original) => ({
@@ -51,6 +51,7 @@ describe("ManagedSessionGate", () => {
   afterEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it("shows a first-load spinner while checking the session", () => {
@@ -108,6 +109,28 @@ describe("ManagedSessionGate", () => {
     expect(openConnection).toHaveBeenCalledWith("a".repeat(43));
     expect(knownIds()).toEqual(["a".repeat(43)]);
     expect(screen.queryByText("Managed app")).not.toBeInTheDocument();
+  });
+
+  it("also forgets disconnected locations while showing the login page", async () => {
+    getSessionMock.mockResolvedValue({ authenticated: false });
+    const id = "a".repeat(43);
+    indexConnection(id, true);
+    rememberPosition(id, "/hubs/SALES", "?tab=users");
+    renderGate();
+    await screen.findByRole("button", { name: "Log in" });
+    expect(new URL(connectionUrl(id)).hash).toBe("#/hubs/SALES?tab=users");
+
+    localStorage.removeItem(directoryPrefix + id);
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: directoryPrefix + id,
+        oldValue: "1",
+        newValue: null,
+        storageArea: localStorage,
+      }),
+    );
+    expect(new URL(connectionUrl(id)).hash).toBe("");
+    expect(getSessionMock).toHaveBeenCalledTimes(1);
   });
 
   it("returns to login for an expired current connection and keeps the other server selectable", async () => {
