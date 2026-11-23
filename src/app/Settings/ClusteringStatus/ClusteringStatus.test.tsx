@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClusteringStatus } from "./ClusteringStatus";
@@ -95,8 +95,10 @@ describe("ClusteringStatus", () => {
     await user.click(screen.getByRole("button", { name: "View server certificate" }));
     expect(await screen.findByText("Certificate: test.example.com")).toBeInTheDocument();
     expect(screen.getByText("Self-signed")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText("Member: member.example")).not.toBeInTheDocument(),
+    );
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
-    expect(screen.queryByText("Member: member.example")).not.toBeInTheDocument();
 
     await user.click(within(screen.getByRole("dialog")).getByText("Close"));
     expect(await screen.findByText("Member: member.example")).toBeInTheDocument();
