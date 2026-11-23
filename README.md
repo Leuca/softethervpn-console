@@ -82,6 +82,19 @@ VPN_DEV_PASSWORD=your-admin-password
 Leave `VPN_DEV_HUB` empty for server administration. Set it to a Virtual Hub name
 when connecting with that hub's administrator credentials.
 
+The development proxy verifies the upstream TLS certificate, including for
+loopback connections. Set `VPN_DEV_HOST` to a DNS name or IP address listed in
+the certificate's subject alternative names. For a local or private CA, obtain
+its public PEM certificate from the administrator through a trusted channel and
+start the proxy with:
+
+```sh
+NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem npm run start:dev
+```
+
+Set this in the launch environment, not in `.env`: Node reads the extra CA
+certificates at process startup. Restart the proxy after changing the CA.
+
 Production mode is embedded in the frontend at build time and cannot be changed
 at runtime. Each build replaces `dist/`, so archive or deploy one mode before
 building the other.

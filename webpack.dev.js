@@ -40,20 +40,13 @@ module.exports = merge(common('development'), {
     client: {
       overlay: true,
     },
-    // Proxy JSON-RPC calls to the target VPN server so the browser talks to it
-    // same-origin, exactly as it does in production. This sidesteps three
-    // problems that block a direct cross-origin fetch during development: the
-    // server's self-signed certificate (accepted here via secure:false), CORS,
-    // and vpnrpc's empty X-VPNADMIN-HUBNAME header. We authenticate every
-    // proxied request as the whole-server administrator by injecting
-    // X-VPNADMIN-PASSWORD. X-VPNADMIN-HUBNAME is only added when a hub is
-    // configured: an empty value makes SoftEther's HTTP parser drop the
-    // connection.
+    // Keep browser RPC same-origin and verify the upstream before sending admin
+    // credentials. SoftEther drops requests with an empty hub header.
     proxy: [
       {
         context: ['/api'],
         target: `https://${VPN_HOST}:${VPN_PORT}`,
-        secure: false,
+        secure: true,
         changeOrigin: true,
         headers: {
           'X-VPNADMIN-PASSWORD': VPN_PASSWORD,
