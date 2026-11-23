@@ -95,6 +95,20 @@ NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem npm run start:dev
 Set this in the launch environment, not in `.env`: Node reads the extra CA
 certificates at process startup. Restart the proxy after changing the CA.
 
+### Development proxy access
+
+The development listener defaults to `127.0.0.1:9000`. For its bind address,
+`HOST` accepts only `127.0.0.1`, `::1`, or `localhost` (bound as `127.0.0.1`).
+`VPN_DEV_HOST` selects the upstream VPN server, not the listener.
+
+Loopback does not authenticate local users. Anyone who can reach the proxy can
+make RPC calls as the configured VPN administrator without logging in. Run it
+only on a trusted single-user machine or in a private network namespace. Do not
+forward or publish its port. For shared previews, use the [managed gateway](gateway/README.md)
+with per-user VPN login and restrict access to trusted administrators.
+
+### Production builds
+
 Production mode is embedded in the frontend at build time and cannot be changed
 at runtime. Each build replaces `dist/`, so archive or deploy one mode before
 building the other.

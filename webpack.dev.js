@@ -8,7 +8,13 @@ const { stylePaths } = require('./stylePaths');
 // Load the dev-only VPN server settings (.env, gitignored) into process.env so
 // the proxy below can reach the server. Values are documented in .env.defaults.
 require('dotenv').config();
-const HOST = process.env.HOST || 'localhost';
+function loopbackHost(host) {
+  if (host === 'localhost') return '127.0.0.1';
+  if (host === '127.0.0.1' || host === '::1') return host;
+  throw new Error('Development proxy HOST must be 127.0.0.1, ::1, or localhost.');
+}
+
+const HOST = loopbackHost(process.env.HOST ?? '127.0.0.1');
 const PORT = process.env.PORT || '9000';
 const VPN_HOST = process.env.VPN_DEV_HOST || '127.0.0.1';
 const VPN_PORT = process.env.VPN_DEV_PORT || '5555';
@@ -32,6 +38,12 @@ module.exports = merge(common('development'), {
   devServer: {
     host: HOST,
     port: PORT,
+    setupMiddlewares(middlewares, server) {
+      // webpack serve can override the configured listener. Check it before listen().
+      if (server.options.ipc) throw new Error('Development proxy requires loopback TCP; IPC is not supported.');
+      server.options.host = loopbackHost(server.options.host);
+      return middlewares;
+    },
     historyApiFallback: true,
     open: true,
     static: {
