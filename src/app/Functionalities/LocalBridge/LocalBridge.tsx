@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -211,6 +212,10 @@ const LocalBridge: React.FunctionComponent = () => {
     </Button>
   );
 
+  const dismissCreate = useEditorDismiss(createOpen, [mode, newHub, newAdapter, tapName], () =>
+    setCreateOpen(false),
+  );
+
   return (
     <AppPage
       title="Local Bridge"
@@ -294,7 +299,7 @@ const LocalBridge: React.FunctionComponent = () => {
       </Stack>
 
       {/* Create local bridge */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={dismissCreate}>
         <ModalHeader title="Create local bridge" />
         <ModalBody>
           <Form>
@@ -369,7 +374,7 @@ const LocalBridge: React.FunctionComponent = () => {
           <Button variant="primary" onClick={create} isDisabled={!canCreate}>
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)}>
+          <Button variant="link" onClick={dismissCreate}>
             Cancel
           </Button>
         </ModalFooter>

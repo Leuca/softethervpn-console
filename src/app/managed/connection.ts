@@ -7,15 +7,43 @@ export const connectionPath = (id: string) => {
   return `/api/connections/${id}`;
 };
 
+const positionKey = (id: string) => "softether-vpn-console.position." + id;
+
+export const rememberPosition = (id: string, pathname: string, search: string) => {
+  if (!validId.test(id)) return;
+  // Only the hub tab is navigation state; never persist arbitrary query parameters.
+  const tab = new URLSearchParams(search).get("tab");
+  const hash = "#" + pathname + (tab ? "?" + new URLSearchParams({ tab }) : "");
+  try {
+    sessionStorage.setItem(positionKey(id), hash);
+  } catch {
+    /* Navigation works without storage. */
+  }
+};
+
+export const forgetPosition = (id: string) => {
+  try {
+    sessionStorage.removeItem(positionKey(id));
+  } catch {
+    /* Storage unavailable. */
+  }
+};
+
 export const connectionUrl = (id: string | null) => {
   const url = new URL(window.location.href);
+  url.hash = "";
   if (id !== null) {
     connectionPath(id);
     url.searchParams.set("connection", id);
+    try {
+      const position = sessionStorage.getItem(positionKey(id));
+      if (position?.startsWith("#/")) url.hash = position;
+    } catch {
+      /* Use the dashboard. */
+    }
   } else {
     url.searchParams.delete("connection");
   }
-  url.hash = "";
   return url.href;
 };
 

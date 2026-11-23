@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -72,15 +73,16 @@ const HubMessage: React.FunctionComponent<HubMessageProps> = ({ hub, trigger }) 
   }, [hub]);
 
   const openModal = () => {
+    setLoaded(false);
     setOpen(true);
     load();
   };
 
-  const closeModal = () => {
+  const closeModal = useEditorDismiss(open && loaded, [useMessage, message], () => {
     if (!saving) {
       setOpen(false);
     }
-  };
+  });
 
   const save = () => {
     if (!canChange) {

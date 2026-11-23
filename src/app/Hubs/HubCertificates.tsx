@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -375,6 +376,10 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const serialResult = parseHexBytes(crlForm?.serial ?? "", "Serial");
   const md5Result = parseHexBytes(crlForm?.md5 ?? "", "MD5 digest", 16);
   const sha1Result = parseHexBytes(crlForm?.sha1 ?? "", "SHA1 digest", 20);
+  const dismissCrl = useEditorDismiss(crlForm !== null, crlForm, () => {
+    setCrlForm(null);
+    setCrlOriginal(null);
+  });
   const crlValidationError = serialResult.error ?? md5Result.error ?? sha1Result.error;
   const crlDirty =
     crlForm?.key === null || recordChanged(crlComparable(crlOriginal), crlComparable(crlForm));
@@ -605,14 +610,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ModalFooter>
       </Modal>
 
-      <Modal
-        variant={ModalVariant.medium}
-        isOpen={crlForm !== null}
-        onClose={() => {
-          setCrlForm(null);
-          setCrlOriginal(null);
-        }}
-      >
+      <Modal variant={ModalVariant.medium} isOpen={crlForm !== null} onClose={dismissCrl}>
         <ModalHeader
           title={crlForm?.key === null ? "Add revoked certificate" : "Edit revoked certificate"}
         />
@@ -761,13 +759,7 @@ const HubCertificates: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           >
             Save
           </Button>
-          <Button
-            variant="link"
-            onClick={() => {
-              setCrlForm(null);
-              setCrlOriginal(null);
-            }}
-          >
+          <Button variant="link" onClick={dismissCrl}>
             Cancel
           </Button>
         </ModalFooter>

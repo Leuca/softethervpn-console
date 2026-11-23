@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -146,6 +147,12 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const isLoading = groups === null && error === null;
   const editDirty = recordChanged(editOriginal, edit);
 
+  const dismissCreate = useEditorDismiss(createOpen, [name, realname, note], () =>
+    setCreateOpen(false),
+  );
+
+  const dismissEdit = useEditorDismiss(edit !== null, edit, () => setEdit(null));
+
   return (
     <Flex
       direction={{ default: "column" }}
@@ -234,7 +241,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       <Modal
         variant={ModalVariant.small}
         isOpen={createOpen}
-        onClose={() => !submitting && setCreateOpen(false)}
+        onClose={() => !submitting && dismissCreate()}
       >
         <ModalHeader title="New group" />
         <ModalBody>
@@ -276,7 +283,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           >
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={submitting}>
+          <Button variant="link" onClick={dismissCreate} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>
@@ -288,7 +295,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       <Modal
         variant={ModalVariant.small}
         isOpen={edit !== null && !policyOpen}
-        onClose={() => !submitting && setEdit(null)}
+        onClose={() => !submitting && dismissEdit()}
       >
         <ModalHeader title={edit ? `Edit ${String(edit.Name_str)}` : ""} />
         <ModalBody>
@@ -328,7 +335,7 @@ const Groups: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           >
             Save
           </Button>
-          <Button variant="link" onClick={() => setEdit(null)} isDisabled={submitting}>
+          <Button variant="link" onClick={dismissEdit} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>

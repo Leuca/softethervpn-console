@@ -10,7 +10,7 @@ import {
 import { PlusCircleIcon, ServerIcon, SignOutAltIcon } from "@patternfly/react-icons";
 import { connectionUrl } from "./connection";
 import { Connection, directoryPrefix, knownIds, listConnections } from "./connectionDirectory";
-import { useHasPendingDrafts } from "./pendingDrafts";
+import { useConnectionLinkGuard, useGuardedAction } from "./pendingDrafts";
 import "./ConnectionSwitcher.css";
 
 interface Props {
@@ -29,7 +29,8 @@ export const ConnectionSwitcher = ({ current, onLogout, onExpired, busy }: Props
   const [open, setOpen] = React.useState(false);
   const [revision, refresh] = React.useReducer((n) => n + 1, 0);
   const [list, setList] = React.useState<Awaited<ReturnType<typeof listConnections>> | null>(null);
-  const hasPendingDrafts = useHasPendingDrafts();
+  const guard = useGuardedAction();
+  const guardLink = useConnectionLinkGuard();
   React.useEffect(() => {
     const storage = (e: StorageEvent) => {
       if (!e.key || e.key.startsWith(directoryPrefix)) refresh();
@@ -54,17 +55,6 @@ export const ConnectionSwitcher = ({ current, onLogout, onExpired, busy }: Props
   const toggle = (value: boolean) => {
     if (value) setList(null);
     setOpen(value);
-  };
-  const guard = (event: React.MouseEvent) => {
-    if (
-      !event.ctrlKey &&
-      !event.metaKey &&
-      !event.shiftKey &&
-      !event.altKey &&
-      hasPendingDrafts() &&
-      !window.confirm("Leave this page? Unsaved changes in this tab will be lost.")
-    )
-      event.preventDefault();
   };
   const label = current ? endpoint(current) + ", " + scope(current) : "Open connections";
   return (
@@ -116,7 +106,7 @@ export const ConnectionSwitcher = ({ current, onLogout, onExpired, busy }: Props
                   key={c.connectionId}
                   component="a"
                   to={connectionUrl(c.connectionId)}
-                  onClick={guard}
+                  onClick={guardLink}
                   description={scope(c)}
                 >
                   {endpoint(c)}
@@ -136,12 +126,16 @@ export const ConnectionSwitcher = ({ current, onLogout, onExpired, busy }: Props
             <DropdownItem
               component="a"
               to={connectionUrl(null)}
-              onClick={guard}
+              onClick={guardLink}
               icon={<PlusCircleIcon />}
             >
               Connect another server
             </DropdownItem>
-            <DropdownItem onClick={onLogout} isDisabled={busy} icon={<SignOutAltIcon />}>
+            <DropdownItem
+              onClick={() => onLogout && guard(onLogout)}
+              isDisabled={busy}
+              icon={<SignOutAltIcon />}
+            >
               Disconnect this connection
             </DropdownItem>
           </DropdownList>

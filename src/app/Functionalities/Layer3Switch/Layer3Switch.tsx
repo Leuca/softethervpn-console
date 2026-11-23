@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -440,6 +441,14 @@ const Layer3Switch: React.FunctionComponent = () => {
   const routeCanCreate =
     isNetworkAddress(rNet, rMask) && isHostIPv4(rGw) && routeMetric !== null && !duplicateRoute;
 
+  const dismissCreate = useEditorDismiss(createOpen, newName, () => setCreateOpen(false));
+
+  const dismissIf = useEditorDismiss(ifOpen, [ifHub, ifIp, ifMask], () => setIfOpen(false));
+
+  const dismissRoute = useEditorDismiss(routeOpen, [rNet, rMask, rGw, rMetric], () =>
+    setRouteOpen(false),
+  );
+
   return (
     <AppPage
       title="Layer 3 Switch"
@@ -690,7 +699,7 @@ const Layer3Switch: React.FunctionComponent = () => {
       </Stack>
 
       {/* Create switch */}
-      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={() => setCreateOpen(false)}>
+      <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={dismissCreate}>
         <ModalHeader title="Create Layer 3 switch" />
         <ModalBody>
           <Form>
@@ -708,14 +717,14 @@ const Layer3Switch: React.FunctionComponent = () => {
           <Button variant="primary" onClick={createSwitch} isDisabled={newName.trim() === ""}>
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)}>
+          <Button variant="link" onClick={dismissCreate}>
             Cancel
           </Button>
         </ModalFooter>
       </Modal>
 
       {/* Add interface */}
-      <Modal variant={ModalVariant.small} isOpen={ifOpen} onClose={() => setIfOpen(false)}>
+      <Modal variant={ModalVariant.small} isOpen={ifOpen} onClose={dismissIf}>
         <ModalHeader title="Add virtual interface" />
         <ModalBody>
           <Form>
@@ -774,14 +783,14 @@ const Layer3Switch: React.FunctionComponent = () => {
           <Button variant="primary" onClick={addIf} isDisabled={!ifCanCreate}>
             Add
           </Button>
-          <Button variant="link" onClick={() => setIfOpen(false)}>
+          <Button variant="link" onClick={dismissIf}>
             Cancel
           </Button>
         </ModalFooter>
       </Modal>
 
       {/* Add route */}
-      <Modal variant={ModalVariant.small} isOpen={routeOpen} onClose={() => setRouteOpen(false)}>
+      <Modal variant={ModalVariant.small} isOpen={routeOpen} onClose={dismissRoute}>
         <ModalHeader title="Add routing table entry" />
         <ModalBody>
           <Form>
@@ -863,7 +872,7 @@ const Layer3Switch: React.FunctionComponent = () => {
           <Button variant="primary" onClick={addRoute} isDisabled={!routeCanCreate}>
             Add
           </Button>
-          <Button variant="link" onClick={() => setRouteOpen(false)}>
+          <Button variant="link" onClick={dismissRoute}>
             Cancel
           </Button>
         </ModalFooter>

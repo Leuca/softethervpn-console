@@ -10,7 +10,7 @@ import {
   StackItem,
 } from "@patternfly/react-core";
 import { ManagedLoginForm } from "./ManagedLoginForm";
-import { connectionId, openConnection } from "./connection";
+import { connectionId, forgetPosition, openConnection } from "./connection";
 import { directoryPrefix, indexConnection } from "./connectionDirectory";
 import { ConnectionSwitcher } from "./ConnectionSwitcher";
 import { ManagedSession, getSession, logout } from "./sessionApi";
@@ -92,7 +92,10 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
       if (event.key !== directoryPrefix + session.connectionId || event.newValue !== null) return;
       void getSession()
         .then((next) => {
-          if (live && !next.authenticated) setSession(next);
+          if (live && !next.authenticated) {
+            forgetPosition(session.connectionId);
+            setSession(next);
+          }
         })
         .catch(() => {
           /* A storage notification is not proof of logout. */

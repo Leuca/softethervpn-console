@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useDraftState } from "@app/managed/pendingDrafts";
+import { useDraftState, useGuardedAction } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -662,6 +662,7 @@ const HubLogFiles: React.FunctionComponent<{ supported: boolean }> = ({ supporte
 
 const HubLogs: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [activeTab, setActiveTab] = React.useState<string>("settings");
+  const guard = useGuardedAction();
   const { capsList } = useServer();
   const settingsSupported = capBool(capsList, "b_support_config_log");
   const filesSupported = capBool(capsList, "b_support_read_log");
@@ -670,7 +671,9 @@ const HubLogs: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     <Tabs
       aria-label="Hub log views"
       activeKey={activeTab}
-      onSelect={(_event, key) => setActiveTab(String(key))}
+      onSelect={(_event, key) => {
+        if (key !== activeTab) guard(() => setActiveTab(String(key)));
+      }}
       mountOnEnter
       unmountOnExit
       style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}

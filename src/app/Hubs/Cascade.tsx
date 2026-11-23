@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -1183,6 +1184,30 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const advancedTouched = ADVANCED_KEYS.some((key) => editTouched.has(key));
   const editDirty = recordChanged(editOriginal, edit, editPassword.length > 0);
 
+  const dismissCreate = useEditorDismiss(
+    createOpen,
+    [
+      name,
+      host,
+      port,
+      destHub,
+      auth,
+      password,
+      createCertificateUpload,
+      serverCert,
+      advanced,
+      proxy,
+      createPolicy,
+    ],
+    () => setCreateOpen(false),
+  );
+
+  const dismissEdit = useEditorDismiss(
+    edit !== null,
+    [edit, editPassword, editCertificateUpload],
+    () => setEdit(null),
+  );
+
   return (
     <Flex
       direction={{ default: "column" }}
@@ -1287,7 +1312,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       <Modal
         variant={ModalVariant.small}
         isOpen={createOpen && !subModalOpen}
-        onClose={() => !submitting && setCreateOpen(false)}
+        onClose={() => !submitting && dismissCreate()}
       >
         <ModalHeader title="New cascade connection" />
         <ModalBody>
@@ -1381,7 +1406,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           >
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={submitting}>
+          <Button variant="link" onClick={dismissCreate} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>
@@ -1391,7 +1416,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       <Modal
         variant={ModalVariant.medium}
         isOpen={edit !== null && !subModalOpen}
-        onClose={() => !submitting && setEdit(null)}
+        onClose={() => !submitting && dismissEdit()}
       >
         <ModalHeader
           title={edit ? `Cascade settings: ${String(edit.AccountName_utf ?? "")}` : ""}
@@ -1491,7 +1516,7 @@ const Cascade: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           >
             Save
           </Button>
-          <Button variant="link" onClick={() => setEdit(null)} isDisabled={submitting}>
+          <Button variant="link" onClick={dismissEdit} isDisabled={submitting}>
             Cancel
           </Button>
         </ModalFooter>

@@ -1,12 +1,14 @@
 import * as React from "react";
 import "@patternfly/react-core/dist/styles/base.css";
-import { HashRouter as Router } from "react-router-dom";
+import { createHashRouter, useLocation } from "react-router-dom";
 import { Bullseye, Spinner } from "@patternfly/react-core";
 import { AppLayout } from "@app/AppLayout/AppLayout";
 import { AppRoutes } from "@app/routes";
 import { ServerProvider, useServer } from "@app/ServerContext";
 import { consoleMode } from "@app/consoleMode";
-import { ManagedSessionGate } from "@app/managed/ManagedSessionGate";
+import { ManagedSessionGate, useManagedSession } from "@app/managed/ManagedSessionGate";
+import { rememberPosition } from "@app/managed/connection";
+import { RouteDraftGuard } from "@app/managed/RouteDraftGuard";
 import { PendingDraftsProvider } from "@app/managed/pendingDrafts";
 import { ThemeProvider } from "@app/ThemeContext";
 import "@app/app.css";
@@ -21,6 +23,12 @@ const LoadingPage: React.FunctionComponent = () => (
 // rendering the layout, so the navigation only shows what applies to this server.
 const AppShell: React.FunctionComponent = () => {
   const { loading } = useServer();
+  const session = useManagedSession();
+  const id = session?.current.connectionId;
+  const { pathname, search } = useLocation();
+  React.useLayoutEffect(() => {
+    if (id) rememberPosition(id, pathname, search);
+  }, [id, pathname, search]);
 
   return loading ? (
     <LoadingPage />
@@ -35,22 +43,21 @@ const AppShell: React.FunctionComponent = () => {
 // embedded web server, which cannot rewrite arbitrary paths to index.html.
 const App: React.FunctionComponent = () => (
   <ThemeProvider>
-    <Router>
+    <PendingDraftsProvider>
+      <RouteDraftGuard />
       {consoleMode === "managed" ? (
-        <PendingDraftsProvider>
-          <ManagedSessionGate>
-            <ServerProvider>
-              <AppShell />
-            </ServerProvider>
-          </ManagedSessionGate>
-        </PendingDraftsProvider>
+        <ManagedSessionGate>
+          <ServerProvider>
+            <AppShell />
+          </ServerProvider>
+        </ManagedSessionGate>
       ) : (
         <ServerProvider>
           <AppShell />
         </ServerProvider>
       )}
-    </Router>
+    </PendingDraftsProvider>
   </ThemeProvider>
 );
 
-export default App;
+export const createConsoleRouter = () => createHashRouter([{ path: "*", element: <App /> }]);

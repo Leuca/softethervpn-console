@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { ConnectionSwitcher } from "./ConnectionSwitcher";
 import { indexConnection, knownIds } from "./connectionDirectory";
 import { getSession } from "./sessionApi";
+import { PendingDraftsProvider, usePendingDraft } from "./pendingDrafts";
 
 vi.mock("./sessionApi", () => ({ getSession: vi.fn() }));
 const a = {
@@ -67,6 +68,53 @@ it("offers live connections from the login page after another tab logs in", asyn
   );
   expect(localStorage.getItem(Object.keys(localStorage)[0])).toBe("1");
 });
+
+it.each([/Hub: OPS/, /Connect another server/])(
+  "guards same-tab clicks on %s once",
+  async (name) => {
+    indexConnection(b.connectionId, true);
+    vi.mocked(getSession).mockImplementation(async (id) => (id === b.connectionId ? b : a));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const user = userEvent.setup();
+    function Draft() {
+      usePendingDraft(() => true);
+      return null;
+    }
+    render(
+      <PendingDraftsProvider>
+        <Draft />
+        <ConnectionSwitcher current={a} />
+      </PendingDraftsProvider>,
+    );
+    const click = async (init?: MouseEventInit) => {
+      await user.click(screen.getByRole("button", { name: /Switch connection/ }));
+      const link = await screen.findByRole("menuitem", { name });
+      let blocked = false;
+      // Observe the real link's default action without asking jsdom to navigate.
+      window.addEventListener(
+        "click",
+        (event) => {
+          blocked = event.defaultPrevented;
+          event.preventDefault();
+        },
+        { once: true },
+      );
+      fireEvent.click(link, init);
+      return blocked;
+    };
+    const unload = () => window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+    expect(await click({ ctrlKey: true })).toBe(false);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(unload()).toBe(false);
+    expect(await click()).toBe(true);
+    expect(unload()).toBe(false);
+    confirm.mockReturnValue(true);
+    expect(await click()).toBe(false);
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(unload()).toBe(true);
+    expect(unload()).toBe(false);
+  },
+);
 
 it.each(["offline", "malformed"])(
   "keeps the unindexed current connection when verification is %s",

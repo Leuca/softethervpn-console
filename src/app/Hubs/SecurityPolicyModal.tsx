@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useGuardedAction, usePendingDraft } from "@app/managed/pendingDrafts";
 import {
   Button,
   Content,
@@ -60,6 +61,10 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
   const setField = (key: string, value: unknown) => setDraft((prev) => ({ ...prev, [key]: value }));
   const clampInt = (value: number) => (Number.isNaN(value) || value < 0 ? 0 : value);
   const dirty = recordChanged(original, draft);
+  const guard = useGuardedAction();
+  const pending = () => isOpen && dirty;
+  usePendingDraft(pending);
+  const dismiss = () => guard(onClose, pending);
   const apply = () => {
     if (hasUsePolicySwitch) {
       onSave(draft);
@@ -71,7 +76,7 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
   };
 
   return (
-    <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={onClose}>
+    <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={dismiss}>
       <ModalHeader title={title} />
       <ModalBody>
         <Stack hasGutter>
@@ -141,7 +146,7 @@ const SecurityPolicyModal: React.FunctionComponent<SecurityPolicyModalProps> = (
         <Button variant="primary" onClick={apply} isDisabled={!dirty}>
           Apply
         </Button>
-        <Button variant="link" onClick={onClose}>
+        <Button variant="link" onClick={dismiss}>
           Cancel
         </Button>
       </ModalFooter>

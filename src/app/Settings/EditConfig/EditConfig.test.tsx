@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditConfig } from "./EditConfig";
+import { PendingDraftsProvider } from "@app/managed/pendingDrafts";
 import { api } from "@app/utils/vpnrpc_settings";
 
 vi.mock("@app/utils/vpnrpc_settings", () => ({
@@ -18,16 +19,26 @@ const configBase64 = (text: string) => btoa(String.fromCharCode(0xef, 0xbb, 0xbf
 describe("EditConfig", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("loads the config into the editor with the BOM stripped", async () => {
+  it("treats a BOM-prefixed CRLF config as clean until the textarea changes", async () => {
     getConfig.mockResolvedValue({
       FileName_str: "vpn_server.config",
-      FileData_bin: configBase64("declare root {\n}\n"),
+      FileData_bin: configBase64("declare root {\r\n}\r\n"),
     });
 
-    render(<EditConfig />);
+    render(
+      <PendingDraftsProvider>
+        <EditConfig />
+      </PendingDraftsProvider>,
+    );
 
     const area = (await screen.findByLabelText("VPN server configuration")) as HTMLTextAreaElement;
     expect(area.value).toBe("declare root {\n}\n");
+    const unload = () => window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+    expect(unload()).toBe(true);
+    await userEvent.type(area, "x");
+    expect(unload()).toBe(false);
+    await userEvent.keyboard("{Backspace}");
+    expect(unload()).toBe(true);
   });
 
   it("applies edited config (with BOM) after confirming", async () => {

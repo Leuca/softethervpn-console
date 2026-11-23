@@ -143,6 +143,7 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
   const hubRef = React.useRef<HTMLInputElement>(null);
   const passwordRef = React.useRef<HTMLInputElement>(null);
   const errorRef = React.useRef<HTMLDivElement>(null);
+  const loggedIn = React.useRef(false);
 
   const readLoginFields = () => {
     const host = hostRef.current?.value.trim() ?? "";
@@ -157,12 +158,13 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
   };
   usePendingDraft(
     () =>
-      (hostRef.current?.value ?? "") !== (initialHints?.host ?? "") ||
-      portRef.current?.value !== String(initialHints?.port ?? DEFAULT_PORT) ||
-      hubLogin !== Boolean(initialHints?.hub.trim()) ||
-      (hubRef.current?.value ?? hubDraft) !== (initialHints?.hub ?? "") ||
-      !!passwordRef.current?.value ||
-      allowSelfSigned !== (initialHints?.allowSelfSigned ?? false),
+      !loggedIn.current &&
+      ((hostRef.current?.value ?? "") !== (initialHints?.host ?? "") ||
+        portRef.current?.value !== String(initialHints?.port ?? DEFAULT_PORT) ||
+        hubLogin !== Boolean(initialHints?.hub.trim()) ||
+        (hubRef.current?.value ?? hubDraft) !== (initialHints?.hub ?? "") ||
+        !!passwordRef.current?.value ||
+        allowSelfSigned !== (initialHints?.allowSelfSigned ?? false)),
   );
   const [invalid, setInvalid] = React.useState<
     ReturnType<typeof readLoginFields>["invalid"] | null
@@ -206,6 +208,7 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
           } else {
             clearLoginHints();
           }
+          loggedIn.current = true;
           onLogin(session);
         } else {
           setError({

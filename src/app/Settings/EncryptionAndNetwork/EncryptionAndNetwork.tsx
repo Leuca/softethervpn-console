@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import { usePendingDraft, useDraftState } from "@app/managed/pendingDrafts";
 import {
   Alert,
@@ -236,6 +237,8 @@ const ServerCertCard: React.FunctionComponent = () => {
     }
   };
 
+  const dismissRegen = useEditorDismiss(regenOpen, cn, () => setRegenOpen(false));
+
   return (
     <Card isFullHeight>
       <CardTitle>Server SSL certificate</CardTitle>
@@ -393,7 +396,7 @@ const ServerCertCard: React.FunctionComponent = () => {
       <Modal
         variant={ModalVariant.small}
         isOpen={regenOpen}
-        onClose={() => !regenerating && setRegenOpen(false)}
+        onClose={() => !regenerating && dismissRegen()}
       >
         <ModalHeader title="Regenerate self-signed certificate" />
         <ModalBody>
@@ -421,7 +424,7 @@ const ServerCertCard: React.FunctionComponent = () => {
           >
             Regenerate
           </Button>
-          <Button variant="link" onClick={() => setRegenOpen(false)} isDisabled={regenerating}>
+          <Button variant="link" onClick={dismissRegen} isDisabled={regenerating}>
             Cancel
           </Button>
         </ModalFooter>

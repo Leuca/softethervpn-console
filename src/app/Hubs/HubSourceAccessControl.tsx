@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -294,6 +295,12 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
     setPendingDelete(null);
   };
 
+  const openEditor = () => {
+    setRules(null);
+    setOpen(true);
+  };
+  const dismissEditor = useEditorDismiss(open && rules !== null, rules, () => setOpen(false));
+
   const save = () => {
     if (rules === null) {
       return;
@@ -312,12 +319,14 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
       });
   };
 
+  const dismissDraft = useEditorDismiss(draft !== null, draft, () => setDraft(null));
+
   return (
     <>
       {trigger ? (
-        trigger(() => setOpen(true))
+        trigger(openEditor)
       ) : (
-        <Button variant="secondary" onClick={() => setOpen(true)}>
+        <Button variant="secondary" onClick={openEditor}>
           Source IP Access Control
         </Button>
       )}
@@ -325,7 +334,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
       <Modal
         variant={ModalVariant.large}
         isOpen={open && draft === null && pendingDelete === null}
-        onClose={() => setOpen(false)}
+        onClose={dismissEditor}
         aria-label="Source IP Access Control"
       >
         <ModalHeader title="Source IP Access Control" />
@@ -423,7 +432,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
           >
             Save rules
           </Button>
-          <Button variant="link" onClick={() => setOpen(false)} isDisabled={saving}>
+          <Button variant="link" onClick={dismissEditor} isDisabled={saving}>
             Close
           </Button>
         </ModalFooter>
@@ -432,7 +441,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
       <Modal
         variant={ModalVariant.medium}
         isOpen={draft !== null}
-        onClose={() => setDraft(null)}
+        onClose={dismissDraft}
         aria-label="Source IP rule"
       >
         <ModalHeader
@@ -533,7 +542,7 @@ const HubSourceAccessControl: React.FunctionComponent<HubSourceAccessControlProp
           <Button variant="primary" onClick={saveDraft} isDisabled={validation.length > 0}>
             {draft?.id === null ? "Add rule" : "Save rule"}
           </Button>
-          <Button variant="link" onClick={() => setDraft(null)}>
+          <Button variant="link" onClick={dismissDraft}>
             Cancel
           </Button>
         </ModalFooter>

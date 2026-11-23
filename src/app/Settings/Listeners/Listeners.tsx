@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -131,6 +132,8 @@ const Listeners: React.FunctionComponent = () => {
     </Button>
   );
 
+  const dismissCreate = useEditorDismiss(createOpen, newPort, () => setCreateOpen(false));
+
   return (
     <AppPage
       title="Listeners"
@@ -206,7 +209,7 @@ const Listeners: React.FunctionComponent = () => {
       <Modal
         variant={ModalVariant.small}
         isOpen={createOpen}
-        onClose={() => !busy && setCreateOpen(false)}
+        onClose={() => !busy && dismissCreate()}
       >
         <ModalHeader title="Create listener" />
         <ModalBody>
@@ -263,7 +266,7 @@ const Listeners: React.FunctionComponent = () => {
           >
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={busy}>
+          <Button variant="link" onClick={dismissCreate} isDisabled={busy}>
             Cancel
           </Button>
         </ModalFooter>

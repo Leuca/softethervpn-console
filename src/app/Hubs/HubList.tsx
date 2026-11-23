@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -141,6 +142,10 @@ const HubList: React.FunctionComponent = () => {
     </Button>
   );
 
+  const dismissCreate = useEditorDismiss(createOpen, [name, password, confirm], () =>
+    setCreateOpen(false),
+  );
+
   return (
     <AppPage
       title="Virtual Hubs"
@@ -256,7 +261,7 @@ const HubList: React.FunctionComponent = () => {
       <Modal
         variant={ModalVariant.small}
         isOpen={!hideAdminOnly && createOpen}
-        onClose={() => !busy && setCreateOpen(false)}
+        onClose={() => !busy && dismissCreate()}
       >
         <ModalHeader title="Create Virtual Hub" />
         <ModalBody>
@@ -306,7 +311,7 @@ const HubList: React.FunctionComponent = () => {
           >
             Create
           </Button>
-          <Button variant="link" onClick={() => setCreateOpen(false)} isDisabled={busy}>
+          <Button variant="link" onClick={dismissCreate} isDisabled={busy}>
             Cancel
           </Button>
         </ModalFooter>

@@ -67,7 +67,7 @@ const EditConfig: React.FunctionComponent = () => {
         const bytes = binToBytes(response.FileData_bin);
         // TextDecoder strips a leading BOM; guard in case one survives.
         const decoded = bytes ? new TextDecoder().decode(bytes) : "";
-        setLoadedText(decoded.replace(/^\uFEFF/, ""));
+        setLoadedText(decoded.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n"));
       }),
     [],
   );

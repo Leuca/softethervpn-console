@@ -1,7 +1,8 @@
 import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
-import App from "./index";
+import { createConsoleRouter } from "./index";
+import { RouterProvider } from "react-router-dom";
 import { getSession } from "./managed/sessionApi";
 
 const testMode = vi.hoisted(() => ({ consoleMode: "integrated" }));
@@ -33,13 +34,14 @@ vi.mock("./managed/sessionApi", () => ({
 const getSessionMock = getSession as unknown as Mock;
 
 describe("App root mode switch", () => {
+  const renderApp = () => render(<RouterProvider router={createConsoleRouter()} />);
   afterEach(() => {
     testMode.consoleMode = "integrated";
     vi.clearAllMocks();
   });
 
   it("renders the app directly in integrated mode", () => {
-    render(<App />);
+    renderApp();
 
     expect(screen.getByText("Integrated app routes")).toBeInTheDocument();
     expect(getSessionMock).not.toHaveBeenCalled();
@@ -49,7 +51,7 @@ describe("App root mode switch", () => {
     testMode.consoleMode = "managed";
     getSessionMock.mockResolvedValue({ authenticated: false });
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByRole("button", { name: "Log in" })).toBeInTheDocument();
     expect(screen.queryByText("Integrated app routes")).not.toBeInTheDocument();

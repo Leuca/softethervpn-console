@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Breadcrumb,
@@ -120,6 +121,10 @@ const EtherIPDetailed: React.FunctionComponent = () => {
 
   const canCreate = id.trim() !== "" && hub !== "" && username.trim() !== "";
 
+  const dismissCreate = useEditorDismiss(createOpen, [id, hub, username, password], () =>
+    setCreateOpen(false),
+  );
+
   return (
     <>
       <Breadcrumb
@@ -188,11 +193,7 @@ const EtherIPDetailed: React.FunctionComponent = () => {
         </Stack>
 
         {/* Add client setting */}
-        <Modal
-          variant={ModalVariant.small}
-          isOpen={createOpen}
-          onClose={() => setCreateOpen(false)}
-        >
+        <Modal variant={ModalVariant.small} isOpen={createOpen} onClose={dismissCreate}>
           <ModalHeader title="Add EtherIP / L2TPv3 client setting" />
           <ModalBody>
             <Form>
@@ -242,7 +243,7 @@ const EtherIPDetailed: React.FunctionComponent = () => {
             <Button variant="primary" onClick={create} isDisabled={!canCreate}>
               Add
             </Button>
-            <Button variant="link" onClick={() => setCreateOpen(false)}>
+            <Button variant="link" onClick={dismissCreate}>
               Cancel
             </Button>
           </ModalFooter>

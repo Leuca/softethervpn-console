@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -190,6 +191,22 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
   const [pkcs12Error, setPkcs12Error] = React.useState<string | null>(null);
   const [openingPkcs12, setOpeningPkcs12] = React.useState(false);
 
+  // The same editor stays mounted while its policy or certificate subdialog is shown.
+  const dismiss = useEditorDismiss(
+    true,
+    [
+      user,
+      password,
+      certFilename,
+      rootCommonNameEnabled,
+      rootSerialEnabled,
+      rootSerial,
+      pkcs12Filename,
+      pkcs12Password,
+    ],
+    onClose,
+  );
+
   const readPkcs12 = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => setPkcs12Bytes(new Uint8Array(reader.result as ArrayBuffer));
@@ -220,7 +237,7 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
   };
 
   return (
-    <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={() => !isSubmitting && onClose()}>
+    <Modal variant={ModalVariant.medium} isOpen={isOpen} onClose={() => !isSubmitting && dismiss()}>
       <ModalHeader title={isCreate ? "New user" : `Edit ${String(user.Name_str)}`} />
       <ModalBody>
         <FormErrorAlert error={error} title="User operation failed" />
@@ -520,7 +537,7 @@ const UserSettingsModal: React.FunctionComponent<UserSettingsModalProps> = ({
         >
           {isCreate ? "Create" : "Save"}
         </Button>
-        <Button variant="link" onClick={onClose} isDisabled={isSubmitting}>
+        <Button variant="link" onClick={dismiss} isDisabled={isSubmitting}>
           Cancel
         </Button>
       </ModalFooter>

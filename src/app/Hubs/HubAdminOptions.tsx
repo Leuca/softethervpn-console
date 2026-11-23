@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -63,6 +64,12 @@ const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, t
     }
   }, [load, open]);
 
+  const openEditor = () => {
+    setOptions(null);
+    setOpen(true);
+  };
+  const dismissEditor = useEditorDismiss(open && options !== null, options, () => setOpen(false));
+
   const save = () => {
     if (options === null) {
       return;
@@ -90,9 +97,9 @@ const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, t
   return (
     <>
       {trigger ? (
-        trigger(() => setOpen(true))
+        trigger(openEditor)
       ) : (
-        <Button variant="secondary" onClick={() => setOpen(true)}>
+        <Button variant="secondary" onClick={openEditor}>
           Administration Options
         </Button>
       )}
@@ -100,7 +107,7 @@ const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, t
       <Modal
         variant={ModalVariant.large}
         isOpen={open}
-        onClose={() => !saving && setOpen(false)}
+        onClose={() => !saving && dismissEditor()}
         aria-label="Virtual Hub Administration Options"
       >
         <ModalHeader title="Virtual Hub Administration Options" />
@@ -140,7 +147,7 @@ const HubAdminOptions: React.FunctionComponent<HubAdminOptionsProps> = ({ hub, t
           >
             Save options
           </Button>
-          <Button variant="link" onClick={() => setOpen(false)} isDisabled={saving}>
+          <Button variant="link" onClick={dismissEditor} isDisabled={saving}>
             Close
           </Button>
         </ModalFooter>

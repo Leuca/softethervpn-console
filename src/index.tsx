@@ -1,11 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "@app/index";
+import { createConsoleRouter } from "@app/index";
+import { RouterProvider } from "react-router-dom";
 
 const root = ReactDOM.createRoot(document.getElementById("root") as Element);
 
 root.render(
   <React.StrictMode>
-    <App />
+    <RouterProvider router={createConsoleRouter()} />
   </React.StrictMode>,
 );

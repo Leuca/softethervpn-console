@@ -1,4 +1,5 @@
 import * as React from "react";
+import { PendingDraftsProvider } from "@app/managed/pendingDrafts";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
@@ -138,8 +139,19 @@ describe("HubLogs", () => {
     enumLogFile.mockResolvedValue({ LogFiles: [logFile] });
     const user = userEvent.setup();
 
-    render(<HubLogs hub="DEFAULT" />);
+    render(
+      <PendingDraftsProvider>
+        <HubLogs hub="DEFAULT" />
+      </PendingDraftsProvider>,
+    );
+    const cycle = await screen.findByLabelText("Security log file switch cycle");
+    await user.selectOptions(cycle, "5");
     await user.click(screen.getByRole("tab", { name: "Files" }));
+    await user.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(cycle).toHaveValue("5");
+    expect(enumLogFile).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "Files" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
     await screen.findByText("@security_log/DEFAULT/20260706.log");
     expect(enumLogFile).toHaveBeenCalledTimes(1);
 

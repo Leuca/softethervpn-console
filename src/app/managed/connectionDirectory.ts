@@ -1,4 +1,4 @@
-import { validId } from "./connection";
+import { forgetPosition, validId } from "./connection";
 import { getSession, ManagedSession } from "./sessionApi";
 
 export type Connection = Extract<ManagedSession, { authenticated: true }>;
@@ -7,6 +7,7 @@ export const directoryPrefix = "softether-vpn-console.connection.";
 // One key per ID avoids lost updates between tabs. Labels and credentials stay out of storage.
 export const indexConnection = (id: string, active: boolean) => {
   if (!validId.test(id)) return;
+  if (!active) forgetPosition(id);
   try {
     if (active) localStorage.setItem(directoryPrefix + id, "1");
     else localStorage.removeItem(directoryPrefix + id);

@@ -1,5 +1,6 @@
 import * as React from "react";
-import App from "@app/index";
+import { createConsoleRouter } from "@app/index";
+import { RouterProvider } from "react-router-dom";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
@@ -78,6 +79,11 @@ async function withDesktopWidth(fn: () => Promise<void>) {
 }
 
 describe("App tests", () => {
+  const App = () => {
+    const [router] = React.useState(createConsoleRouter);
+    React.useEffect(() => () => router.dispose(), [router]);
+    return <RouterProvider router={router} />;
+  };
   const enumConnection = api.EnumConnection as unknown as Mock;
   const getCaps = api.GetCaps as unknown as Mock;
   const defaultCaps = {

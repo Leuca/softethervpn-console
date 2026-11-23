@@ -443,7 +443,7 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           setRuntimeOpen(false);
         }
         setToggling(false);
-        load();
+        setEnabled(nextEnabled);
       })
       .catch((e) => {
         setConfirmEnable(false);

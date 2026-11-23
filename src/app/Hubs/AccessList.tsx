@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEditorDismiss } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -774,6 +775,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const showTcpState = caps.supportTcpState && protocol === 6;
   const allowPassEffects = draft ? !draft.discard : false;
 
+  const dismissEditor = useEditorDismiss(editor !== null, editor, () => setEditor(null));
+
   return (
     <Flex
       direction={{ default: "column" }}
@@ -892,7 +895,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ScrollableTable>
       ) : null}
 
-      <Modal variant={ModalVariant.large} isOpen={editor !== null} onClose={() => setEditor(null)}>
+      <Modal variant={ModalVariant.large} isOpen={editor !== null} onClose={dismissEditor}>
         <ModalHeader
           title={
             editor?.mode === "create"
@@ -1406,7 +1409,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <Button variant="primary" onClick={saveEditor} isDisabled={busy || validation.length > 0}>
             {editor?.mode === "edit" ? "Save" : "Create"}
           </Button>
-          <Button variant="link" onClick={() => setEditor(null)}>
+          <Button variant="link" onClick={dismissEditor}>
             Cancel
           </Button>
         </ModalFooter>
