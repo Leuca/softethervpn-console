@@ -114,6 +114,45 @@ body,
   z-index: var(--pf-t--global--z-index--md);
 }
 
+.se-masthead.se-masthead--managed {
+  --se-tool-size: 2.5rem;
+  --pf-v6-c-masthead--PaddingBlock: 0.375rem;
+  --pf-v6-c-masthead__main--MarginInlineEnd: var(--pf-t--global--spacer--sm);
+  --pf-v6-c-masthead__logo--Width: auto;
+  --pf-v6-c-masthead__logo--MaxHeight: 2rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+.se-masthead--managed .se-masthead-actions {
+  min-inline-size: 0;
+  gap: var(--pf-t--global--spacer--xs);
+}
+.se-masthead--managed .pf-v6-c-masthead__brand,
+.se-masthead--managed .pf-v6-c-masthead__toggle {
+  display: flex;
+  align-items: center;
+}
+.se-masthead--managed .se-masthead-actions .pf-v6-c-menu-toggle,
+.se-masthead--managed .pf-v6-c-masthead__toggle button {
+  inline-size: var(--se-tool-size);
+  block-size: var(--se-tool-size);
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (any-pointer: coarse) {
+  .se-masthead.se-masthead--managed { --se-tool-size: 2.75rem; }
+}
+@media (max-width: 600px) {
+  .se-masthead.se-masthead--managed {
+    --pf-v6-c-masthead--PaddingInline: var(--pf-t--global--spacer--sm);
+    --pf-v6-c-masthead--m-display-inline__main--ColumnGap: var(--pf-t--global--spacer--xs);
+  }
+  .se-masthead--managed .se-brand__text { display: none; }
+}
+
 .se-app-page__header {
   background-color: var(--pf-t--global--background--color--primary--default);
   box-shadow: var(--pf-t--global--box-shadow--sm--bottom);

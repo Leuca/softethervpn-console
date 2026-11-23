@@ -1,11 +1,9 @@
 import * as React from "react";
+import { usePendingDraft } from "@app/managed/pendingDrafts";
 import {
   ActionGroup,
   Alert,
   Button,
-  Card,
-  CardBody,
-  CardTitle,
   Checkbox,
   ExpandableSection,
   Form,
@@ -157,6 +155,15 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
       invalid: { host: !host, port: !validPort(port), hub: hubLogin && !hub, password: !password },
     };
   };
+  usePendingDraft(
+    () =>
+      (hostRef.current?.value ?? "") !== (initialHints?.host ?? "") ||
+      portRef.current?.value !== String(initialHints?.port ?? DEFAULT_PORT) ||
+      hubLogin !== Boolean(initialHints?.hub.trim()) ||
+      (hubRef.current?.value ?? hubDraft) !== (initialHints?.hub ?? "") ||
+      !!passwordRef.current?.value ||
+      allowSelfSigned !== (initialHints?.allowSelfSigned ?? false),
+  );
   const [invalid, setInvalid] = React.useState<
     ReturnType<typeof readLoginFields>["invalid"] | null
   >(null);
@@ -228,221 +235,227 @@ const ManagedLoginForm: React.FunctionComponent<ManagedLoginFormProps> = ({ onLo
     }
   };
 
-  return (
-    <Card className="se-managed-login-card">
-      <CardTitle>Server connection</CardTitle>
-      <CardBody>
-        <Stack hasGutter>
-          {error && (
-            <StackItem>
-              <div id="managed-login-error" ref={errorRef} tabIndex={-1}>
-                <Alert variant="danger" title={error.title} isInline isLiveRegion>
-                  {error.message}
-                </Alert>
-              </div>
-            </StackItem>
+  // iOS AutoFill can mistake the host for a username. Desktop extensions need
+  // its custom fields inside the same native form as the password.
+  const separateDetails =
+    /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const formProps = {
+    method: "post",
+    onSubmit: handleSubmit,
+    onChange: revalidate,
+    "aria-busy": submitting,
+  };
+  const details = (
+    <>
+      <div className="se-managed-login__target-fields">
+        <FormGroup label="Server host" fieldId="managed-login-host" isRequired>
+          <TextInput
+            id="managed-login-host"
+            name="host"
+            autoComplete="url"
+            autoCapitalize="none"
+            spellCheck={false}
+            ref={hostRef}
+            defaultValue={initialHints?.host ?? ""}
+            placeholder="vpn.example.com"
+            validated={invalid?.host ? "error" : "default"}
+            aria-label="Server host"
+            aria-describedby={invalid?.host ? "managed-login-host-error" : undefined}
+            aria-invalid={invalid?.host ?? false}
+            isDisabled={submitting}
+          />
+          {invalid?.host && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem id="managed-login-host-error" variant="error">
+                  Enter the SoftEther server host name or IP address.
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
           )}
-          <StackItem>
-            {/* Keep connection details out of Safari's password autofill form. */}
-            <Form
-              aria-label="SoftEther server details"
-              method="post"
-              onSubmit={handleSubmit}
-              onChange={revalidate}
-              aria-busy={submitting}
-            >
-              <div className="se-managed-login__target-fields">
-                <FormGroup label="Server host" fieldId="managed-login-host" isRequired>
-                  <TextInput
-                    id="managed-login-host"
-                    name="host"
-                    autoComplete="url"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    ref={hostRef}
-                    defaultValue={initialHints?.host ?? ""}
-                    placeholder="vpn.example.com"
-                    validated={invalid?.host ? "error" : "default"}
-                    aria-label="Server host"
-                    aria-describedby={invalid?.host ? "managed-login-host-error" : undefined}
-                    aria-invalid={invalid?.host ?? false}
-                    isDisabled={submitting}
-                  />
-                  {invalid?.host && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem id="managed-login-host-error" variant="error">
-                          Enter the SoftEther server host name or IP address.
-                        </HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </FormGroup>
-                <FormGroup label="Port" fieldId="managed-login-port" isRequired>
-                  <TextInput
-                    type="number"
-                    id="managed-login-port"
-                    name="port"
-                    ref={portRef}
-                    min={1}
-                    max={65535}
-                    defaultValue={String(initialHints?.port ?? DEFAULT_PORT)}
-                    validated={invalid?.port ? "error" : "default"}
-                    aria-label="Port"
-                    aria-describedby={invalid?.port ? "managed-login-port-error" : undefined}
-                    aria-invalid={invalid?.port ?? false}
-                    isDisabled={submitting}
-                  />
-                  {invalid?.port && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem id="managed-login-port-error" variant="error">
-                          Enter a TCP port between 1 and 65535.
-                        </HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </FormGroup>
-              </div>
-              <FormGroup label="Administrator scope" fieldId="managed-login-scope" role="group">
-                <ToggleGroup role="presentation" areAllGroupsDisabled={submitting}>
-                  <ToggleGroupItem
-                    text="Server"
-                    isSelected={!hubLogin}
-                    onChange={() => selectScope(false)}
-                  />
-                  <ToggleGroupItem
-                    text="Virtual Hub"
-                    isSelected={hubLogin}
-                    onChange={() => selectScope(true)}
-                  />
-                </ToggleGroup>
-              </FormGroup>
-              <button type="submit" hidden disabled={submitting} />
-            </Form>
-          </StackItem>
-          <StackItem>
-            {/* A new form keeps the previous scope's password out of the new scope. */}
-            <Form
-              key={hubLogin ? "hub" : "server"}
-              aria-label={hubLogin ? "SoftEther Virtual Hub login" : "SoftEther server login"}
-              method="post"
-              onSubmit={handleSubmit}
-              onChange={revalidate}
-              aria-busy={submitting}
-            >
-              {hubLogin && (
-                <FormGroup label="Virtual Hub" fieldId="managed-login-hub" isRequired>
-                  <TextInput
-                    id="managed-login-hub"
-                    name="hub"
-                    ref={hubRef}
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    defaultValue={hubDraft}
-                    isRequired
-                    validated={invalid?.hub ? "error" : "default"}
-                    aria-describedby={invalid?.hub ? "managed-login-hub-error" : undefined}
-                    aria-invalid={invalid?.hub ?? false}
-                    isDisabled={submitting}
-                  />
-                  {invalid?.hub && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem id="managed-login-hub-error" variant="error">
-                          Enter the Virtual Hub name.
-                        </HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </FormGroup>
-              )}
-              <FormGroup label="Password" fieldId="managed-login-password" isRequired>
-                <TextInput
-                  type="password"
-                  id="managed-login-password"
-                  name="password"
-                  ref={passwordRef}
-                  autoComplete="current-password"
-                  validated={invalid?.password ? "error" : "default"}
-                  aria-label="Password"
-                  aria-describedby={invalid?.password ? "managed-login-password-error" : undefined}
-                  aria-invalid={invalid?.password ?? false}
-                  isDisabled={submitting}
-                />
-                {invalid?.password && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem id="managed-login-password-error" variant="error">
-                        Enter the administrator password.
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </FormGroup>
-              <ExpandableSection
-                isExpanded={advancedOpen}
-                toggleText="Advanced connection options"
-                onToggle={(_event, expanded) => setAdvancedOpen(expanded)}
-              >
-                <FormGroup fieldId="managed-login-allow-self-signed">
-                  <Checkbox
-                    id="managed-login-allow-self-signed"
-                    label="Allow a self-signed SoftEther server certificate"
-                    isChecked={allowSelfSigned}
-                    onChange={(_event, checked) => setAllowSelfSigned(checked)}
-                    isDisabled={submitting}
-                  />
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem>
-                        Certificate verification will be disabled. Use this only for a trusted
-                        private server.
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                </FormGroup>
-              </ExpandableSection>
-              <FormGroup fieldId="managed-login-remember-server">
-                <Checkbox
-                  id="managed-login-remember-server"
-                  label="Remember server details on this browser"
-                  isChecked={rememberServer}
-                  onChange={(_event, checked) => {
-                    setRememberServer(checked);
-                    if (!checked) {
-                      clearLoginHints();
-                    }
-                  }}
-                  isDisabled={submitting}
-                />
-                <FormHelperText>
-                  <HelperText>
-                    <HelperTextItem>
-                      Saves the host, port, Virtual Hub, and certificate preference. The
-                      administrator password is never saved. Clear this checkbox to forget the saved
-                      details.
-                    </HelperTextItem>
-                  </HelperText>
-                </FormHelperText>
-              </FormGroup>
-              <ActionGroup>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  isLoading={submitting}
-                  isDisabled={submitting}
-                  spinnerAriaValueText="Logging in"
-                >
-                  Log in
-                </Button>
-              </ActionGroup>
-            </Form>
-          </StackItem>
-        </Stack>
-      </CardBody>
-    </Card>
+        </FormGroup>
+        <FormGroup label="Port" fieldId="managed-login-port" isRequired>
+          <TextInput
+            type="number"
+            id="managed-login-port"
+            name="port"
+            ref={portRef}
+            min={1}
+            max={65535}
+            defaultValue={String(initialHints?.port ?? DEFAULT_PORT)}
+            validated={invalid?.port ? "error" : "default"}
+            aria-label="Port"
+            aria-describedby={invalid?.port ? "managed-login-port-error" : undefined}
+            aria-invalid={invalid?.port ?? false}
+            isDisabled={submitting}
+          />
+          {invalid?.port && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem id="managed-login-port-error" variant="error">
+                  Enter a TCP port between 1 and 65535.
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+        </FormGroup>
+      </div>
+      <FormGroup label="Administrator scope" fieldId="managed-login-scope" role="group">
+        <ToggleGroup role="presentation" areAllGroupsDisabled={submitting}>
+          <ToggleGroupItem
+            text="Server"
+            isSelected={!hubLogin}
+            onChange={() => selectScope(false)}
+          />
+          <ToggleGroupItem
+            text="Virtual Hub"
+            isSelected={hubLogin}
+            onChange={() => selectScope(true)}
+          />
+        </ToggleGroup>
+      </FormGroup>
+    </>
+  );
+  const credentials = (
+    <React.Fragment key={hubLogin ? "hub" : "server"}>
+      {hubLogin && (
+        <FormGroup label="Virtual Hub" fieldId="managed-login-hub" isRequired>
+          <TextInput
+            id="managed-login-hub"
+            name="hub"
+            ref={hubRef}
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            defaultValue={hubDraft}
+            isRequired
+            validated={invalid?.hub ? "error" : "default"}
+            aria-describedby={invalid?.hub ? "managed-login-hub-error" : undefined}
+            aria-invalid={invalid?.hub ?? false}
+            isDisabled={submitting}
+          />
+          {invalid?.hub && (
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem id="managed-login-hub-error" variant="error">
+                  Enter the Virtual Hub name.
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          )}
+        </FormGroup>
+      )}
+      <FormGroup label="Password" fieldId="managed-login-password" isRequired>
+        <TextInput
+          type="password"
+          id="managed-login-password"
+          name="password"
+          ref={passwordRef}
+          autoComplete="current-password"
+          validated={invalid?.password ? "error" : "default"}
+          aria-label="Password"
+          aria-describedby={invalid?.password ? "managed-login-password-error" : undefined}
+          aria-invalid={invalid?.password ?? false}
+          isDisabled={submitting}
+        />
+        {invalid?.password && (
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem id="managed-login-password-error" variant="error">
+                Enter the administrator password.
+              </HelperTextItem>
+            </HelperText>
+          </FormHelperText>
+        )}
+      </FormGroup>
+      <ExpandableSection
+        isExpanded={advancedOpen}
+        toggleText="Advanced connection options"
+        onToggle={(_event, expanded) => setAdvancedOpen(expanded)}
+      >
+        <FormGroup fieldId="managed-login-allow-self-signed">
+          <Checkbox
+            id="managed-login-allow-self-signed"
+            label="Allow a self-signed SoftEther server certificate"
+            isChecked={allowSelfSigned}
+            onChange={(_event, checked) => setAllowSelfSigned(checked)}
+            isDisabled={submitting}
+          />
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem>
+                Certificate verification will be disabled. Use this only for a trusted private
+                server.
+              </HelperTextItem>
+            </HelperText>
+          </FormHelperText>
+        </FormGroup>
+      </ExpandableSection>
+      <FormGroup fieldId="managed-login-remember-server">
+        <Checkbox
+          id="managed-login-remember-server"
+          label="Remember server details on this browser"
+          isChecked={rememberServer}
+          onChange={(_event, checked) => {
+            setRememberServer(checked);
+            if (!checked) {
+              clearLoginHints();
+            }
+          }}
+          isDisabled={submitting}
+        />
+        <FormHelperText>
+          <HelperText>
+            <HelperTextItem>
+              Saves the host, port, Virtual Hub, and certificate preference, but not your password.
+            </HelperTextItem>
+          </HelperText>
+        </FormHelperText>
+      </FormGroup>
+      <ActionGroup>
+        <Button
+          type="submit"
+          variant="primary"
+          isLoading={submitting}
+          isDisabled={submitting}
+          spinnerAriaValueText="Logging in"
+        >
+          Log in
+        </Button>
+      </ActionGroup>
+    </React.Fragment>
+  );
+  return (
+    <Stack hasGutter>
+      {error && (
+        <StackItem>
+          <div id="managed-login-error" ref={errorRef} tabIndex={-1}>
+            <Alert variant="danger" title={error.title} isInline isLiveRegion>
+              {error.message}
+            </Alert>
+          </div>
+        </StackItem>
+      )}
+      {separateDetails && (
+        <StackItem>
+          <Form {...formProps} aria-label="SoftEther server details">
+            {details}
+            <button type="submit" hidden disabled={submitting} />
+          </Form>
+        </StackItem>
+      )}
+      <StackItem>
+        <Form
+          {...formProps}
+          key={separateDetails ? String(hubLogin) : "desktop"}
+          aria-label={hubLogin ? "SoftEther Virtual Hub login" : "SoftEther server login"}
+        >
+          {!separateDetails && details}
+          {credentials}
+        </Form>
+      </StackItem>
+    </Stack>
   );
 };
 

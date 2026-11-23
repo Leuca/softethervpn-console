@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useDraftBaseline } from "@app/managed/pendingDrafts";
 import {
   ActionGroup,
   Alert,
@@ -63,6 +64,7 @@ const DdnsSection: React.FunctionComponent = () => {
   const [status, setStatus] = React.useState<VPN.VpnDDnsClientStatus | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [hostname, setHostname] = React.useState("");
+  const markHostnameSaved = useDraftBaseline(hostname);
   const [changing, setChanging] = React.useState(false);
   const [changeError, setChangeError] = React.useState<string | null>(null);
   // FQDN to offer regenerating the server cert for (null = no prompt).
@@ -77,9 +79,10 @@ const DdnsSection: React.FunctionComponent = () => {
       .then((response) => {
         setStatus(response);
         setHostname(response.CurrentHostName_str);
+        markHostnameSaved(response.CurrentHostName_str);
       })
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [markHostnameSaved]);
 
   React.useEffect(() => {
     load();
@@ -117,10 +120,14 @@ const DdnsSection: React.FunctionComponent = () => {
     setCertDone(false);
     api
       .ChangeDDnsClientHostname(new VPN.VpnRpcTest({ StrValue_str: hostname }))
-      .then(() => api.GetDDnsClientStatus())
+      .then(() => {
+        markHostnameSaved(hostname);
+        return api.GetDDnsClientStatus();
+      })
       .then((response) => {
         setStatus(response);
         setHostname(response.CurrentHostName_str);
+        markHostnameSaved(response.CurrentHostName_str);
         setChanging(false);
         maybePromptCertRegen(response.CurrentFqdn_str);
       })
@@ -336,6 +343,8 @@ const ProxySection: React.FunctionComponent = () => {
   const [port, setPort] = React.useState(8080);
   const [user, setUser] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const proxyDraft = [proxyType, host, port, user, password] as const;
+  const markProxySaved = useDraftBaseline(proxyDraft);
 
   const load = React.useCallback(() => {
     setError(null);
@@ -348,6 +357,13 @@ const ProxySection: React.FunctionComponent = () => {
         setPort(response.ProxyPort_u32 || 8080);
         setUser(response.ProxyUsername_str);
         setPassword(response.ProxyPassword_str);
+        markProxySaved([
+          response.ProxyType_u32,
+          response.ProxyHostName_str,
+          response.ProxyPort_u32 || 8080,
+          response.ProxyUsername_str,
+          response.ProxyPassword_str,
+        ]);
         setLoaded(true);
       })
       .catch((e) => {
@@ -357,7 +373,7 @@ const ProxySection: React.FunctionComponent = () => {
           setError(String(e));
         }
       });
-  }, []);
+  }, [markProxySaved]);
 
   React.useEffect(() => {
     load();
@@ -379,6 +395,7 @@ const ProxySection: React.FunctionComponent = () => {
         }),
       )
       .then(() => {
+        markProxySaved(proxyDraft);
         setSaving(false);
         load();
       })

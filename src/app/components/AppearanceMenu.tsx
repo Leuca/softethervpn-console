@@ -68,6 +68,7 @@ const AppearanceMenu: React.FunctionComponent<AppearanceMenuProps> = ({ classNam
       toggle={(toggleRef) => (
         <MenuToggle
           ref={toggleRef}
+          variant="plain"
           className={className}
           aria-label={`Appearance, color scheme: ${colorSchemeLabel}, contrast: ${contrastLabel}`}
           title={`Theme selection, current: ${colorSchemeLabel}`}

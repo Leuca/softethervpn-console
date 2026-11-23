@@ -7,6 +7,7 @@ import { AppRoutes } from "@app/routes";
 import { ServerProvider, useServer } from "@app/ServerContext";
 import { consoleMode } from "@app/consoleMode";
 import { ManagedSessionGate } from "@app/managed/ManagedSessionGate";
+import { PendingDraftsProvider } from "@app/managed/pendingDrafts";
 import { ThemeProvider } from "@app/ThemeContext";
 import "@app/app.css";
 
@@ -36,11 +37,13 @@ const App: React.FunctionComponent = () => (
   <ThemeProvider>
     <Router>
       {consoleMode === "managed" ? (
-        <ManagedSessionGate>
-          <ServerProvider>
-            <AppShell />
-          </ServerProvider>
-        </ManagedSessionGate>
+        <PendingDraftsProvider>
+          <ManagedSessionGate>
+            <ServerProvider>
+              <AppShell />
+            </ServerProvider>
+          </ManagedSessionGate>
+        </PendingDraftsProvider>
       ) : (
         <ServerProvider>
           <AppShell />

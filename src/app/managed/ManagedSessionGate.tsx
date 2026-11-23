@@ -10,7 +10,9 @@ import {
   StackItem,
 } from "@patternfly/react-core";
 import { ManagedLoginForm } from "./ManagedLoginForm";
-import { openConnection } from "./connection";
+import { connectionId, openConnection } from "./connection";
+import { directoryPrefix, indexConnection } from "./connectionDirectory";
+import { ConnectionSwitcher } from "./ConnectionSwitcher";
 import { ManagedSession, getSession, logout } from "./sessionApi";
 import logo from "@app/bgimages/icons8-softether-vpn.svg";
 import { AppearanceMenu } from "@app/components/AppearanceMenu";
@@ -23,6 +25,8 @@ interface ManagedSessionGateProps {
 }
 
 interface ManagedSessionControls {
+  current: AuthenticatedManagedSession;
+  expired: () => void;
   isLoggingOut: boolean;
   logout: () => void;
 }
@@ -44,6 +48,8 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
     getSession()
       .then((nextSession) => {
         if (active) {
+          if (nextSession.authenticated) indexConnection(nextSession.connectionId, true);
+          else if (connectionId) indexConnection(connectionId, false);
           setSession(nextSession);
           setError(null);
         }
@@ -61,17 +67,43 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
   }, []);
 
   const handleLogin = (nextSession: AuthenticatedManagedSession) => {
+    indexConnection(nextSession.connectionId, true);
     openConnection(nextSession.connectionId);
   };
+
+  const expired = React.useCallback(() => setSession({ authenticated: false }), []);
 
   const handleLogout = () => {
     setIsLoggingOut(true);
     setLogoutError(null);
     logout()
-      .then(() => setSession({ authenticated: false }))
+      .then(() => {
+        if (connectionId) indexConnection(connectionId, false);
+        setSession({ authenticated: false });
+      })
       .catch((e) => setLogoutError(e instanceof Error ? e.message : String(e)))
       .finally(() => setIsLoggingOut(false));
   };
+
+  React.useEffect(() => {
+    if (!session?.authenticated) return;
+    let live = true;
+    const removed = (event: StorageEvent) => {
+      if (event.key !== directoryPrefix + session.connectionId || event.newValue !== null) return;
+      void getSession()
+        .then((next) => {
+          if (live && !next.authenticated) setSession(next);
+        })
+        .catch(() => {
+          /* A storage notification is not proof of logout. */
+        });
+    };
+    window.addEventListener("storage", removed);
+    return () => {
+      live = false;
+      window.removeEventListener("storage", removed);
+    };
+  }, [session]);
 
   if (session === null) {
     return (
@@ -84,23 +116,21 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
   if (!session.authenticated) {
     return (
       <div className="se-managed-login">
-        <AppearanceMenu className="se-managed-login__appearance-menu" />
-        <div className="se-managed-login__panel">
-          <div className="se-managed-login__intro">
-            <div className="se-managed-login__brand">
-              <img src={logo} className="se-managed-login__logo" alt="" />
-              <span className="se-managed-login__brand-text">
-                <strong>SoftEther</strong>
-                <span>VPN Console</span>
-              </span>
-            </div>
-            <div className="se-managed-login__copy">
-              <Content component="h1">Connect to SoftEther VPN Server</Content>
-              <Content component="p">
-                Choose the server to manage. Your administrator password is used only to open this
-                secure session.
-              </Content>
-            </div>
+        <header className="se-managed-login__bar">
+          <div className="se-managed-login__brand">
+            <img src={logo} className="se-managed-login__logo" alt="" />
+            <span className="se-managed-login__brand-text">
+              <strong>SoftEther</strong>
+              <span>VPN Console</span>
+            </span>
+          </div>
+          <p className="se-managed-login__intro">Server and Virtual Hub administration</p>
+          <AppearanceMenu className="se-managed-login__appearance" />
+        </header>
+        <main className="se-managed-login__panel">
+          <div className="se-managed-login__heading">
+            <Content component="h1">Connect to server</Content>
+            <ConnectionSwitcher />
           </div>
           <Stack hasGutter>
             {error && (
@@ -114,13 +144,15 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
               <ManagedLoginForm onLogin={handleLogin} />
             </StackItem>
           </Stack>
-        </div>
+        </main>
       </div>
     );
   }
 
   return (
-    <ManagedSessionContext.Provider value={{ isLoggingOut, logout: handleLogout }}>
+    <ManagedSessionContext.Provider
+      value={{ current: session, expired, isLoggingOut, logout: handleLogout }}
+    >
       {logoutError && (
         <AlertGroup isToast isLiveRegion>
           <Alert

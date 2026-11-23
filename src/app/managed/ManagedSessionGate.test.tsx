@@ -5,9 +5,14 @@ import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
 import { ManagedSessionGate, useManagedSession } from "./ManagedSessionGate";
 import { ManagedSession, getSession, login, logout } from "./sessionApi";
 import { openConnection } from "./connection";
+import { ConnectionSwitcher } from "./ConnectionSwitcher";
+import { indexConnection, knownIds } from "./connectionDirectory";
 import { ThemeProvider } from "@app/ThemeContext";
 
-vi.mock("./connection", () => ({ openConnection: vi.fn() }));
+vi.mock("./connection", async (original) => ({
+  ...(await original<typeof import("./connection")>()),
+  openConnection: vi.fn(),
+}));
 
 vi.mock("./sessionApi", () => ({
   getSession: vi.fn(),
@@ -25,6 +30,7 @@ const ManagedApp = () => {
   return (
     <div>
       Managed app
+      {session && <ConnectionSwitcher current={session.current} onExpired={session.expired} />}
       <button type="button" onClick={session?.logout}>
         Log out
       </button>
@@ -44,6 +50,7 @@ const renderGate = () =>
 describe("ManagedSessionGate", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it("shows a first-load spinner while checking the session", () => {
@@ -85,7 +92,7 @@ describe("ManagedSessionGate", () => {
     getSessionMock.mockResolvedValue({ authenticated: false } satisfies ManagedSession);
     loginMock.mockResolvedValue({
       authenticated: true,
-      connectionId: "test-connection",
+      connectionId: "a".repeat(43),
       host: "vpn.example.com",
       port: 443,
       hub: "",
@@ -98,8 +105,36 @@ describe("ManagedSessionGate", () => {
     await user.type(screen.getByLabelText("Password"), "secret");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
-    expect(openConnection).toHaveBeenCalledWith("test-connection");
+    expect(openConnection).toHaveBeenCalledWith("a".repeat(43));
+    expect(knownIds()).toEqual(["a".repeat(43)]);
     expect(screen.queryByText("Managed app")).not.toBeInTheDocument();
+  });
+
+  it("returns to login for an expired current connection and keeps the other server selectable", async () => {
+    const a = {
+      authenticated: true,
+      connectionId: "a".repeat(43),
+      host: "alpha.test",
+      port: 443,
+      hub: "",
+    };
+    const b = { ...a, connectionId: "b".repeat(43), host: "beta.test" };
+    indexConnection(b.connectionId, true);
+    getSessionMock
+      .mockResolvedValueOnce(a)
+      .mockImplementation(async (id) => (id === b.connectionId ? b : { authenticated: false }));
+    renderGate();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Switch connection: alpha/ }));
+    expect(await screen.findByRole("button", { name: "Log in" })).toBeInTheDocument();
+    expect(screen.queryByText("Managed app")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Open connections/ }));
+    expect(await screen.findByRole("menuitem", { name: /beta.test/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("?connection=" + b.connectionId),
+    );
+    expect(knownIds()).toEqual([b.connectionId]);
+    expect(logoutMock).not.toHaveBeenCalled();
   });
 
   it("returns to the login form after logout", async () => {

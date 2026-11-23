@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useDraftState } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -351,10 +352,13 @@ const SecureNatRuntimeModal: React.FunctionComponent<{
 
 const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const { capsList, hideNonCluster } = useServer();
-  const [config, setConfig] = React.useState<Record<string, unknown> | null>(null);
+  const [config, setConfig, resetConfig, markConfigSaved] = useDraftState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [enabled, setEnabled] = React.useState(false);
   const [runtimeOpen, setRuntimeOpen] = React.useState(false);
-  const [mac, setMac] = React.useState("");
+  const [mac, setMac, resetMac, markMacSaved] = useDraftState("");
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [toggling, setToggling] = React.useState(false);
@@ -376,11 +380,11 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           secureNatOption as unknown as Record<string, unknown>,
         );
         setEnabled(currentEnabled);
-        setConfig(option);
-        setMac(formatMacAddress(option.MacAddress_bin, ""));
+        resetConfig(option);
+        resetMac(formatMacAddress(option.MacAddress_bin, ""));
       })
       .catch((e) => setError(String(e)));
-  }, [hub]);
+  }, [hub, resetConfig, resetMac]);
 
   React.useEffect(() => {
     load();
@@ -417,6 +421,8 @@ const SecureNAT: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     api
       .SetSecureNATOption(obj)
       .then(() => {
+        markConfigSaved(config);
+        markMacSaved(mac);
         setSaving(false);
         load();
       })

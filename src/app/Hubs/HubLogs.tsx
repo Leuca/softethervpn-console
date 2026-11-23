@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useDraftState } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -207,22 +208,24 @@ const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean 
   hub,
   supported,
 }) => {
-  const [config, setConfig] = React.useState<VPN.VpnRpcHubLog | null>(null);
+  const [config, setConfig, resetConfig, markConfigSaved] = useDraftState<VPN.VpnRpcHubLog | null>(
+    null,
+  );
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
     if (!supported) {
-      setConfig(null);
+      resetConfig(null);
       setError(null);
       return;
     }
     setError(null);
     api
       .GetHubLog(new VPN.VpnRpcHubLog({ HubName_str: hub }))
-      .then((response) => setConfig(normalizeLogSettings(response)))
+      .then((response) => resetConfig(normalizeLogSettings(response)))
       .catch((e) => setError(String(e)));
-  }, [hub, supported]);
+  }, [hub, supported, resetConfig]);
 
   React.useEffect(() => {
     load();
@@ -252,6 +255,7 @@ const HubLogSettings: React.FunctionComponent<{ hub: string; supported: boolean 
     api
       .SetHubLog(payload)
       .then(() => {
+        markConfigSaved(config);
         setSaving(false);
         load();
       })

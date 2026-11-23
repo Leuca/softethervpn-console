@@ -1,10 +1,16 @@
 import * as React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import { PendingDraftsProvider } from "@app/managed/pendingDrafts";
+import { ConnectionSwitcher } from "@app/managed/ConnectionSwitcher";
+import { getSession } from "@app/managed/sessionApi";
+import { indexConnection } from "@app/managed/connectionDirectory";
 import { DynDNS } from "./DDNS";
 import { api } from "@app/utils/vpnrpc_settings";
 import { SELF_SIGNED_CERT_B64 } from "@app/utils/x509.fixture";
+
+vi.mock("@app/managed/sessionApi", () => ({ getSession: vi.fn() }));
 
 vi.mock("@app/utils/vpnrpc_settings", () => ({
   api: {
@@ -80,6 +86,72 @@ describe("DynDNS", () => {
     expect(screen.getByText(/At least 3 characters/i)).toBeInTheDocument();
     expect(setBtn).toBeDisabled();
   });
+
+  it.each(["save", "restore"])(
+    "warns on switch only until the hostname draft is resolved: %s",
+    async (action) => {
+      const a = {
+        authenticated: true as const,
+        connectionId: "a".repeat(43),
+        host: "alpha.test",
+        port: 443,
+        hub: "",
+      };
+      const b = { ...a, host: "beta.test", connectionId: "b".repeat(43) };
+      indexConnection(b.connectionId, true);
+      vi.mocked(getSession).mockImplementation(async (id) => (id === b.connectionId ? b : a));
+      getStatus
+        .mockResolvedValueOnce(status())
+        .mockResolvedValue(status({ CurrentHostName_str: "newname" }));
+      changeHostname.mockResolvedValue({});
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+      try {
+        const user = userEvent.setup();
+        render(
+          <PendingDraftsProvider>
+            <ConnectionSwitcher current={a} />
+            <DynDNS />
+          </PendingDraftsProvider>,
+        );
+        const input = await screen.findByLabelText("New hostname");
+        await user.clear(input);
+        await user.type(input, "newname");
+        const toggle = screen.getByRole("button", { name: /Switch connection/ });
+        const link = () => screen.findByRole("menuitem", { name: /beta.test/ });
+        await user.click(toggle);
+        expect(fireEvent.click(await link())).toBe(false);
+        expect(confirm).toHaveBeenCalledOnce();
+
+        if (action === "save") {
+          changeHostname.mockRejectedValueOnce(new Error("Save failed"));
+          await user.click(screen.getByRole("button", { name: "Set hostname" }));
+          await screen.findByText(/Save failed/);
+          await user.click(toggle);
+          expect(fireEvent.click(await link())).toBe(false);
+          expect(confirm).toHaveBeenCalledTimes(2);
+        }
+        confirm.mockClear();
+        await user.click(
+          screen.getByRole("button", { name: action === "save" ? "Set hostname" : "Restore" }),
+        );
+        await waitFor(() => expect(screen.getByRole("button", { name: "Restore" })).toBeDisabled());
+        expect(input).toHaveValue(action === "save" ? "newname" : "vpn123456");
+        await user.click(toggle);
+        // Observe whether React allowed navigation without asking jsdom to load a document.
+        const observe = vi.fn((event: MouseEvent) => {
+          expect(event.defaultPrevented).toBe(false);
+          event.preventDefault();
+        });
+        window.addEventListener("click", observe, { once: true });
+        fireEvent.click(await link());
+        expect(observe).toHaveBeenCalledOnce();
+        expect(confirm).not.toHaveBeenCalled();
+      } finally {
+        confirm.mockRestore();
+        indexConnection(b.connectionId, false);
+      }
+    },
+  );
 
   it("changes the hostname and reloads", async () => {
     getStatus.mockResolvedValue(status());

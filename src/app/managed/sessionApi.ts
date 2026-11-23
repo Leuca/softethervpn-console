@@ -69,9 +69,9 @@ const postJson = <T>(path: string, body?: unknown): Promise<T> =>
         },
   );
 
-export const getSession = async (): Promise<ManagedSession> =>
-  connectionId
-    ? requestJson<ManagedSession>(`${connectionPath(connectionId)}/session`)
+export const getSession = async (id = connectionId): Promise<ManagedSession> =>
+  id
+    ? requestJson<ManagedSession>(`${connectionPath(id)}/session`, { cache: "no-store" })
     : { authenticated: false };
 
 export const login = (payload: ManagedLoginPayload): Promise<ManagedSession> =>

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useDraftState, usePendingDraft } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -33,19 +34,24 @@ const settingsTrigger = (title: string, description: string) => {
 
 const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the full GetHub response, plus an optional new admin password.
-  const [config, setConfig] = React.useState<Record<string, unknown> | null>(null);
+  const [config, setConfig, resetConfig, markConfigSaved] = useDraftState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [newPassword, setNewPassword] = React.useState("");
+
+  usePendingDraft(() => newPassword !== "");
 
   const load = React.useCallback(() => {
     setError(null);
     setNewPassword("");
     api
       .GetHub(new VPN.VpnRpcCreateHub({ HubName_str: hub }))
-      .then((response) => setConfig(response as unknown as Record<string, unknown>))
+      .then((response) => resetConfig(response as unknown as Record<string, unknown>))
       .catch((e) => setError(String(e)));
-  }, [hub]);
+  }, [hub, resetConfig]);
 
   React.useEffect(() => {
     load();
@@ -71,6 +77,7 @@ const Properties: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     api
       .SetHub(obj)
       .then(() => {
+        markConfigSaved(config);
         setSaving(false);
         load();
       })

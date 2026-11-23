@@ -113,8 +113,14 @@ gateway, which handles server selection and login. See
 
 ### Managed connections
 
-In managed mode each login opens a tab bound to that connection. To connect to
-another server or hub, open the console root URL in a new tab and log in there.
+In managed mode the header shows the current host, port, and administrator
+scope. Open its menu to switch connections, connect another server or hub, or
+disconnect only the current connection. On the login page, **Open connections**
+returns to an existing connection. Open a connection link in a new tab to work
+side by side. Switching in place loads a fresh dashboard.
+The browser indexes opaque connection IDs only. Server and hub names are
+retrieved using each connection's private cookie, not written to the index.
+Without local storage, existing connection URLs still work in separate tabs.
 Reloading a connected tab retains its target; logging out disconnects only
 that connection. Closing a tab does not log it out. Connections expire after
 eight hours or when the gateway restarts. An upgrade from the unscoped API
@@ -131,6 +137,8 @@ support custom fields:
 | Port        | `managed-login-port` | `port`          |
 | Virtual Hub | `managed-login-hub`  | `hub`           |
 
+On desktop, the target and credential fields belong to a single native form
+so one fill can supply the server host, port, and password together.
 Configure those fields on the same password-manager entry as the administrator
 password. Prefer the `id` when the password manager supports it. Custom-field
 matching is password-manager-specific; the password itself uses the standard

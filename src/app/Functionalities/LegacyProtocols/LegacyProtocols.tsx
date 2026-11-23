@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useDraftState } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -29,8 +30,8 @@ type Config = Record<string, unknown>;
 const LegacyProtocols: React.FunctionComponent = () => {
   const navigate = useNavigate();
 
-  const [ipsec, setIpsec] = React.useState<Config | null>(null);
-  const [ovpn, setOvpn] = React.useState<Config | null>(null);
+  const [ipsec, setIpsec, resetIpsec, markIpsecSaved] = useDraftState<Config | null>(null);
+  const [ovpn, setOvpn, resetOvpn, markOvpnSaved] = useDraftState<Config | null>(null);
   const [hubs, setHubs] = React.useState<string[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -39,12 +40,12 @@ const LegacyProtocols: React.FunctionComponent = () => {
     setError(null);
     Promise.all([api.GetIPsecServices(), api.GetOpenVpnSstpConfig(), api.EnumHub()])
       .then(([ipsecResp, ovpnResp, hubList]) => {
-        setIpsec(ipsecResp as unknown as Config);
-        setOvpn(ovpnResp as unknown as Config);
+        resetIpsec(ipsecResp as unknown as Config);
+        resetOvpn(ovpnResp as unknown as Config);
         setHubs((hubList.HubList ?? []).map((h) => h.HubName_str));
       })
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [resetIpsec, resetOvpn]);
 
   React.useEffect(() => {
     load();
@@ -63,12 +64,14 @@ const LegacyProtocols: React.FunctionComponent = () => {
     setError(null);
     api
       .SetIPsecServices(new VPN.VpnIPsecServices(ipsec as Partial<VPN.VpnIPsecServices>))
-      .then(() =>
-        api.SetOpenVpnSstpConfig(
-          new VPN.VpnOpenVpnSstpConfig(ovpn as Partial<VPN.VpnOpenVpnSstpConfig>),
-        ),
-      )
       .then(() => {
+        markIpsecSaved(ipsec);
+        return api.SetOpenVpnSstpConfig(
+          new VPN.VpnOpenVpnSstpConfig(ovpn as Partial<VPN.VpnOpenVpnSstpConfig>),
+        );
+      })
+      .then(() => {
+        markOvpnSaved(ovpn);
         setSaving(false);
         load();
       })

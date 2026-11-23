@@ -1,0 +1,43 @@
+.se-connections__toggle {
+  max-inline-size: min(24rem, 48vw);
+}
+.se-connections__toggle .pf-v6-c-menu-toggle__text {
+  min-inline-size: 0;
+  text-align: start;
+}
+.se-connections__target,
+.se-connections__scope {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.se-connections__scope {
+  color: var(--pf-t--global--text--color--subtle);
+}
+.se-connections__menu {
+  min-inline-size: min(19rem, calc(100vw - 2rem));
+  max-inline-size: min(28rem, calc(100vw - 2rem));
+  overflow-wrap: anywhere;
+}
+.se-connections__menu [aria-current="true"] {
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+.se-connections__target {
+  display: flex;
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+.se-connections__host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.se-connections__host + span {
+  flex: none;
+}
+.se-connections__identity {
+  min-inline-size: 0;
+  max-inline-size: 26rem;
+  line-height: 1.2;
+  margin-inline-end: var(--pf-t--global--spacer--xs);
+  text-align: end;
+}

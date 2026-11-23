@@ -14,6 +14,7 @@ const loginMock = login as unknown as Mock;
 
 describe("ManagedLoginForm", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     window.localStorage.clear();
   });
@@ -61,7 +62,34 @@ describe("ManagedLoginForm", () => {
     );
   });
 
-  it("offers the hub as a username only for Virtual Hub login", async () => {
+  it.each(["Server", "Virtual Hub"])("accepts a single desktop autofill for %s", async (scope) => {
+    loginMock.mockResolvedValue({ authenticated: true });
+    const user = userEvent.setup();
+    render(<ManagedLoginForm onLogin={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: scope }));
+    const password = screen.getByLabelText<HTMLInputElement>("Password");
+    const form = password.closest("form")!;
+    const fill = (id: string, value: string) => {
+      const field = form.elements.namedItem(id);
+      expect(field).toBeInstanceOf(HTMLInputElement);
+      (field as HTMLInputElement).value = value;
+    };
+    fill("managed-login-host", "desktop.example");
+    fill("managed-login-port", "5555");
+    if (scope === "Virtual Hub") fill("managed-login-hub", "OPS");
+    fill("managed-login-password", "vault-secret");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+    expect(loginMock).toHaveBeenCalledWith({
+      host: "desktop.example",
+      port: 5555,
+      hub: scope === "Virtual Hub" ? "OPS" : "",
+      password: "vault-secret",
+      allowSelfSigned: false,
+    });
+  });
+
+  it("keeps iPhone server details separate and offers the hub as a username only for Virtual Hub login", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS)");
     loginMock.mockResolvedValue({ authenticated: true });
     const user = userEvent.setup();
     render(<ManagedLoginForm onLogin={vi.fn()} />);

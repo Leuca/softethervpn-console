@@ -26,6 +26,7 @@ describe("managed session API", () => {
 
     await expect(getSession()).resolves.toEqual(session);
     expect(fetchMock).toHaveBeenCalledWith(`/api/connections/${"a".repeat(43)}/session`, {
+      cache: "no-store",
       credentials: "same-origin",
     });
   });

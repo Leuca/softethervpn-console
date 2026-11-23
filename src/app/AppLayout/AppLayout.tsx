@@ -1,16 +1,12 @@
 import * as React from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  Dropdown,
-  DropdownItem,
-  DropdownList,
   Masthead,
   MastheadBrand,
   MastheadContent,
   MastheadLogo,
   MastheadMain,
   MastheadToggle,
-  MenuToggle,
   Nav,
   NavExpandable,
   NavItem,
@@ -25,6 +21,7 @@ import { BarsIcon, UserIcon } from "@patternfly/react-icons";
 import { IAppRoute, IAppRouteGroup, isRouteAccessible, routes } from "@app/routes";
 import { useServer } from "@app/ServerContext";
 import { useManagedSession } from "@app/managed/ManagedSessionGate";
+import { ConnectionSwitcher } from "@app/managed/ConnectionSwitcher";
 import { AppearanceMenu } from "@app/components/AppearanceMenu";
 import { accessibleRouteChangeHandler } from "@app/utils/utils";
 import logo from "@app/bgimages/icons8-softether-vpn.svg";
@@ -40,7 +37,6 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const location = useLocation();
   const { user, hideAdminOnly, hideNonCluster, hideNonBridge, hiddenLabels } = useServer();
   const managedSession = useManagedSession();
-  const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
 
   // Keep the desktop sidebar user-controlled and stable while treating the
   // narrow sidebar as a dismissible overlay. PatternFly docks the sidebar at
@@ -87,7 +83,10 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
     group.routes.some(isRouteVisible);
 
   const masthead = (
-    <Masthead className="se-masthead">
+    <Masthead
+      className={managedSession ? "se-masthead se-masthead--managed" : "se-masthead"}
+      display={managedSession ? { default: "inline" } : undefined}
+    >
       <MastheadMain>
         <MastheadToggle>
           <PageToggleButton
@@ -126,40 +125,16 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
       </MastheadMain>
       <MastheadContent>
         <div className="se-masthead-actions">
+          {managedSession && (
+            <ConnectionSwitcher
+              current={managedSession.current}
+              busy={managedSession.isLoggingOut}
+              onLogout={managedSession.logout}
+              onExpired={managedSession.expired}
+            />
+          )}
           <AppearanceMenu />
-          {managedSession ? (
-            <div className="se-user-menu">
-              <Dropdown
-                isOpen={isUserMenuOpen}
-                onOpenChange={setIsUserMenuOpen}
-                onSelect={() => setIsUserMenuOpen(false)}
-                popperProps={{ position: "right" }}
-                toggle={(toggleRef) => (
-                  <MenuToggle
-                    ref={toggleRef}
-                    aria-label={`User menu for ${user}`}
-                    isExpanded={isUserMenuOpen}
-                    onClick={() => setIsUserMenuOpen((open) => !open)}
-                  >
-                    <span className="se-user__content">
-                      <UserIcon />
-                      <span className="se-user__role">{user}</span>
-                    </span>
-                  </MenuToggle>
-                )}
-              >
-                <DropdownList>
-                  <DropdownItem
-                    key="logout"
-                    isDisabled={managedSession.isLoggingOut}
-                    onClick={managedSession.logout}
-                  >
-                    Log out
-                  </DropdownItem>
-                </DropdownList>
-              </Dropdown>
-            </div>
-          ) : (
+          {!managedSession && (
             <span className="se-user">
               <UserIcon />
               <span className="se-user__role">{user}</span>

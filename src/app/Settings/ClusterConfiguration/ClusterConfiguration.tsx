@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useDraftState } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -61,7 +62,7 @@ interface FarmForm {
 }
 
 const ClusterConfig: React.FunctionComponent = () => {
-  const [form, setForm] = React.useState<FarmForm | null>(null);
+  const [form, setForm, resetForm] = useDraftState<FarmForm | null>(null);
   const [currentMode, setCurrentMode] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -82,7 +83,7 @@ const ClusterConfig: React.FunctionComponent = () => {
     () =>
       api.GetFarmSetting().then((response) => {
         setCurrentMode(response.ServerType_u32);
-        setForm({
+        resetForm({
           mode: response.ServerType_u32,
           controllerOnly: response.ControllerOnly_bool ?? false,
           weight: response.Weight_u32 || DEFAULT_WEIGHT,
@@ -95,7 +96,7 @@ const ClusterConfig: React.FunctionComponent = () => {
           password: response.MemberPasswordPlaintext_str ?? "",
         });
       }),
-    [],
+    [resetForm],
   );
 
   const load = React.useCallback(() => {
@@ -185,7 +186,7 @@ const ClusterConfig: React.FunctionComponent = () => {
         // The server restarts on success; wait for it to come back rather than
         // hitting it mid-restart and showing a transient error.
         setSaving(false);
-        setForm(null);
+        resetForm(null);
         setRestarting(true);
         waitForRestart();
       })

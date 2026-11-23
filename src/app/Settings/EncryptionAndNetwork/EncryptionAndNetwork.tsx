@@ -1,4 +1,5 @@
 import * as React from "react";
+import { usePendingDraft, useDraftState } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -76,6 +77,7 @@ const AdminPasswordCard: React.FunctionComponent = () => {
     variant: "success" | "danger";
     text: string;
   } | null>(null);
+  usePendingDraft(() => !!(password || confirm));
   const mismatch = confirm !== "" && confirm !== password;
   const canChange = password !== "" && confirm !== "" && confirm === password;
 
@@ -192,6 +194,8 @@ const ServerCertCard: React.FunctionComponent = () => {
       })
       .finally(() => setRegenerating(false));
   };
+
+  usePendingDraft(() => !!(certFile || keyFile || pkcs12Password));
 
   const clearImport = () => {
     setCertFile("");
@@ -429,7 +433,7 @@ const ServerCertCard: React.FunctionComponent = () => {
 // --- Encryption algorithm ---------------------------------------------------
 
 const CipherCard: React.FunctionComponent = () => {
-  const [cipher, setCipher] = React.useState<string | null>(null);
+  const [cipher, setCipher, resetCipher, markCipherSaved] = useDraftState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
@@ -437,9 +441,9 @@ const CipherCard: React.FunctionComponent = () => {
     setError(null);
     api
       .GetServerCipher()
-      .then((r) => setCipher(r.String_str))
+      .then((r) => resetCipher(r.String_str))
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [resetCipher]);
 
   React.useEffect(() => {
     load();
@@ -450,7 +454,10 @@ const CipherCard: React.FunctionComponent = () => {
     setSaving(true);
     api
       .SetServerCipher(new VPN.VpnRpcStr({ String_str: cipher }))
-      .then(() => setSaving(false))
+      .then(() => {
+        markCipherSaved(cipher);
+        setSaving(false);
+      })
       .catch((e) => {
         setError(String(e));
         setSaving(false);
@@ -502,7 +509,9 @@ const CipherCard: React.FunctionComponent = () => {
 // --- Keep alive -------------------------------------------------------------
 
 const KeepAliveCard: React.FunctionComponent = () => {
-  const [keep, setKeep] = React.useState<Record<string, unknown> | null>(null);
+  const [keep, setKeep, resetKeep, markKeepSaved] = useDraftState<Record<string, unknown> | null>(
+    null,
+  );
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
@@ -510,9 +519,9 @@ const KeepAliveCard: React.FunctionComponent = () => {
     setError(null);
     api
       .GetKeep(new VPN.VpnRpcKeep())
-      .then((r) => setKeep(r as unknown as Record<string, unknown>))
+      .then((r) => resetKeep(r as unknown as Record<string, unknown>))
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [resetKeep]);
   React.useEffect(() => {
     load();
   }, [load]);
@@ -525,6 +534,7 @@ const KeepAliveCard: React.FunctionComponent = () => {
     api
       .SetKeep(new VPN.VpnRpcKeep(keep as Partial<VPN.VpnRpcKeep>))
       .then(() => {
+        markKeepSaved(keep);
         setSaving(false);
         load();
       })
@@ -619,7 +629,10 @@ const KeepAliveCard: React.FunctionComponent = () => {
 // --- Syslog -----------------------------------------------------------------
 
 const SyslogCard: React.FunctionComponent = () => {
-  const [syslog, setSyslog] = React.useState<Record<string, unknown> | null>(null);
+  const [syslog, setSyslog, resetSyslog, markSyslogSaved] = useDraftState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
@@ -634,10 +647,10 @@ const SyslogCard: React.FunctionComponent = () => {
         if (!s.Port_u32) {
           s.Port_u32 = 514;
         }
-        setSyslog(s);
+        resetSyslog(s);
       })
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [resetSyslog]);
   React.useEffect(() => {
     load();
   }, [load]);
@@ -658,6 +671,7 @@ const SyslogCard: React.FunctionComponent = () => {
     api
       .SetSysLog(new VPN.VpnSyslogSetting(syslog as Partial<VPN.VpnSyslogSetting>))
       .then(() => {
+        markSyslogSaved(syslog);
         setSaving(false);
         load();
       })
@@ -759,7 +773,10 @@ const SyslogCard: React.FunctionComponent = () => {
 // --- VPN over ICMP / DNS ----------------------------------------------------
 
 const SpecialListenerCard: React.FunctionComponent = () => {
-  const [listener, setListener] = React.useState<Record<string, unknown> | null>(null);
+  const [listener, setListener, resetListener, markListenerSaved] = useDraftState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
@@ -767,9 +784,9 @@ const SpecialListenerCard: React.FunctionComponent = () => {
     setError(null);
     api
       .GetSpecialListener()
-      .then((r) => setListener(r as unknown as Record<string, unknown>))
+      .then((r) => resetListener(r as unknown as Record<string, unknown>))
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [resetListener]);
   React.useEffect(() => {
     load();
   }, [load]);
@@ -784,6 +801,7 @@ const SpecialListenerCard: React.FunctionComponent = () => {
         new VPN.VpnRpcSpecialListener(listener as Partial<VPN.VpnRpcSpecialListener>),
       )
       .then(() => {
+        markListenerSaved(listener);
         setSaving(false);
         load();
       })

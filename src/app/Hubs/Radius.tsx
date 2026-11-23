@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useDraftState, usePendingDraft } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -27,10 +28,15 @@ const MAX_RETRY_INTERVAL = 10000;
 
 const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   // Working copy of the full GetHubRadius response, plus an optional new secret.
-  const [config, setConfig] = React.useState<Record<string, unknown> | null>(null);
+  const [config, setConfig, resetConfig, markConfigSaved] = useDraftState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [newSecret, setNewSecret] = React.useState("");
+
+  usePendingDraft(() => newSecret !== "");
 
   const load = React.useCallback(() => {
     setError(null);
@@ -47,10 +53,10 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         if (!r.RadiusRetryInterval_u32) {
           r.RadiusRetryInterval_u32 = DEFAULT_RETRY_INTERVAL;
         }
-        setConfig(r);
+        resetConfig(r);
       })
       .catch((e) => setError(String(e)));
-  }, [hub]);
+  }, [hub, resetConfig]);
 
   React.useEffect(() => {
     load();
@@ -78,6 +84,7 @@ const Radius: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     api
       .SetHubRadius(obj)
       .then(() => {
+        markConfigSaved(config);
         setSaving(false);
         load();
       })

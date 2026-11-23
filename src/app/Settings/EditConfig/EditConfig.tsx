@@ -1,4 +1,5 @@
 import * as React from "react";
+import { usePendingDraft } from "@app/managed/pendingDrafts";
 import {
   Alert,
   Bullseye,
@@ -104,6 +105,8 @@ const EditConfig: React.FunctionComponent = () => {
 
   // The edited text if the editor is mounted, else the loaded text.
   const currentText = (): string | null => configRef.current?.value ?? loadedText;
+
+  usePendingDraft(() => currentText() !== loadedText);
 
   const download = () => {
     const value = currentText();
