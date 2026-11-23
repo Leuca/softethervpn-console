@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
+import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccessList } from "./AccessList";
 import { api } from "@app/utils/vpnrpc_settings";
 
@@ -24,6 +24,7 @@ vi.mock("@app/utils/vpnrpc_settings", () => ({
   api: {
     EnumAccess: vi.fn(),
     AddAccess: vi.fn(),
+    CallAsync: vi.fn(),
     DeleteAccess: vi.fn(),
     SetAccessList: vi.fn(),
   },
@@ -35,8 +36,7 @@ vi.mock("@app/ServerContext", () => ({
 
 const enumAccess = api.EnumAccess as unknown as Mock;
 const addAccess = api.AddAccess as unknown as Mock;
-const deleteAccess = api.DeleteAccess as unknown as Mock;
-const setAccessList = api.SetAccessList as unknown as Mock;
+const conditionalWrite = api.CallAsync as unknown as Mock;
 
 const rule = {
   Id_u32: 1,
@@ -54,8 +54,13 @@ const rule = {
 
 describe("AccessList", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     serverState.capsList = [...fullCaps];
+  });
+
+  afterEach(() => {
+    expect(api.DeleteAccess).not.toHaveBeenCalled();
+    expect(api.SetAccessList).not.toHaveBeenCalled();
   });
 
   it("lists rules with action, protocol and endpoints", async () => {
@@ -70,34 +75,33 @@ describe("AccessList", () => {
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument(); // dest /32
   });
 
-  it("toggles a rule active state via SetAccessList (whole list)", async () => {
-    enumAccess.mockResolvedValue({ AccessList: [rule] });
-    setAccessList.mockResolvedValue({});
+  it("toggles a rule with a revision-checked list replacement", async () => {
+    enumAccess.mockResolvedValue({ AccessList: [rule], AclRevision_str: "rev-a" });
+    conditionalWrite.mockResolvedValue({});
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
     await screen.findByText("block guests");
     await user.click(screen.getByLabelText("Rule 1 active"));
 
-    const sent = setAccessList.mock.calls[0][0];
-    expect(sent.HubName_str).toBe("DEFAULT");
+    const [method, sent] = conditionalWrite.mock.calls[0];
+    expect(method).toBe("SetAccessListIfCurrent");
+    expect(sent).toMatchObject({ HubName_str: "DEFAULT", AclRevision_str: "rev-a" });
     expect(sent.AccessList[0]).toMatchObject({ Id_u32: 1, Active_bool: false });
   });
 
   it("aborts a whole-list save when the rule was deleted concurrently", async () => {
-    // Initial load shows the rule; the refetch before SetAccessList finds it
-    // gone (another administrator deleted it), so nothing is overwritten.
     enumAccess
-      .mockResolvedValueOnce({ AccessList: [rule] })
-      .mockResolvedValueOnce({ AccessList: [] });
+      .mockResolvedValueOnce({ AccessList: [rule], AclRevision_str: "rev-a" })
+      .mockResolvedValueOnce({ AccessList: [], AclRevision_str: "rev-b" });
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
     await screen.findByText("block guests");
     await user.click(screen.getByLabelText("Rule 1 active"));
 
-    expect(await screen.findByText(/The rule no longer exists on the server/)).toBeInTheDocument();
-    expect(setAccessList).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Review the refreshed list/)).toBeInTheDocument();
+    expect(conditionalWrite).not.toHaveBeenCalled();
     expect(await screen.findByText("No access list rules")).toBeInTheDocument();
   });
 
@@ -131,14 +135,21 @@ describe("AccessList", () => {
     });
   });
 
-  it("edits a rule via SetAccessList", async () => {
-    enumAccess.mockResolvedValue({ AccessList: [rule] });
-    setAccessList.mockResolvedValue({});
+  it("edits a rule while preserving unrelated changes from the re-read", async () => {
+    const other = { ...rule, Id_u32: 2, Note_utf: "another rule" };
+    const changed = { ...other, DestPortStart_u32: 1234 };
+    enumAccess
+      .mockResolvedValueOnce({ AccessList: [rule, other], AclRevision_str: "rev-a" })
+      .mockResolvedValue({
+        AccessList: [Object.fromEntries(Object.entries(rule).reverse()), changed],
+        AclRevision_str: "rev-b",
+      });
+    conditionalWrite.mockResolvedValue({});
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
-    await screen.findByText("block guests");
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    const row = await screen.findByRole("row", { name: /block guests/ });
+    await user.click(within(row).getByRole("button", { name: /kebab toggle/i }));
     await user.click(await screen.findByText("Edit"));
     await user.clear(screen.getByLabelText("Priority"));
     await user.type(screen.getByLabelText("Priority"), "50");
@@ -146,15 +157,58 @@ describe("AccessList", () => {
     await user.type(screen.getByLabelText("Memo"), "block tcp service");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    const sent = setAccessList.mock.calls[0][0];
-    expect(sent.HubName_str).toBe("DEFAULT");
+    const [method, sent] = conditionalWrite.mock.calls[0];
+    expect(method).toBe("SetAccessListIfCurrent");
+    expect(sent).toMatchObject({ HubName_str: "DEFAULT", AclRevision_str: "rev-b" });
     expect(sent.AccessList[0]).toMatchObject({
       Id_u32: 1,
       Priority_u32: 50,
       Note_utf: "block tcp service",
       Protocol_u32: 6,
     });
+    expect(sent.AccessList).toHaveLength(2);
+    expect(sent.AccessList[1]).toMatchObject(changed);
   }, 10_000);
+
+  it("keeps the draft and its original baseline when the server row changes", async () => {
+    const original = { ...rule, SrcMacAddress_bin: "AAAAAAAA" };
+    enumAccess
+      .mockResolvedValueOnce({ AccessList: [original], AclRevision_str: "rev-a" })
+      .mockResolvedValue({
+        AccessList: [{ ...original, SrcMacAddress_bin: "AAAAAAAB" }],
+        AclRevision_str: "rev-b",
+      });
+    const user = userEvent.setup();
+
+    render(<AccessList hub="DEFAULT" />);
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByText("Edit"));
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.clear(dialog.getByLabelText("Memo"));
+    await user.type(dialog.getByLabelText("Memo"), "my draft");
+    const save = dialog.getByRole("button", { name: "Save" });
+    await user.click(save);
+    expect(await dialog.findByText(/Review the refreshed list/)).toBeInTheDocument();
+    await user.click(save);
+    expect(dialog.getByLabelText("Memo")).toHaveValue("my draft");
+    expect(enumAccess).toHaveBeenCalledTimes(3);
+    expect(conditionalWrite).not.toHaveBeenCalled();
+  });
+
+  it("does not toggle a different rule at the same position", async () => {
+    enumAccess
+      .mockResolvedValueOnce({
+        AccessList: [{ ...rule, UniqueId_u32: 40000 }],
+        AclRevision_str: "a",
+      })
+      .mockResolvedValue({ AccessList: [{ ...rule, UniqueId_u32: 40001 }], AclRevision_str: "b" });
+    const user = userEvent.setup();
+
+    render(<AccessList hub="DEFAULT" />);
+    await user.click(await screen.findByLabelText("Rule 1 active"));
+    expect(await screen.findByText(/Review the refreshed list/)).toBeInTheDocument();
+    expect(conditionalWrite).not.toHaveBeenCalled();
+  });
 
   it("clones a rule via AddAccess with the next unused priority", async () => {
     enumAccess.mockResolvedValue({ AccessList: [rule] });
@@ -163,7 +217,12 @@ describe("AccessList", () => {
 
     render(<AccessList hub="DEFAULT" />);
     await screen.findByText("block guests");
+    expect(screen.getByText(/Upgrade the VPN server/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Rule 1 active")).toBeDisabled();
     await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    for (const action of ["Edit", "Delete"]) {
+      expect(screen.getByText(action).closest('[aria-disabled="true"]')).toBeInTheDocument();
+    }
     await user.click(await screen.findByText("Clone"));
     await user.click(screen.getByRole("button", { name: "Create" }));
 
@@ -187,7 +246,7 @@ describe("AccessList", () => {
       { CapsName_str: "b_support_redirect_url_acl", CapsValue_u32: 0 },
       { CapsName_str: "b_support_acl_group", CapsValue_u32: 0 },
     ];
-    enumAccess.mockResolvedValue({ AccessList: [rule] });
+    enumAccess.mockResolvedValue({ AccessList: [rule], AclRevision_str: "rev-a" });
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
@@ -222,9 +281,12 @@ describe("AccessList", () => {
     ).toBeInTheDocument();
   });
 
-  it("deletes a rule after confirmation", async () => {
-    enumAccess.mockResolvedValue({ AccessList: [rule] });
-    deleteAccess.mockResolvedValue({});
+  it("deletes by position under the freshly enumerated revision", async () => {
+    const original = { ...rule, UniqueId_u32: 40000 };
+    enumAccess
+      .mockResolvedValueOnce({ AccessList: [original], AclRevision_str: "rev-a" })
+      .mockResolvedValue({ AccessList: [original], AclRevision_str: "rev-b" });
+    conditionalWrite.mockResolvedValue({});
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
@@ -235,7 +297,79 @@ describe("AccessList", () => {
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
-    expect(deleteAccess.mock.calls[0][0]).toMatchObject({ HubName_str: "DEFAULT", Id_u32: 1 });
-    expect(enumAccess).toHaveBeenCalledTimes(2);
+    expect(conditionalWrite).toHaveBeenCalledWith("DeleteAccessIfCurrent", {
+      HubName_str: "DEFAULT",
+      Id_u32: 1,
+      AclRevision_str: "rev-b",
+    });
+    expect(enumAccess).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not delete a renumbered rule or the new occupant of its ID", async () => {
+    enumAccess
+      .mockResolvedValueOnce({ AccessList: [rule], AclRevision_str: "a" })
+      .mockResolvedValue({
+        AclRevision_str: "b",
+        AccessList: [
+          { ...rule, Note_utf: "new occupant" },
+          { ...rule, Id_u32: 2 },
+        ],
+      });
+    const user = userEvent.setup();
+
+    render(<AccessList hub="DEFAULT" />);
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByText("Delete"));
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.click(dialog.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByText(/Review the refreshed list/)).toBeInTheDocument();
+    expect(screen.getByText("new occupant")).toBeInTheDocument();
+    expect(conditionalWrite).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", 3])(
+    "sends no write without an opaque revision (%s)",
+    async (revision) => {
+      enumAccess
+        .mockResolvedValueOnce({ AccessList: [rule], AclRevision_str: "rev-a" })
+        .mockResolvedValue({ AccessList: [rule], AclRevision_str: revision });
+      const user = userEvent.setup();
+
+      render(<AccessList hub="DEFAULT" />);
+      await user.click(await screen.findByLabelText("Rule 1 active"));
+      expect(await screen.findByText(/No changes were sent/)).toBeInTheDocument();
+      expect(conditionalWrite).not.toHaveBeenCalled();
+    },
+  );
+
+  it("retains the draft without retrying a rejected conditional save", async () => {
+    enumAccess.mockResolvedValue({ AccessList: [rule], AclRevision_str: "rev-a" });
+    conditionalWrite.mockRejectedValue(new Error("ACL revision mismatch"));
+    const user = userEvent.setup();
+
+    render(<AccessList hub="DEFAULT" />);
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByText("Edit"));
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.clear(dialog.getByLabelText("Memo"));
+    await user.type(dialog.getByLabelText("Memo"), "my draft");
+    await user.click(dialog.getByRole("button", { name: "Save" }));
+    expect(await dialog.findByText(/ACL revision mismatch/)).toBeInTheDocument();
+    expect(dialog.getByLabelText("Memo")).toHaveValue("my draft");
+    expect(conditionalWrite).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fall back when conditional delete is unsupported", async () => {
+    enumAccess.mockResolvedValue({ AccessList: [rule], AclRevision_str: "rev-a" });
+    conditionalWrite.mockRejectedValue(new Error("Method not found"));
+    const user = userEvent.setup();
+
+    render(<AccessList hub="DEFAULT" />);
+    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByText("Delete"));
+    const dialog = within(await screen.findByRole("dialog"));
+    await user.click(dialog.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByText(/Method not found/)).toBeInTheDocument();
+    expect(conditionalWrite).toHaveBeenCalledTimes(1);
   });
 });
