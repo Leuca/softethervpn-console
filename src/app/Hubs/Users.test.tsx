@@ -449,10 +449,12 @@ describe("Users", () => {
       fileInput,
       new File([new Uint8Array([5, 6, 7, 8])], "user.p12", { type: "application/x-pkcs12" }),
     );
-    await user.type(within(dialog).getByLabelText("PKCS #12 archive password"), "archive-password");
+    await user.click(within(dialog).getByLabelText("PKCS #12 archive password"));
+    await user.paste("archive-password");
     await user.click(within(dialog).getByRole("button", { name: "Add security policy" }));
-    await screen.findByText("Security policy: alice");
+    const policyHeading = await screen.findByText("Security policy: alice");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(policyHeading).not.toBeInTheDocument());
     dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText("User certificate or PKCS #12 file name")).toHaveValue(
       "user.p12",

@@ -361,6 +361,7 @@ describe("Properties", () => {
     await user.selectOptions(within(ruleDialog).getByLabelText("Action"), "deny");
     await user.type(within(ruleDialog).getByLabelText("IP address"), "198.51.100.25");
     await user.click(within(ruleDialog).getByRole("button", { name: "Add rule" }));
+    await waitFor(() => expect(ruleDialog).not.toBeInTheDocument());
 
     const updatedDialog = await screen.findByRole("dialog", { name: "Source IP Access Control" });
     expect(await within(updatedDialog).findByText("198.51.100.25")).toBeInTheDocument();
@@ -402,6 +403,7 @@ describe("Properties", () => {
     await user.type(within(ruleDialog).getByLabelText("IP address"), "2001:db8::");
     await user.type(within(ruleDialog).getByLabelText("Subnet mask"), "/64");
     await user.click(within(ruleDialog).getByRole("button", { name: "Add rule" }));
+    await waitFor(() => expect(ruleDialog).not.toBeInTheDocument());
 
     const updatedDialog = await screen.findByRole("dialog", { name: "Source IP Access Control" });
     await user.click(within(updatedDialog).getByRole("button", { name: "Save rules" }));
@@ -434,6 +436,7 @@ describe("Properties", () => {
     await user.click(within(editDialog).getByLabelText("Subnet"));
     await user.type(within(editDialog).getByLabelText("Subnet mask"), "255.255.255.0");
     await user.click(within(editDialog).getByRole("button", { name: "Save rule" }));
+    await waitFor(() => expect(editDialog).not.toBeInTheDocument());
 
     const updatedDialog = await screen.findByRole("dialog", { name: "Source IP Access Control" });
     expect(await within(updatedDialog).findByText("192.0.2.10/255.255.255.0")).toBeInTheDocument();
@@ -441,6 +444,7 @@ describe("Properties", () => {
     await user.click(await screen.findByText("Delete"));
     const deleteDialog = await screen.findByRole("dialog", { name: "Delete source IP rule" });
     await user.click(within(deleteDialog).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(deleteDialog).not.toBeInTheDocument());
     const afterDeleteDialog = await screen.findByRole("dialog", {
       name: "Source IP Access Control",
     });

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubLogs } from "./HubLogs";
@@ -129,7 +129,7 @@ describe("HubLogs", () => {
     expect(readLogFile.mock.calls[1][0]).toMatchObject({ Offset_u32: 11 });
 
     await user.click(within(dialog).getByText("Close"));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(enumLogFile).toHaveBeenCalledTimes(3);
   });
 
