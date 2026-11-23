@@ -5,6 +5,7 @@ const DEFAULT_MAX_CLIENTS = 10_000;
 interface LoginRateLimiterOptions {
   attemptLimit?: number;
   maxClients?: number;
+  // Monotonic milliseconds keep fixed-window expiries in insertion order.
   now?: () => number;
   windowMs?: number;
 }
@@ -24,7 +25,7 @@ export class LoginRateLimiter {
   constructor(options: LoginRateLimiterOptions = {}) {
     this.attemptLimit = options.attemptLimit ?? DEFAULT_ATTEMPT_LIMIT;
     this.maxClients = options.maxClients ?? DEFAULT_MAX_CLIENTS;
-    this.now = options.now ?? Date.now;
+    this.now = options.now ?? (() => performance.now());
     this.windowMs = options.windowMs ?? DEFAULT_WINDOW_MS;
 
     if (!Number.isInteger(this.attemptLimit) || this.attemptLimit <= 0) {
@@ -38,40 +39,31 @@ export class LoginRateLimiter {
     }
   }
 
-  retryAfterSeconds(client: string): number | undefined {
-    const now = this.now();
-    const attempt = this.attempts.get(client);
-
-    if (!attempt) {
-      return undefined;
-    }
-    if (attempt.expiresAt <= now) {
-      this.attempts.delete(client);
-      return undefined;
-    }
-    if (attempt.attempts < this.attemptLimit) {
-      return undefined;
-    }
-
-    return Math.max(1, Math.ceil((attempt.expiresAt - now) / 1000));
-  }
-
-  recordAttempt(client: string): void {
+  // Admit and count the attempt, or return the wait in whole seconds.
+  tryRecordAttempt(client: string): number | undefined {
     const now = this.now();
     const attempt = this.attempts.get(client);
 
     if (attempt && attempt.expiresAt > now) {
+      if (attempt.attempts >= this.attemptLimit) {
+        return Math.ceil((attempt.expiresAt - now) / 1000);
+      }
       attempt.attempts += 1;
-      return;
+      return undefined;
     }
 
-    if (!attempt && this.attempts.size >= this.maxClients) {
-      const oldestClient = this.attempts.keys().next().value;
-      if (oldestClient !== undefined) {
-        this.attempts.delete(oldestClient);
+    // Reinsert renewed windows at the end so insertion order stays in expiry order.
+    if (attempt) {
+      this.attempts.delete(client);
+    } else if (this.attempts.size >= this.maxClients) {
+      const [oldestClient, oldest] = this.attempts.entries().next().value!;
+      if (oldest.expiresAt > now) {
+        return Math.ceil((oldest.expiresAt - now) / 1000);
       }
+      this.attempts.delete(oldestClient);
     }
 
     this.attempts.set(client, { attempts: 1, expiresAt: now + this.windowMs });
+    return undefined;
   }
 }

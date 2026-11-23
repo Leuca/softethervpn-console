@@ -42,14 +42,6 @@ export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = a
     '/login',
     { schema: { body: loginBodySchema } },
     async (request, reply) => {
-      const retryAfter = loginRateLimiter.retryAfterSeconds(request.ip);
-      if (retryAfter !== undefined) {
-        return reply
-          .header('Retry-After', String(retryAfter))
-          .code(429)
-          .send({ error: 'Too many login attempts. Try again later.' });
-      }
-
       const loginCredentials = {
         ...request.body,
         host: request.body.host.trim(),
@@ -60,7 +52,14 @@ export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = a
         return reply.code(400).send({ error: 'Server host is required.' });
       }
 
-      loginRateLimiter.recordAttempt(request.ip);
+      const retryAfter = loginRateLimiter.tryRecordAttempt(request.ip);
+      if (retryAfter !== undefined) {
+        return reply
+          .header('Retry-After', String(retryAfter))
+          .code(429)
+          .send({ error: 'Too many login attempts. Try again later.' });
+      }
+
       let credentials;
       try {
         credentials = await options.upstreamResolver.resolve(loginCredentials);
