@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { Properties } from "./Properties";
@@ -359,7 +359,9 @@ describe("Properties", () => {
     await user.click(within(acDialog).getByRole("button", { name: "Add rule" }));
     const ruleDialog = await screen.findByRole("dialog", { name: "Source IP rule" });
     await user.selectOptions(within(ruleDialog).getByLabelText("Action"), "deny");
-    await user.type(within(ruleDialog).getByLabelText("IP address"), "198.51.100.25");
+    fireEvent.change(within(ruleDialog).getByLabelText("IP address"), {
+      target: { value: "198.51.100.25" },
+    });
     await user.click(within(ruleDialog).getByRole("button", { name: "Add rule" }));
     await waitFor(() => expect(ruleDialog).not.toBeInTheDocument());
 
@@ -400,8 +402,12 @@ describe("Properties", () => {
     const ruleDialog = await screen.findByRole("dialog", { name: "Source IP rule" });
     await user.click(within(ruleDialog).getByLabelText("IPv6"));
     await user.click(within(ruleDialog).getByLabelText("Subnet"));
-    await user.type(within(ruleDialog).getByLabelText("IP address"), "2001:db8::");
-    await user.type(within(ruleDialog).getByLabelText("Subnet mask"), "/64");
+    fireEvent.change(within(ruleDialog).getByLabelText("IP address"), {
+      target: { value: "2001:db8::" },
+    });
+    fireEvent.change(within(ruleDialog).getByLabelText("Subnet mask"), {
+      target: { value: "/64" },
+    });
     await user.click(within(ruleDialog).getByRole("button", { name: "Add rule" }));
     await waitFor(() => expect(ruleDialog).not.toBeInTheDocument());
 
@@ -430,12 +436,16 @@ describe("Properties", () => {
     await user.click(within(acDialog).getByRole("button", { name: /kebab toggle/i }));
     await user.click(await screen.findByText("Edit"));
     const editDialog = await screen.findByRole("dialog", { name: "Source IP rule" });
-    const priority = within(editDialog).getByLabelText("Priority");
-    await user.clear(priority);
-    await user.type(priority, "50");
+    fireEvent.change(within(editDialog).getByLabelText("Priority"), {
+      target: { value: "50" },
+    });
     await user.click(within(editDialog).getByLabelText("Subnet"));
-    await user.type(within(editDialog).getByLabelText("Subnet mask"), "255.255.255.0");
-    await user.click(within(editDialog).getByRole("button", { name: "Save rule" }));
+    const subnetMask = within(editDialog).getByLabelText("Subnet mask");
+    fireEvent.change(subnetMask, { target: { value: "255.255.255.0" } });
+    expect(subnetMask).toHaveValue("255.255.255.0");
+    const saveRule = within(editDialog).getByRole("button", { name: "Save rule" });
+    expect(saveRule).toBeEnabled();
+    await user.click(saveRule);
     await waitFor(() => expect(editDialog).not.toBeInTheDocument());
 
     const updatedDialog = await screen.findByRole("dialog", { name: "Source IP Access Control" });
