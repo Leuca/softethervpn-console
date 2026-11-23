@@ -7,19 +7,20 @@ frontend remains part of SoftEther VPN Server and is not installed by this RPM.
 
 ## Release flow
 
-The `srpm` release job runs after the frontend bundles are uploaded to a draft
-GitHub release. It:
+The `srpm` release job runs after the frontend bundles are staged. It:
 
-1. Downloads the tagged GitHub source archive used by `Source0`.
+1. Verifies the push event object (commit or annotated tag) peels to the
+   checked-out commit. It uses `git archive` on that commit for `Source0`,
+   without resolving the tag again or including working-tree edits.
 2. Uses Fedora's `nodejs-packaging-bundler` to create production and
    development dependency archives covering the frontend and nested gateway.
 3. Generates the required `bundled(npm(...))` RPM provides from both lockfiles
    and includes the bundler-generated production license report for review.
 4. Injects the release version, RPM-compatible version, repository owner,
    bundled provides, and changelog entry into the spec.
-5. Builds and checks the SRPM, creates its SHA-256 checksum, and uploads both to
-   the draft release. A final job publishes the release only after every upload
-   succeeds.
+5. Builds and checks the SRPM, creates its SHA-256 checksum, and stages both
+   for the publisher. The workflow summary records the common source commit
+   for the two bundles and the SRPM; the rendered spec's Source0 also names it.
 
 The resulting SRPM is self-contained. Binary RPM builds use the bundled sources
 and do not contact the npm registry.
@@ -42,15 +43,18 @@ files or suppress the bundler's license diagnostics globally.
 On Fedora, install the same tools used by CI:
 
 ```sh
-sudo dnf install gh nodejs-packaging-bundler rpm-build rpmlint systemd-rpm-macros
+sudo dnf install git-core nodejs-packaging-bundler rpm-build rpmlint systemd-rpm-macros
 ```
 
-Then build a released version:
+Then build a released version from its trusted local tag:
 
 ```sh
-SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" \
+SOURCE_DATE_EPOCH="$(git show -s --format=%ct 'refs/tags/v0.2.0^{commit}')" \
   packaging/build-srpm.sh 0.2.0 "$PWD/artifacts"
 ```
+
+Alternatively, pass a trusted full commit or annotated-tag object ID as the
+third argument. As in CI, it must resolve to the current checkout's commit.
 
 Use `mock` to build the generated SRPM in a clean Fedora environment:
 

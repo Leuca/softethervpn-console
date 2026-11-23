@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 set -euo pipefail
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-  echo "Usage: $0 VERSION [OUTPUT_DIRECTORY]" >&2
+if [[ $# -lt 1 || $# -gt 3 ]]; then
+  echo "Usage: $0 VERSION [OUTPUT_DIRECTORY [EXPECTED_CHECKOUT_OID]]" >&2
   exit 2
 fi
 
@@ -22,6 +22,23 @@ if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/softethervpn-console$ ]]; then
   exit 2
 fi
 
+checkout="$(cd "$(dirname "$0")/.." && pwd -P)"
+git_cmd=(git --no-replace-objects -c "safe.directory=$checkout" -C "$checkout")
+if [[ $# -eq 3 ]]; then
+  if [[ ! "$3" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Expected a full release event object ID." >&2
+    exit 2
+  fi
+  # An annotated tag object and the checkout identify the same peeled commit.
+  source_commit="$("${git_cmd[@]}" rev-parse --verify "$3^{commit}")"
+  if [[ "$source_commit" != "$("${git_cmd[@]}" rev-parse --verify HEAD)" ]]; then
+    echo "Release event does not match the checked-out commit." >&2
+    exit 1
+  fi
+else
+  source_commit="$("${git_cmd[@]}" rev-parse --verify "refs/tags/v$upstream_version^{commit}")"
+fi
+
 rpm_version="${upstream_version/-/\~}"
 work_dir="$(mktemp -d)"
 top_dir="$work_dir/rpmbuild"
@@ -37,16 +54,12 @@ trap cleanup EXIT
 
 mkdir -p "$sources_dir" "$specs_dir" "$source_tree" "$package_tarballs" "$output_dir"
 
-source_archive="$sources_dir/$name-$upstream_version.tar.gz"
-source_url="https://github.com/$repository/archive/v$upstream_version/$name-$upstream_version.tar.gz"
-curl --fail --location --retry 5 --retry-all-errors "$source_url" --output "$source_archive"
+source_name="$name-$source_commit"
+source_archive="$sources_dir/$source_name.tar.gz"
+source_url="https://github.com/$repository/archive/$source_commit/$source_name.tar.gz"
+"${git_cmd[@]}" archive --format=tar.gz --prefix="$source_name/" -o "$source_archive" "$source_commit"
 tar -xzf "$source_archive" -C "$source_tree"
-
-project_dir="$(find "$source_tree" -mindepth 1 -maxdepth 1 -type d -print -quit)"
-if [[ -z "$project_dir" ]]; then
-  echo "The release archive did not contain a source directory." >&2
-  exit 1
-fi
+project_dir="$source_tree/$source_name"
 
 create_npm_tarball() {
   local package_dir="$1"
@@ -139,7 +152,7 @@ sed -i \
   -e "s/^Version:.*/Version:        $rpm_version/" \
   -e "s/^%global github_owner .*/%global github_owner $owner/" \
   -e "s|^Source0:.*|Source0:        $source_url|" \
-  -e "s|^%autosetup -n .*|%autosetup -n $name-$upstream_version|" \
+  -e "s|^%autosetup -n .*|%autosetup -n $source_name|" \
   "$rendered_spec"
 
 rpmbuild -bs --define "_topdir $top_dir" "$rendered_spec"
@@ -161,3 +174,7 @@ install -p -m 0644 "${source_rpms[0]}" "$source_rpm"
   sha256sum "$source_rpm_asset_name" > "$source_rpm_asset_name.sha256"
 )
 printf '%s\n' "$source_rpm"
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  printf 'Source commit for the v%s integrated bundle, managed bundle, and `%s`: `%s`.\n' \
+    "$upstream_version" "$source_rpm_asset_name" "$source_commit" >> "$GITHUB_STEP_SUMMARY"
+fi

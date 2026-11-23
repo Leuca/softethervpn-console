@@ -94,11 +94,6 @@ jobs:
     outputs:
       filename: ${{ steps.build.outputs.filename }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
       - name: Install Fedora packaging tools
         run: >-
           dnf install -y
@@ -108,6 +103,11 @@ jobs:
           rpmlint
           systemd-rpm-macros
 
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
       - name: Build source RPM
         id: build
         shell: bash
@@ -115,7 +115,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          packaging/build-srpm.sh "$version" srpm
+          packaging/build-srpm.sh "$version" srpm "${GITHUB_SHA:?}"
           filename="softethervpn-console-${version/-/.}-1$(rpm --eval '%{?dist}').src.rpm"
           printf 'filename=%s\n' "$filename" >> "$GITHUB_OUTPUT"
 
