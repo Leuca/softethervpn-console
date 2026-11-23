@@ -107,6 +107,9 @@ describe('gateway RPC proxy', () => {
       });
 
       expect(failedRpc.statusCode).toBe(502);
+      expect(failedRpc.json()).toEqual({
+        error: 'Unable to reach the selected SoftEther VPN Server.',
+      });
       expect(session.json()).toEqual(login.json());
     } finally {
       await server.close();

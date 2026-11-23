@@ -26,6 +26,7 @@ describe('SoftEther login probe', () => {
         params: { IntValue_u32: 42 },
         id: 'login-probe',
       }),
+      { maxBytes: 16 * 1024, deadlineMs: 15_000 },
     );
   });
 

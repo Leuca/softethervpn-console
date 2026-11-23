@@ -2,6 +2,7 @@ import { RpcForwarder } from './rpcProxy.js';
 import { SessionCredentials } from './sessions.js';
 
 const PROBE_VALUE = 42;
+const PROBE_BUDGET = { maxBytes: 16 * 1024, deadlineMs: 15_000 };
 const TLS_ERROR_CODES = new Set([
   'CERT_HAS_EXPIRED',
   'DEPTH_ZERO_SELF_SIGNED_CERT',
@@ -44,7 +45,7 @@ const isTlsVerificationError = (error: unknown): boolean => {
 export const createLoginProbe = (forward: RpcForwarder): LoginProbe => async (credentials) => {
   let response;
   try {
-    response = await forward(credentials, PROBE_REQUEST);
+    response = await forward(credentials, PROBE_REQUEST, PROBE_BUDGET);
   } catch (error) {
     if (isTlsVerificationError(error)) {
       throw new LoginProbeError(

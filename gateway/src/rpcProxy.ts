@@ -4,7 +4,8 @@ import { FastifyPluginAsync } from 'fastify';
 import { SESSION_COOKIE } from './sessionCookie.js';
 import { SessionCredentials, SessionStore } from './sessions.js';
 
-const RPC_TIMEOUT_MS = 5 * 60 * 1000;
+const RPC_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const RPC_BUDGET = { maxBytes: 16 * 1024 * 1024, deadlineMs: 6 * 60 * 1000 };
 
 export interface RpcResponse {
   statusCode: number;
@@ -12,7 +13,11 @@ export interface RpcResponse {
   body: string;
 }
 
-export type RpcForwarder = (session: SessionCredentials, body: string) => Promise<RpcResponse>;
+export type RpcForwarder = (
+  session: SessionCredentials,
+  body: string,
+  budget?: typeof RPC_BUDGET,
+) => Promise<RpcResponse>;
 
 interface RpcProxyOptions {
   sessions: SessionStore;
@@ -61,29 +66,54 @@ export const buildRpcRequestOptions = (
   },
 });
 
-export const forwardRpcRequest: RpcForwarder = (session, body) =>
+export const forwardRpcRequest: RpcForwarder = (session, body, budget = RPC_BUDGET) =>
   new Promise((resolve, reject) => {
-    const upstream = httpsRequest(buildRpcRequestOptions(session, body), (response) => {
-      const chunks: Buffer[] = [];
+    const upstream = httpsRequest(buildRpcRequestOptions(session, body));
+    const chunks: Buffer[] = [];
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      chunks.length = 0;
+      upstream.destroy();
+      reject(error);
+    };
+    const timedOut = () => fail(new Error('SoftEther JSON-RPC request timed out.'));
+    const deadline = setTimeout(timedOut, budget.deadlineMs);
 
-      response.on('data', (chunk: Buffer) => chunks.push(chunk));
-      response.on('end', () => {
+    upstream.on('error', fail);
+    upstream.setTimeout(RPC_IDLE_TIMEOUT_MS, timedOut);
+    upstream.once('response', (response) => {
+      let bytes = 0;
+      response.on('error', fail);
+      response.once('close', () => {
+        if (!settled) fail(new Error('SoftEther JSON-RPC response closed early.'));
+      });
+      response.on('data', (chunk: Buffer) => {
+        if (settled) return;
+        bytes += chunk.byteLength;
+        if (bytes > budget.maxBytes) {
+          fail(new Error('SoftEther JSON-RPC response too large.'));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      response.once('end', () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(deadline);
         resolve({
           statusCode: response.statusCode ?? 502,
           contentType:
             typeof response.headers['content-type'] === 'string'
               ? response.headers['content-type']
               : undefined,
-          body: Buffer.concat(chunks).toString('utf8'),
+          body: Buffer.concat(chunks, bytes).toString('utf8'),
         });
       });
-      response.on('error', reject);
     });
 
-    upstream.setTimeout(RPC_TIMEOUT_MS, () =>
-      upstream.destroy(new Error('SoftEther JSON-RPC request timed out.')),
-    );
-    upstream.on('error', reject);
     upstream.end(body);
   });
 
