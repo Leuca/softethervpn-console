@@ -56,18 +56,20 @@ describe('gateway session routes', () => {
       expect(login.statusCode).toBe(200);
       expect(login.json()).toEqual({
         authenticated: true,
+        connectionId: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
         host: loginPayload.host,
         port: loginPayload.port,
         hub: loginPayload.hub,
       });
       expect(cookie).toContain('HttpOnly');
+      expect(login.cookies[0].path).toBe(`/api/connections/${login.json().connectionId}`);
       expect(cookie).toContain('SameSite=Strict');
       expect(cookie).toContain('Secure');
       expect(login.body).not.toContain(loginPayload.password);
 
       const session = await server.inject({
         method: 'GET',
-        url: '/session',
+        url: `/api/connections/${login.json().connectionId}/session`,
         headers: { cookie: cookie as string },
       });
 
@@ -93,12 +95,12 @@ describe('gateway session routes', () => {
       const cookie = login.headers['set-cookie'] as string;
       const logout = await server.inject({
         method: 'POST',
-        url: '/logout',
+        url: `/api/connections/${login.json().connectionId}/logout`,
         headers: { cookie },
       });
       const session = await server.inject({
         method: 'GET',
-        url: '/session',
+        url: `/api/connections/${login.json().connectionId}/session`,
         headers: { cookie },
       });
 
@@ -109,7 +111,7 @@ describe('gateway session routes', () => {
     }
   });
 
-  it('replaces the previous session after a successful login', async () => {
+  it("rejects another connection's cookie even when supplied explicitly", async () => {
     const sessions = new SessionStore();
     const server = buildGatewayServer({
       loginProbe: vi.fn().mockResolvedValue(undefined),
@@ -130,21 +132,21 @@ describe('gateway session routes', () => {
         headers: { cookie: firstCookie },
         payload: loginPayload,
       });
-      const secondCookie = secondLogin.headers['set-cookie'] as string;
+      expect(secondLogin.cookies[0].value).not.toBe(firstLogin.cookies[0].value);
       const previousSession = await server.inject({
         method: 'GET',
-        url: '/session',
+        url: `/api/connections/${firstLogin.json().connectionId}/session`,
         headers: { cookie: firstCookie },
       });
       const currentSession = await server.inject({
         method: 'GET',
-        url: '/session',
-        headers: { cookie: secondCookie },
+        url: `/api/connections/${secondLogin.json().connectionId}/session`,
+        headers: { cookie: firstCookie },
       });
 
-      expect(secondCookie).not.toBe(firstCookie);
-      expect(previousSession.json()).toEqual({ authenticated: false });
-      expect(currentSession.json()).toEqual(secondLogin.json());
+      expect(firstLogin.json().connectionId).not.toBe(secondLogin.json().connectionId);
+      expect(previousSession.json()).toEqual(firstLogin.json());
+      expect(currentSession.json()).toEqual({ authenticated: false });
     } finally {
       await server.close();
     }
@@ -169,12 +171,12 @@ describe('gateway session routes', () => {
       });
       const firstSession = await server.inject({
         method: 'GET',
-        url: '/session',
+        url: `/api/connections/${firstLogin.json().connectionId}/session`,
         headers: { cookie: firstLogin.headers['set-cookie'] as string },
       });
       const secondSession = await server.inject({
         method: 'GET',
-        url: '/session',
+        url: `/api/connections/${secondLogin.json().connectionId}/session`,
         headers: { cookie: secondLogin.headers['set-cookie'] as string },
       });
 
@@ -209,7 +211,7 @@ describe('gateway session routes', () => {
       });
       const currentSession = await server.inject({
         method: 'GET',
-        url: '/session',
+        url: `/api/connections/${firstLogin.json().connectionId}/session`,
         headers: { cookie },
       });
 

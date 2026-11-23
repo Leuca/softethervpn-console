@@ -1,7 +1,7 @@
 # Managed gateway
 
 The managed gateway serves the managed frontend, owns login sessions, and
-proxies same-origin `/api/` requests to the SoftEther server selected at login.
+proxies same-origin `/api/connections/:id/rpc` requests to the SoftEther server selected at login.
 The frontend still owns capability detection and route visibility.
 
 ## Build and run
@@ -84,12 +84,12 @@ location / {
 
 ## Sessions and upstream TLS
 
-Sessions use random opaque IDs in `HttpOnly`, `SameSite=Strict` cookies.
-Administrator passwords and session state remain in gateway memory. Sessions
-expire eight hours after login and are not extended by activity; logout,
-expiry, successful re-login from the same browser, or gateway shutdown
-invalidates the old session. Separate browsers have independent sessions, and a
-failed replacement login leaves the current session active. Post-login upstream
+Every login returns a fresh connection ID and sets a separate `HttpOnly`,
+`SameSite=Strict` cookie scoped to `/api/connections/:id`. RPC, session lookup,
+and logout require both that ID and the matching cookie. Concurrent logins never change
+an existing ID's server or hub. Administrator passwords stay in gateway memory.
+Each connection expires eight hours after login, on logout, or on restart.
+Activity does not extend its lifetime. Post-login upstream
 failures do not invalidate a session so temporary outages can be retried. Only
 one gateway process is supported because there is no shared session store.
 
@@ -133,3 +133,10 @@ curl http://127.0.0.1:8080/healthz
 Managed mode is intended for trusted administrators behind the access boundary
 described above. Network egress rules remain recommended as defense in depth.
 See the [security review](SECURITY.md) for the complete boundary.
+
+## Gateway tests
+
+Run `npm test` in `gateway/` with OpenSSL and Google Chrome installed.
+To use another Chromium executable, set `CHROME_BIN` to its absolute path.
+The isolation test uses a fresh browser context and temporary loopback servers;
+neither Chrome nor Playwright is required at runtime.

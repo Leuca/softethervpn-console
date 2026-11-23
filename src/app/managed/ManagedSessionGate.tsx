@@ -10,6 +10,7 @@ import {
   StackItem,
 } from "@patternfly/react-core";
 import { ManagedLoginForm } from "./ManagedLoginForm";
+import { openConnection } from "./connection";
 import { ManagedSession, getSession, logout } from "./sessionApi";
 import logo from "@app/bgimages/icons8-softether-vpn.svg";
 import { AppearanceMenu } from "@app/components/AppearanceMenu";
@@ -60,8 +61,7 @@ const ManagedSessionGate: React.FunctionComponent<ManagedSessionGateProps> = ({ 
   }, []);
 
   const handleLogin = (nextSession: AuthenticatedManagedSession) => {
-    setSession(nextSession);
-    setError(null);
+    openConnection(nextSession.connectionId);
   };
 
   const handleLogout = () => {

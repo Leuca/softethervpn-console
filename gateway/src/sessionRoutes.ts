@@ -5,12 +5,12 @@ import { SESSION_COOKIE } from './sessionCookie.js';
 import { LoginCredentials, SessionStore } from './sessions.js';
 import { UpstreamResolutionError, UpstreamResolver } from './upstreamResolution.js';
 
-const COOKIE_OPTIONS = {
+const cookieOptions = (id: string) => ({
   httpOnly: true,
-  path: '/',
+  path: `/api/connections/${id}`,
   sameSite: 'strict' as const,
   secure: 'auto' as const,
-};
+});
 
 interface SessionRoutesOptions {
   loginRateLimiter?: LoginRateLimiter;
@@ -82,15 +82,12 @@ export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = a
         return reply.code(502).send({ error: 'The selected server could not be reached.' });
       }
 
-      const previousId = request.cookies[SESSION_COOKIE];
-      if (previousId) {
-        options.sessions.delete(previousId);
-      }
-      const id = options.sessions.create(credentials);
-      reply.setCookie(SESSION_COOKIE, id, COOKIE_OPTIONS);
+      const { owner, id } = options.sessions.create(credentials);
+      reply.setCookie(SESSION_COOKIE, owner, cookieOptions(id));
 
       return {
         authenticated: true,
+        connectionId: id,
         host: credentials.host,
         port: credentials.port,
         hub: credentials.hub,
@@ -98,32 +95,30 @@ export const registerSessionRoutes: FastifyPluginAsync<SessionRoutesOptions> = a
     },
   );
 
-  server.get('/session', async (request, reply) => {
-    const id = request.cookies[SESSION_COOKIE];
-    const session = id ? options.sessions.get(id) : undefined;
+  server.get<{ Params: { id: string } }>('/api/connections/:id/session', async (request) => {
+    const { id } = request.params;
+    const session = options.sessions.owned(request.cookies[SESSION_COOKIE], id);
 
     if (!session) {
-      if (id) {
-        reply.clearCookie(SESSION_COOKIE, COOKIE_OPTIONS);
-      }
       return { authenticated: false };
     }
 
     return {
       authenticated: true,
+      connectionId: id,
       host: session.host,
       port: session.port,
       hub: session.hub,
     };
   });
 
-  server.post('/logout', async (request, reply) => {
-    const id = request.cookies[SESSION_COOKIE];
-    if (id) {
+  server.post<{ Params: { id: string } }>('/api/connections/:id/logout', async (request, reply) => {
+    const { id } = request.params;
+    if (options.sessions.owned(request.cookies[SESSION_COOKIE], id)) {
       options.sessions.delete(id);
+      reply.clearCookie(SESSION_COOKIE, cookieOptions(id));
     }
 
-    reply.clearCookie(SESSION_COOKIE, COOKIE_OPTIONS);
     return reply.code(204).send();
   });
 };

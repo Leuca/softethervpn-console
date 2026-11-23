@@ -1,1 +1,1 @@
-export const SESSION_COOKIE = 'softether_console_session';
+export const SESSION_COOKIE = 'softether_console_connection';

@@ -14,7 +14,7 @@ describe('SessionStore', () => {
   it('stores credentials under an opaque random ID', () => {
     const store = new SessionStore({ now: () => 1_000, ttlMs: 5_000 });
 
-    const id = store.create(credentials);
+    const { id } = store.create(credentials);
 
     expect(id).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(store.get(id)).toEqual({ ...credentials, expiresAt: 6_000 });
@@ -23,7 +23,7 @@ describe('SessionStore', () => {
   it('removes expired sessions when they are read', () => {
     let now = 1_000;
     const store = new SessionStore({ now: () => now, ttlMs: 5_000 });
-    const id = store.create(credentials);
+    const { id } = store.create(credentials);
 
     now = 6_000;
 
@@ -32,10 +32,24 @@ describe('SessionStore', () => {
 
   it('deletes sessions explicitly', () => {
     const store = new SessionStore();
-    const id = store.create(credentials);
+    const { id } = store.create(credentials);
 
     expect(store.delete(id)).toBe(true);
     expect(store.get(id)).toBeUndefined();
+  });
+
+  it('expires one connection without transferring it to another login', () => {
+    let now = 0;
+    const store = new SessionStore({ now: () => now, ttlMs: 100 });
+    const a = store.create(credentials);
+    now = 50;
+    const b = store.create({ ...credentials, hub: 'SECOND' });
+    now = 100;
+    expect(store.owned(a.owner, a.id)).toBeUndefined();
+    expect(store.owned(a.owner, b.id)).toBeUndefined();
+    expect(store.owned(b.owner, b.id)?.hub).toBe('SECOND');
+    expect(store.owned(b.id, b.id)).toBeUndefined();
+    store.clear();
   });
 
   it('clears every session and expiry timer during shutdown', () => {
@@ -43,8 +57,8 @@ describe('SessionStore', () => {
 
     try {
       const store = new SessionStore({ ttlMs: 5_000 });
-      const firstId = store.create(credentials);
-      const secondId = store.create({ ...credentials, password: 'another-secret' });
+      const { id: firstId } = store.create(credentials);
+      const { id: secondId } = store.create({ ...credentials, password: 'another-secret' });
 
       store.clear();
 
@@ -61,7 +75,7 @@ describe('SessionStore', () => {
 
     try {
       const store = new SessionStore({ ttlMs: 5_000 });
-      const id = store.create(credentials);
+      const { id } = store.create(credentials);
 
       vi.advanceTimersByTime(5_000);
 

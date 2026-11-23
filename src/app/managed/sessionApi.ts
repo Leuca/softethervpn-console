@@ -1,3 +1,5 @@
+import { connectionId, connectionPath } from "./connection";
+
 export interface ManagedLoginPayload {
   host: string;
   port: number;
@@ -12,6 +14,7 @@ export type ManagedSession =
     }
   | {
       authenticated: true;
+      connectionId: string;
       host: string;
       port: number;
       hub: string;
@@ -66,9 +69,15 @@ const postJson = <T>(path: string, body?: unknown): Promise<T> =>
         },
   );
 
-export const getSession = (): Promise<ManagedSession> => requestJson<ManagedSession>("/session");
+export const getSession = async (): Promise<ManagedSession> =>
+  connectionId
+    ? requestJson<ManagedSession>(`${connectionPath(connectionId)}/session`)
+    : { authenticated: false };
 
 export const login = (payload: ManagedLoginPayload): Promise<ManagedSession> =>
   postJson<ManagedSession>("/login", payload);
 
-export const logout = (): Promise<void> => postJson<void>("/logout");
+export const logout = async (): Promise<void> => {
+  if (!connectionId) throw new Error("No managed connection selected.");
+  return postJson<void>(`${connectionPath(connectionId)}/logout`);
+};

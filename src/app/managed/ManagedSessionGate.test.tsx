@@ -4,7 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
 import { ManagedSessionGate, useManagedSession } from "./ManagedSessionGate";
 import { ManagedSession, getSession, login, logout } from "./sessionApi";
+import { openConnection } from "./connection";
 import { ThemeProvider } from "@app/ThemeContext";
+
+vi.mock("./connection", () => ({ openConnection: vi.fn() }));
 
 vi.mock("./sessionApi", () => ({
   getSession: vi.fn(),
@@ -78,10 +81,11 @@ describe("ManagedSessionGate", () => {
     expect(screen.queryByText("Managed app")).not.toBeInTheDocument();
   });
 
-  it("renders children after a successful login", async () => {
+  it("opens a fresh document bound to the login connection", async () => {
     getSessionMock.mockResolvedValue({ authenticated: false } satisfies ManagedSession);
     loginMock.mockResolvedValue({
       authenticated: true,
+      connectionId: "test-connection",
       host: "vpn.example.com",
       port: 443,
       hub: "",
@@ -94,7 +98,8 @@ describe("ManagedSessionGate", () => {
     await user.type(screen.getByLabelText("Password"), "secret");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
-    expect(await screen.findByText("Managed app")).toBeInTheDocument();
+    expect(openConnection).toHaveBeenCalledWith("test-connection");
+    expect(screen.queryByText("Managed app")).not.toBeInTheDocument();
   });
 
   it("returns to the login form after logout", async () => {

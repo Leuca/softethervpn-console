@@ -90,27 +90,31 @@ export const forwardRpcRequest: RpcForwarder = (session, body) =>
 export const registerRpcProxy: FastifyPluginAsync<RpcProxyOptions> = async (server, options) => {
   const forward = options.forward ?? forwardRpcRequest;
 
-  server.post<{ Body: unknown }>('/api/', async (request, reply) => {
-    const id = request.cookies[SESSION_COOKIE];
-    const session = id ? options.sessions.get(id) : undefined;
+  server.post<{ Body: unknown; Params: { id: string } }>(
+    '/api/connections/:id/rpc',
+    async (request, reply) => {
+      const session = options.sessions.owned(request.cookies[SESSION_COOKIE], request.params.id);
 
-    if (!session) {
-      return reply.code(401).send({ error: 'Authentication required.' });
-    }
-
-    const body = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);
-    if (body === undefined) {
-      return reply.code(400).send({ error: 'A JSON-RPC request body is required.' });
-    }
-
-    try {
-      const response = await forward(session, body);
-      if (response.contentType) {
-        reply.header('Content-Type', response.contentType);
+      if (!session) {
+        return reply.code(401).send({ error: 'Authentication required.' });
       }
-      return reply.code(response.statusCode).send(response.body);
-    } catch {
-      return reply.code(502).send({ error: 'Unable to reach the selected SoftEther VPN Server.' });
-    }
-  });
+
+      const body = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);
+      if (body === undefined) {
+        return reply.code(400).send({ error: 'A JSON-RPC request body is required.' });
+      }
+
+      try {
+        const response = await forward(session, body);
+        if (response.contentType) {
+          reply.header('Content-Type', response.contentType);
+        }
+        return reply.code(response.statusCode).send(response.body);
+      } catch {
+        return reply
+          .code(502)
+          .send({ error: 'Unable to reach the selected SoftEther VPN Server.' });
+      }
+    },
+  );
 };

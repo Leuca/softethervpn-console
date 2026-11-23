@@ -35,7 +35,7 @@ describe('gateway RPC proxy', () => {
     try {
       const response = await server.inject({
         method: 'POST',
-        url: '/api/',
+        url: '/api/connections/missing/rpc',
         payload: { jsonrpc: '2.0', method: 'Test', id: 1 },
       });
 
@@ -64,7 +64,7 @@ describe('gateway RPC proxy', () => {
       const payload = JSON.stringify({ jsonrpc: '2.0', method: 'Test', params: {}, id: 1 });
       const response = await server.inject({
         method: 'POST',
-        url: '/api/',
+        url: `/api/connections/${login.json().connectionId}/rpc`,
         headers: { cookie, 'content-type': 'text/plain' },
         payload,
       });
@@ -96,13 +96,13 @@ describe('gateway RPC proxy', () => {
       const cookie = login.headers['set-cookie'] as string;
       const failedRpc = await server.inject({
         method: 'POST',
-        url: '/api/',
+        url: `/api/connections/${login.json().connectionId}/rpc`,
         headers: { cookie },
         payload: { jsonrpc: '2.0', method: 'Test', id: 1 },
       });
       const session = await server.inject({
         method: 'GET',
-        url: '/session',
+        url: `/api/connections/${login.json().connectionId}/session`,
         headers: { cookie },
       });
 

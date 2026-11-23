@@ -12,10 +12,10 @@ Browser-facing HTTPS alone does not provide that access control.
 | DNS rebinding             | Hostnames are resolved once during login. The complete initial address set is pinned in the session and used for every later connection without another DNS lookup.                                          |
 | Login brute force         | Each client address gets ten login attempts per minute. The limit is process-local, resets on restart, and does not replace reverse-proxy rate limiting for exposed deployments.                             |
 | Request size              | Fastify rejects bodies over 1 MiB before a route handler runs.                                                                                                                                               |
-| JSON-RPC proxy            | Only authenticated `POST /api/` requests are forwarded. The upstream path, method, authentication headers, and HTTPS transport are fixed. Socket pooling is disabled so each request uses its session's pin. |
-| Session fixation          | Login creates a new 256-bit random session ID and invalidates the previous cookie's session after a successful probe.                                                                                        |
+| JSON-RPC proxy            | Only `POST /api/connections/:id/rpc` with the owning browser cookie is forwarded. The upstream path, method, authentication headers, and HTTPS transport are fixed. Socket pooling is disabled so each request uses its session's pin. |
+| Connection ownership      | Each login issues an independent random connection ID and secret. The gateway verifies the secret against that ID before forwarding, even if a client sends a cookie outside its intended path. |
 | CSRF                      | Cookies use `SameSite=Strict`; state-changing requests with a mismatched `Origin` are rejected. Requests without `Origin` remain available to non-browser clients.                                           |
-| Cookie settings           | The cookie is `HttpOnly`, `SameSite=Strict`, scoped to `/`, and marked `Secure` when the trusted connection metadata reports HTTPS.                                                                          |
+| Cookie settings           | Each cookie is `HttpOnly`, `SameSite=Strict`, scoped to its connection's API path, and marked `Secure` when trusted connection metadata reports HTTPS. Logout clears only that cookie. |
 | Credential lifetime       | Passwords exist only in gateway memory. Logout, the fixed eight-hour expiry timer, or graceful/process exit removes the live session; JavaScript strings cannot be actively zeroed.                          |
 | Logs                      | Production logging redacts password, authorization, cookie, and `Set-Cookie` paths in addition to Fastify's metadata-only request serializer. Operators must not add unredacted custom logging.              |
 | Error disclosure          | Login and network failures return fixed messages. Authenticated SoftEther JSON-RPC responses are returned to the browser because the console needs them.                                                     |
@@ -26,10 +26,9 @@ Browser-facing HTTPS alone does not provide that access control.
 Review the administrator access boundary and gateway egress rules whenever the
 deployment or network boundaries change.
 
-Each browser cookie identifies an independent session. A successful login from
-an already authenticated browser replaces only that cookie's previous session;
-a failed replacement login leaves the working session intact. Post-login
-upstream failures return a fixed gateway error but do not remove the session,
-because a temporary server restart or network interruption should remain
-retryable. Sessions are not extended by activity and there is no shared or
-persistent session store.
+Each connection has its own browser cookie. The document URL identifies
+one connection, not a credential. Opening the console root in another tab can
+add a connection; neither a successful nor a failed login retargets existing
+tabs. Logout and the fixed eight-hour expiry revoke only that connection.
+A request already forwarded cannot be recalled. Reconnecting creates a new ID.
+The store is in memory; gateway restarts require fresh logins.

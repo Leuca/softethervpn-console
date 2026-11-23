@@ -46,7 +46,7 @@ describe('gateway configuration', () => {
 describe('gateway server', () => {
   it('removes live session credentials when the server closes', async () => {
     const sessions = new SessionStore();
-    const id = sessions.create({
+    const { id } = sessions.create({
       host: 'vpn.example.com',
       port: 443,
       hub: '',
@@ -80,7 +80,7 @@ describe('gateway server', () => {
     try {
       const rejected = await server.inject({
         method: 'POST',
-        url: '/logout',
+        url: '/api/connections/missing/logout',
         headers: {
           host: '127.0.0.1:8080',
           origin: 'https://attacker.example.com',
@@ -90,7 +90,7 @@ describe('gateway server', () => {
       });
       const accepted = await server.inject({
         method: 'POST',
-        url: '/logout',
+        url: '/api/connections/missing/logout',
         headers: {
           host: '127.0.0.1:8080',
           origin: 'https://console.example.com:8443',

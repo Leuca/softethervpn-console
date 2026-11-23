@@ -111,6 +111,15 @@ does not include managed login behavior. The managed artifact requires the
 gateway, which handles server selection and login. See
 [`gateway/README.md`](gateway/README.md) for its deployment and TLS boundaries.
 
+### Managed connections
+
+In managed mode each login opens a tab bound to that connection. To connect to
+another server or hub, open the console root URL in a new tab and log in there.
+Reloading a connected tab retains its target; logging out disconnects only
+that connection. Closing a tab does not log it out. Connections expire after
+eight hours or when the gateway restarts. An upgrade from the unscoped API
+requires reloading old tabs and logging in again.
+
 ### Password manager custom fields
 
 The managed login form exposes stable identifiers for password managers that

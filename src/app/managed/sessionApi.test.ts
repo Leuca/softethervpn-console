@@ -7,6 +7,11 @@ import {
   ManagedLoginPayload,
 } from "./sessionApi";
 
+vi.mock("./connection", async (original) => ({
+  ...(await original<typeof import("./connection")>()),
+  connectionId: "a".repeat(43),
+}));
+
 const jsonResponse = (body: unknown, init?: ResponseInit): Response =>
   new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
@@ -20,7 +25,9 @@ describe("managed session API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(getSession()).resolves.toEqual(session);
-    expect(fetchMock).toHaveBeenCalledWith("/session", { credentials: "same-origin" });
+    expect(fetchMock).toHaveBeenCalledWith(`/api/connections/${"a".repeat(43)}/session`, {
+      credentials: "same-origin",
+    });
   });
 
   it("posts login details without keeping the password in the response shape", async () => {
@@ -52,7 +59,7 @@ describe("managed session API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(logout()).resolves.toBeUndefined();
-    expect(fetchMock).toHaveBeenCalledWith("/logout", {
+    expect(fetchMock).toHaveBeenCalledWith(`/api/connections/${"a".repeat(43)}/logout`, {
       credentials: "same-origin",
       method: "POST",
     });

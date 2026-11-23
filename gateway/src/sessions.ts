@@ -30,7 +30,7 @@ interface SessionStoreOptions {
 
 export class SessionStore {
   private readonly expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly sessions = new Map<string, GatewaySession>();
+  private readonly sessions = new Map<string, { owner: string; session: GatewaySession }>();
   private readonly ttlMs: number;
   private readonly now: () => number;
 
@@ -43,26 +43,30 @@ export class SessionStore {
     }
   }
 
-  create(credentials: SessionCredentials): string {
+  create(credentials: SessionCredentials) {
+    const owner = randomBytes(32).toString('base64url');
     const id = randomBytes(32).toString('base64url');
 
     this.sessions.set(id, {
-      ...credentials,
-      expiresAt: this.now() + this.ttlMs,
+      owner,
+      session: { ...credentials, expiresAt: this.now() + this.ttlMs },
     });
 
     const expiryTimer = setTimeout(() => {
-      this.expiryTimers.delete(id);
-      this.sessions.delete(id);
+      this.delete(id);
     }, this.ttlMs);
     expiryTimer.unref();
     this.expiryTimers.set(id, expiryTimer);
 
-    return id;
+    return { owner, id };
+  }
+
+  owned(owner: string | undefined, id: string): GatewaySession | undefined {
+    return owner && this.sessions.get(id)?.owner === owner ? this.get(id) : undefined;
   }
 
   get(id: string): GatewaySession | undefined {
-    const session = this.sessions.get(id);
+    const session = this.sessions.get(id)?.session;
 
     if (session && session.expiresAt <= this.now()) {
       this.delete(id);
