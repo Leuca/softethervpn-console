@@ -51,7 +51,8 @@ const MAX_NOTE_LENGTH = 255;
 const MAX_REDIRECT_URL_LENGTH = 255;
 const MAX_DELAY = 10000;
 const MAX_PERCENT = 100;
-const upgradeMessage = "Upgrade the VPN server to edit, toggle or delete existing access rules.";
+// Cedar's DeleteAccess interprets IDs at MAX_ACCESSLISTS or above as hashes.
+const FIRST_HASH_DELETE_ID = 32768;
 
 type AccessListResponse = VPN.VpnRpcEnumAccessList & { AclRevision_str?: unknown };
 const hasRevision = (token: unknown): token is string => typeof token === "string" && token !== "";
@@ -101,6 +102,55 @@ type EditorState = { draft: RuleDraft } & (
 // Compare the full RPC row, including identity and fields not exposed in the form.
 const ruleSnapshot = (rule: VPN.VpnAccess) =>
   JSON.stringify(Object.entries(rule).sort(([a], [b]) => a.localeCompare(b)));
+
+type NativeAccess = VPN.VpnAccess & { UniqueId_u32?: number };
+const deleteId = (current: NativeAccess, rows: NativeAccess[]): number => {
+  if (current.Id_u32 < FIRST_HASH_DELETE_ID) return current.Id_u32;
+  const hash = current.UniqueId_u32;
+  if (
+    hash === undefined ||
+    !Number.isInteger(hash) ||
+    hash < FIRST_HASH_DELETE_ID ||
+    hash > 0xffffffff ||
+    rows.some((row) => row !== current && row.UniqueId_u32 === hash)
+  ) {
+    throw new Error("No rule was deleted. The server did not provide a unique delete ID.");
+  }
+  return hash;
+};
+
+type RuleImpact = { snapshot: string; description: string };
+
+// Both native SetAccessList variants apply these hub options to every submitted row.
+const otherRuleChanges = (others: VPN.VpnAccess[], options: VPN.VpnAdminOption[]): RuleImpact[] => {
+  const enabled = new Set(
+    options.filter((o) => o.Value_u32 !== 0).map((o) => o.Name_str.toLowerCase()),
+  );
+  return others.flatMap((row) => {
+    const removed: string[] = [];
+    if (enabled.has("no_access_list_include_file")) {
+      if (/^(include|exclude):/i.test(row.SrcUsername_str))
+        removed.push(`source user filter (${row.SrcUsername_str})`);
+      if (/^(include|exclude):/i.test(row.DestUsername_str))
+        removed.push(`destination user filter (${row.DestUsername_str})`);
+    }
+    if (enabled.has("no_delay_jitter_packet_loss")) {
+      if (row.Delay_u32) removed.push(`delay (${row.Delay_u32} ms)`);
+      if (row.Jitter_u32) removed.push(`jitter (${row.Jitter_u32}%)`);
+      if (row.Loss_u32) removed.push(`packet loss (${row.Loss_u32}%)`);
+    }
+    return removed.length
+      ? [
+          {
+            snapshot: ruleSnapshot(row),
+            description: `Rule #${row.Id_u32}${row.Note_utf ? ` (${row.Note_utf})` : ""}: ${removed.join(", ")}`,
+          },
+        ]
+      : [];
+  });
+};
+
+type PendingSave = { original: VPN.VpnAccess; replacement: VPN.VpnAccess; impacts: RuleImpact[] };
 
 type AccessCaps = {
   supportIpv6: boolean;
@@ -637,10 +687,11 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const caps = React.useMemo(() => accessCapsFromServer(capsList), [capsList]);
   const [list, setList] = React.useState<AccessListResponse | null>(null);
   const rules = list && (list.AccessList ?? []);
-  const canChange = hasRevision(list?.AclRevision_str);
+  const hasWriteProtection = hasRevision(list?.AclRevision_str);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<VPN.VpnAccess | null>(null);
+  const [pendingSave, setPendingSave] = React.useState<PendingSave | null>(null);
   const [editor, setEditor] = React.useState<EditorState | null>(null);
 
   const load = React.useCallback(() => {
@@ -655,23 +706,28 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     load();
   }, [load]);
 
-  // Only the native revision check covers writers intervening after this read.
-  // A legacy setter would ignore the token; never fall back to it.
+  // Re-reading detects prior changes; only the native check protects the write itself.
   const mutateRule = async (
     original: VPN.VpnAccess,
     replacement: VPN.VpnAccess | null,
-    onSaved?: () => void,
+    approved?: RuleImpact[],
   ) => {
     setBusy(true);
     setError(null);
+    let confirm: PendingSave | null = null;
     try {
+      const options =
+        replacement === null
+          ? null
+          : await api.GetHubAdminOptions(new VPN.VpnRpcAdminOption({ HubName_str: hub }));
       const response: AccessListResponse = await api.EnumAccess(
         new VPN.VpnRpcEnumAccessList({ HubName_str: hub }),
       );
       const revision = response.AclRevision_str;
-      if (!hasRevision(revision)) {
+      const guarded = hasRevision(revision);
+      if (hasWriteProtection && !guarded) {
         setList(response);
-        setError(`No changes were sent. ${upgradeMessage}`);
+        setError("No changes were sent. The VPN server no longer reports ACL write protection.");
         return;
       }
       const fresh = response.AccessList ?? [];
@@ -688,25 +744,45 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         return;
       }
       if (replacement !== null) {
-        await api.CallAsync("SetAccessListIfCurrent", {
+        if (!Array.isArray(options?.AdminOptionList)) {
+          throw new Error(
+            "No changes were sent. The server did not return its hub administration options.",
+          );
+        }
+        const impacts = otherRuleChanges(
+          fresh.filter((row) => row !== current),
+          options.AdminOptionList,
+        );
+        if (impacts.length && JSON.stringify(impacts) !== JSON.stringify(approved)) {
+          setList(response);
+          confirm = { original, replacement, impacts };
+          return;
+        }
+        const params = {
           HubName_str: hub,
-          AclRevision_str: revision,
           AccessList: fresh.map((item) =>
             normalizeRuleForSave(item === current ? { ...current, ...replacement } : item),
           ),
-        });
+        };
+        if (guarded) {
+          await api.CallAsync("SetAccessListIfCurrent", { ...params, AclRevision_str: revision });
+        } else {
+          await api.SetAccessList(new VPN.VpnRpcEnumAccessList(params));
+        }
+        setEditor(null);
       } else {
-        await api.CallAsync("DeleteAccessIfCurrent", {
-          HubName_str: hub,
-          AclRevision_str: revision,
-          Id_u32: current.Id_u32,
-        });
+        const params = { HubName_str: hub, Id_u32: deleteId(current, fresh) };
+        if (guarded) {
+          await api.CallAsync("DeleteAccessIfCurrent", { ...params, AclRevision_str: revision });
+        } else {
+          await api.DeleteAccess(new VPN.VpnRpcDeleteAccess(params));
+        }
       }
-      onSaved?.();
       load();
     } catch (e) {
       setError(String(e));
     } finally {
+      setPendingSave(confirm);
       setBusy(false);
     }
   };
@@ -756,7 +832,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         });
       return;
     }
-    void mutateRule(editor.original, rule, () => setEditor(null));
+    void mutateRule(editor.original, rule);
   };
 
   const confirmDelete = () => {
@@ -779,6 +855,12 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const errorAlert = error && (
     <Alert variant="danger" title="Access list operation failed" isInline>
       {error}
+    </Alert>
+  );
+  const writeWarning = list && !hasWriteProtection && (
+    <Alert variant="warning" title="No protection against concurrent ACL changes" isInline>
+      If someone else changes the list at the same time, you may overwrite their changes or affect
+      the wrong rule. Upgrade the VPN server to enable protection.
     </Alert>
   );
 
@@ -812,11 +894,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       </Flex>
 
       {!editor && errorAlert}
-      {list && !canChange && !error && (
-        <Alert variant="warning" title="Server upgrade required" isInline>
-          {upgradeMessage}
-        </Alert>
-      )}
+      {editor?.mode !== "edit" && pendingDelete === null && !pendingSave && writeWarning}
 
       {isLoading ? (
         <Bullseye>
@@ -870,7 +948,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     id={`access-active-${rule.Id_u32}`}
                     aria-label={`Rule ${rule.Id_u32} active`}
                     isChecked={rule.Active_bool}
-                    isDisabled={busy || !canChange}
+                    isDisabled={busy}
                     onChange={(_event, checked) =>
                       void mutateRule(rule, { ...rule, Active_bool: checked })
                     }
@@ -885,18 +963,14 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <Td isActionCell>
                   <ActionsColumn
                     items={[
-                      { title: "Edit", onClick: () => openEdit(rule), isAriaDisabled: !canChange },
+                      { title: "Edit", onClick: () => openEdit(rule) },
                       {
                         title: "Clone",
                         onClick: () => openClone(rule),
                         isAriaDisabled: !canAddRule,
                       },
                       { isSeparator: true },
-                      {
-                        title: "Delete",
-                        onClick: () => setPendingDelete(rule),
-                        isAriaDisabled: !canChange,
-                      },
+                      { title: "Delete", onClick: () => setPendingDelete(rule) },
                     ]}
                     isDisabled={busy}
                   />
@@ -907,7 +981,11 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         </ScrollableTable>
       ) : null}
 
-      <Modal variant={ModalVariant.large} isOpen={editor !== null} onClose={dismissEditor}>
+      <Modal
+        variant={ModalVariant.large}
+        isOpen={editor !== null && !pendingSave}
+        onClose={() => !busy && dismissEditor()}
+      >
         <ModalHeader
           title={
             editor?.mode === "create"
@@ -921,6 +999,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           {draft && (
             <Form>
               {errorAlert}
+              {editor?.mode === "edit" && writeWarning}
               {validation.length > 0 && (
                 <Alert variant="warning" title="Rule is not ready to save" isInline>
                   {validation[0]}
@@ -1419,14 +1498,59 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           )}
         </ModalBody>
         <ModalFooter>
-          <Button
-            variant="primary"
-            onClick={saveEditor}
-            isDisabled={busy || validation.length > 0 || (editor?.mode === "edit" && !canChange)}
-          >
+          <Button variant="primary" onClick={saveEditor} isDisabled={busy || validation.length > 0}>
             {editor?.mode === "edit" ? "Save" : "Create"}
           </Button>
-          <Button variant="link" onClick={dismissEditor}>
+          <Button variant="link" onClick={dismissEditor} isDisabled={busy}>
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal
+        variant={ModalVariant.small}
+        isOpen={pendingSave !== null}
+        aria-labelledby="acl-save-impact-title"
+        elementToFocus="[data-cancel-acl-save]"
+        onClose={() => !busy && setPendingSave(null)}
+      >
+        <ModalHeader
+          title="Review changes"
+          labelId="acl-save-impact-title"
+          titleIconVariant="warning"
+        />
+        <ModalBody>
+          <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
+            <p>
+              Saving rule #{pendingSave?.original.Id_u32} will also clear these settings from other
+              rules under the current hub options:
+            </p>
+            <ul style={{ overflowWrap: "anywhere" }}>
+              {pendingSave?.impacts.map((impact) => (
+                <li key={impact.snapshot}>{impact.description}</li>
+              ))}
+            </ul>
+            {writeWarning}
+          </Flex>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="danger"
+            isLoading={busy}
+            isDisabled={busy}
+            onClick={() =>
+              pendingSave &&
+              void mutateRule(pendingSave.original, pendingSave.replacement, pendingSave.impacts)
+            }
+          >
+            Save all changes
+          </Button>
+          <Button
+            variant="link"
+            data-cancel-acl-save
+            onClick={() => setPendingSave(null)}
+            isDisabled={busy}
+          >
             Cancel
           </Button>
         </ModalFooter>
@@ -1438,7 +1562,9 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         onClose={() => !busy && setPendingDelete(null)}
       >
         <ModalHeader title="Delete rule" titleIconVariant="warning" />
-        <ModalBody>Delete access list rule #{pendingDelete?.Id_u32}?</ModalBody>
+        <ModalBody>
+          Delete access list rule #{pendingDelete?.Id_u32}?{writeWarning}
+        </ModalBody>
         <ModalFooter>
           <Button variant="danger" onClick={confirmDelete} isLoading={busy} isDisabled={busy}>
             Delete

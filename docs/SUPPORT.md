@@ -14,9 +14,12 @@ unsupported unless stated otherwise.
 
 Feature visibility follows the authenticated role and SoftEther's `GetCaps`
 response. A supported server may therefore expose only a subset of the console.
-Editing, toggling, and deleting existing Access List rules require a server
-with conditional ACL writes. Without that capability, viewing, creating, and
-cloning rules remain available.
+Editing, toggling, and deleting Access List rules work on servers without
+conditional ACL writes, but the console warns that concurrent changes may
+be lost or affect the wrong rule. Conditional writes require server support.
+On either server, editing or toggling one rule replaces the whole list. If hub
+options would clear username filters or packet simulation settings on other
+rules, the console lists those changes and asks for confirmation before saving.
 
 The upstream `5.2.5188` tag, source defaults, and published Windows binaries
 retain the embedded Build 5187 number. Build 5187 is therefore the Developer

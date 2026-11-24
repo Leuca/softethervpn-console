@@ -9,6 +9,9 @@
   filling server and Virtual Hub credentials with password managers.
 - Node.js 26 joins Node.js 22 and 24 as a supported release line.
   Release bundles are built with Node.js 24.
+- Access List edits, toggles, and deletes use conditional writes when
+  supported by the VPN server. On older servers these actions still work,
+  with a warning that concurrent changes may be lost or affect the wrong rule.
 
 ## Breaking changes
 
@@ -19,10 +22,6 @@
   not retained because requests need to identify their destination explicitly
   to prevent one connection from receiving another's commands. The native
   SoftEther `/api/` endpoint used by integrated mode is unchanged.
-- On servers without conditional ACL writes, you can still view, create, and
-  clone Access List rules. Editing, toggling, or deleting an existing rule
-  requires a server with conditional writes. The console no longer falls back
-  to a write that could silently overwrite another administrator's changes.
 
 ## Upgrade and rollback
 
