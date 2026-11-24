@@ -51,9 +51,10 @@ it.each([
       printf 'HTTP/2.0 %s Status\nContent-Type: application/json\r\n\r\n%s\n' "$HTTP" "$STATE"
       [[ "$HTTP" == 200 ]]
     }`;
-    const result = spawnSync("/bin/bash", ["-e", "-c", gh + "\n" + check.run], {
+    const result = spawnSync("/bin/bash", ["--norc", "-e", "-c", gh + "\n" + check.run], {
       env: { PATH: "", GH_TOKEN: token, ISSUE_AUTHOR: "example", HTTP: String(http), STATE: state, GITHUB_OUTPUT: output },
       encoding: "utf8",
+      timeout: 5000,
     });
     expect(result.status).toBe(status);
     expect(result.stderr.trim()).toBe(
@@ -66,9 +67,10 @@ it.each([
 });
 
 it("adds only PF Team to the opened issue", () => {
-  const result = spawnSync("/bin/bash", ["-e", "-c", 'gh() { printf "%s\\n" "$@"; }\n' + apply.run], {
+  const result = spawnSync("/bin/bash", ["--norc", "-e", "-c", 'gh() { printf "%s\\n" "$@"; }\n' + apply.run], {
     env: { PATH: "", GITHUB_REPOSITORY: "example/repo", ISSUE_NUMBER: "7" },
     encoding: "utf8",
+    timeout: 5000,
   });
   expect(result.status).toBe(0);
   expect(result.stdout.trim().split("\n")).toEqual([

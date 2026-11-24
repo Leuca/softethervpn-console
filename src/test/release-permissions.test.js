@@ -120,7 +120,7 @@ function checkPublication({ tag = "v1.2.3", notes = false, confirmed = true, suc
       printf '%s\\n' "$(< "$RUNNER_TEMP/reply$i")"
       [[ ! -f "$RUNNER_TEMP/fail$i" ]]
     }`;
-    const result = spawnSync("/bin/bash", ["-eo", "pipefail", "-c", gh + "\n" + publish.steps.at(-1).run], {
+    const result = spawnSync("/bin/bash", ["--norc", "-eo", "pipefail", "-c", gh + "\n" + publish.steps.at(-1).run], {
       cwd: dir, encoding: "utf8", timeout: 5000,
       env: { PATH: join(dir, "bin"), RUNNER_TEMP: dir, GH_REPO: "example/project", GITHUB_REF_NAME: tag,
         SRPM_NAME: rpm, IMMUTABLE_RELEASES_CONFIRMED: String(confirmed) },
