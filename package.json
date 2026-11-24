@@ -10,7 +10,7 @@
   "license": "MIT",
   "private": true,
   "engines": {
-    "node": "^22.13.0 || ^24.0.0"
+    "node": "^22.15.0 || ^24.0.0 || ^26.0.0"
   },
   "allowScripts": {
     "esbuild@0.25.11": true

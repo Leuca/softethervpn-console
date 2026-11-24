@@ -6,6 +6,8 @@ The frontend still owns capability detection and route visibility.
 
 ## Build and run
 
+The managed gateway supports Node.js 22.x, 24.x, and 26.x.
+
 The managed release archive contains the frontend in `dist/` and compiled
 gateway in `gateway/dist/`. After extracting it, install runtime dependencies:
 
