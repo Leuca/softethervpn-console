@@ -9,6 +9,8 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx,js,jsx}"],
     maxWorkers: 2,
     environment: "jsdom",
+    // Let jsdom provide storage instead of Node's built-in Web Storage.
+    execArgv: ["--no-experimental-webstorage"],
     setupFiles: ["./src/test/setup.ts"],
     globals: true,
     css: true,

@@ -59,6 +59,9 @@ and TLS boundaries.
 
 ## Quick-start
 
+Use Node.js 22.15.0 or later in the 22.x line, 24.x, or 26.x. Release bundles
+are built with Node.js 24.
+
 ```bash
 git clone https://github.com/Leuca/softethervpn-console
 cd softethervpn-console
