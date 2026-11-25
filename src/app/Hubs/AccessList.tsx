@@ -6,9 +6,9 @@ import {
   Button,
   Checkbox,
   EmptyState,
-  EmptyStateActions,
+  ExpandableSection,
   EmptyStateBody,
-  EmptyStateFooter,
+  MenuToggle,
   Flex,
   FlexItem,
   Form,
@@ -30,12 +30,14 @@ import {
 } from "@patternfly/react-core";
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table";
 import { ScrollableTable } from "@app/components/ScrollableTable";
-import { PlusCircleIcon } from "@patternfly/react-icons";
+import { EllipsisVIcon, PlusCircleIcon } from "@patternfly/react-icons";
 import * as VPN from "vpnrpc/dist/vpnrpc";
 import { api } from "@app/utils/vpnrpc_settings";
 import { binToBytes } from "@app/utils/blob_utils";
 import { capBool, capValue } from "@app/utils/caps";
 import { useServer } from "@app/ServerContext";
+
+import "./AccessList.css";
 
 const PROTOCOLS: Record<number, string> = {
   0: "Any",
@@ -58,6 +60,7 @@ type AccessListResponse = VPN.VpnRpcEnumAccessList & { AclRevision_str?: unknown
 const hasRevision = (token: unknown): token is string => typeof token === "string" && token !== "";
 
 const protocolLabel = (n: number): string => PROTOCOLS[n] ?? `IP ${n}`;
+const supportsPorts = (protocol: number) => protocol === 0 || protocol === 6 || protocol === 17;
 
 type RuleDraft = {
   id: number;
@@ -295,8 +298,8 @@ const parseIpv6Mask = (value: string): Uint8Array | null => {
   return parseIpv6(text);
 };
 
-const ipv6MaskToPrefix = (bytes: Uint8Array | null): number | null => {
-  if (!bytes || bytes.length !== 16) {
+const maskToPrefix = (bytes: Uint8Array | number[] | null): number | null => {
+  if (!bytes || (bytes.length !== 16 && bytes.length !== 4)) {
     return null;
   }
   let prefix = 0;
@@ -349,7 +352,7 @@ const parseMac = (value: string): Uint8Array | null => {
 };
 
 const formatIpv6Mask = (bytes: Uint8Array | null): string => {
-  const prefix = ipv6MaskToPrefix(bytes);
+  const prefix = maskToPrefix(bytes);
   return prefix !== null ? `/${prefix}` : ipv6ToString(bytes);
 };
 
@@ -372,26 +375,19 @@ function endpoint(rule: VPN.VpnAccess, side: "src" | "dest"): string {
   if (!ip || ipv4Any(ip, mask)) {
     return "any";
   }
-  return mask === FULL4 ? ip : `${ip}/${mask}`;
+  return mask === FULL4 || !mask ? ip : `${ip}/${maskToPrefix(parseIpv4(mask)) ?? mask}`;
 }
 
-const portSummary = (rule: VPN.VpnAccess): string => {
-  if (rule.Protocol_u32 !== 6 && rule.Protocol_u32 !== 17) {
-    return "-";
-  }
-  const source =
-    rule.SrcPortStart_u32 === 0
-      ? "any"
-      : rule.SrcPortEnd_u32 && rule.SrcPortEnd_u32 !== rule.SrcPortStart_u32
-        ? `${rule.SrcPortStart_u32}-${rule.SrcPortEnd_u32}`
-        : String(rule.SrcPortStart_u32);
-  const destination =
-    rule.DestPortStart_u32 === 0
-      ? "any"
-      : rule.DestPortEnd_u32 && rule.DestPortEnd_u32 !== rule.DestPortStart_u32
-        ? `${rule.DestPortStart_u32}-${rule.DestPortEnd_u32}`
-        : String(rule.DestPortStart_u32);
-  return `Src ${source} / Dst ${destination}`;
+const trafficSummary = (rule: VPN.VpnAccess): string => {
+  // The SDK enum omits the native wildcard (0) and custom protocol numbers.
+  const protocol: number = rule.Protocol_u32;
+  if (!supportsPorts(protocol)) return protocolLabel(protocol);
+  const port = (label: string, start: number, end: number) =>
+    start ? ` ${label} ${start}${end && end !== start ? "-" + end : ""}` : "";
+  const ports =
+    port("src", rule.SrcPortStart_u32, rule.SrcPortEnd_u32) +
+    port("dst", rule.DestPortStart_u32, rule.DestPortEnd_u32);
+  return (protocol === 0 && ports ? "TCP/UDP" : protocolLabel(protocol)) + ports;
 };
 
 const nextPriority = (rules: VPN.VpnAccess[] | null): number => {
@@ -491,90 +487,91 @@ const selectedProtocol = (draft: RuleDraft): number => {
   return Number(draft.protocolKind);
 };
 
-const validatePortRange = (start: string, end: string, label: string, errors: string[]) => {
+const validatePortRange = (
+  start: string,
+  end: string,
+  label: string,
+  errors: Record<string, string>,
+) => {
+  const field = `access-${label === "Source" ? "src" : "dest"}-port`;
   const startValue = start.trim() === "" ? 0 : parseInteger(start);
   const endValue = end.trim() === "" ? 0 : parseInteger(end);
-  if (startValue === null || endValue === null || startValue > 65535 || endValue > 65535) {
-    errors.push(`${label} ports must be between 0 and 65535.`);
-    return;
-  }
+  const invalidStart = startValue === null || startValue > 65535;
+  const invalidEnd = endValue === null || endValue > 65535;
+  if (invalidStart) errors[`${field}-start`] = `${label} start port must be between 0 and 65535.`;
+  if (invalidEnd) errors[`${field}-end`] = `${label} end port must be between 0 and 65535.`;
+  if (invalidStart || invalidEnd) return;
   if (startValue === 0 && endValue !== 0) {
-    errors.push(`${label} port range needs a start port.`);
+    errors[`${field}-start`] = `${label} port range needs a start port.`;
   }
   if (startValue !== 0 && endValue !== 0 && startValue > endValue) {
-    errors.push(`${label} start port must be less than or equal to the end port.`);
+    errors[`${field}-end`] = `${label} start port must be less than or equal to the end port.`;
   }
 };
 
-const validateDraft = (draft: RuleDraft, caps: AccessCaps): string[] => {
-  const errors: string[] = [];
+const validateDraft = (draft: RuleDraft, caps: AccessCaps): Record<string, string> => {
+  const errors: Record<string, string> = {};
   const priority = parseInteger(draft.priority);
   if (priority === null || priority < 1) {
-    errors.push("Priority must be 1 or higher.");
+    errors["access-priority"] = "Priority must be 1 or higher.";
   }
   if (draft.note.length > MAX_NOTE_LENGTH) {
-    errors.push(`Note must be ${MAX_NOTE_LENGTH} characters or fewer.`);
+    errors["access-note"] = `Note must be ${MAX_NOTE_LENGTH} characters or fewer.`;
   }
   if (draft.ipVersion === "ipv6" && !caps.supportIpv6) {
-    errors.push("This server does not support IPv6 access list rules.");
-  } else if (draft.ipVersion === "ipv4") {
-    if (!draft.srcAny && (!isIpv4(draft.srcIp) || !isIpv4(draft.srcMask))) {
-      errors.push("Source IPv4 address and mask must be valid.");
-    }
-    if (!draft.destAny && (!isIpv4(draft.destIp) || !isIpv4(draft.destMask))) {
-      errors.push("Destination IPv4 address and mask must be valid.");
-    }
+    errors["access-ip-version"] = "This server does not support IPv6 access list rules.";
   } else {
-    if (!draft.srcAny && (!parseIpv6(draft.srcIp) || !parseIpv6Mask(draft.srcMask))) {
-      errors.push("Source IPv6 address and mask must be valid.");
-    }
-    if (!draft.destAny && (!parseIpv6(draft.destIp) || !parseIpv6Mask(draft.destMask))) {
-      errors.push("Destination IPv6 address and mask must be valid.");
+    const ipv4 = draft.ipVersion === "ipv4";
+    for (const side of ["src", "dest"] as const) {
+      if (draft[`${side}Any`]) continue;
+      const label = (side === "src" ? "Source " : "Destination ") + (ipv4 ? "IPv4" : "IPv6");
+      const ip = draft[`${side}Ip`];
+      const mask = draft[`${side}Mask`];
+      if (!(ipv4 ? isIpv4(ip) : parseIpv6(ip)))
+        errors[`access-${side}-ip`] = `${label} address must be valid.`;
+      if (!(ipv4 ? isIpv4(mask) : parseIpv6Mask(mask)))
+        errors[`access-${side}-mask`] = `${label} subnet mask must be valid.`;
     }
   }
 
   if (draft.protocolKind === "custom") {
     const protocol = parseInteger(draft.protocolNumber);
     if (protocol === null || protocol < 0 || protocol > 255) {
-      errors.push("Protocol number must be between 0 and 255.");
+      errors["access-protocol-number"] = "Protocol number must be between 0 and 255.";
     }
   }
 
   const protocol = selectedProtocol(draft);
-  if (protocol === 6 || protocol === 17) {
+  if (supportsPorts(protocol)) {
     validatePortRange(draft.srcPortStart, draft.srcPortEnd, "Source", errors);
     validatePortRange(draft.destPortStart, draft.destPortEnd, "Destination", errors);
   }
 
-  if (
-    caps.supportMac &&
-    draft.checkSrcMac &&
-    (!parseMac(draft.srcMac) || !parseMac(draft.srcMacMask))
-  ) {
-    errors.push("Source MAC address and mask must be valid.");
-  }
-  if (
-    caps.supportMac &&
-    draft.checkDstMac &&
-    (!parseMac(draft.dstMac) || !parseMac(draft.dstMacMask))
-  ) {
-    errors.push("Destination MAC address and mask must be valid.");
+  if (caps.supportMac) {
+    for (const side of ["src", "dst"] as const) {
+      if (!(side === "src" ? draft.checkSrcMac : draft.checkDstMac)) continue;
+      const label = side === "src" ? "Source MAC" : "Destination MAC";
+      if (!parseMac(draft[`${side}Mac`]))
+        errors[`access-${side}-mac`] = `${label} address must be valid.`;
+      if (!parseMac(draft[`${side}MacMask`]))
+        errors[`access-${side}-mac-mask`] = `${label} mask must be valid.`;
+    }
   }
   if (caps.supportTcpState && draft.checkTcpState && protocol !== 6) {
-    errors.push("TCP state matching is only available for TCP rules.");
+    errors["access-tcp-state"] = "TCP state matching is only available for TCP rules.";
   }
 
   const delay = draft.delay.trim() === "" ? 0 : parseInteger(draft.delay);
   const jitter = draft.jitter.trim() === "" ? 0 : parseInteger(draft.jitter);
   const loss = draft.loss.trim() === "" ? 0 : parseInteger(draft.loss);
   if (caps.supportSimulation && (delay === null || delay < 0 || delay > MAX_DELAY)) {
-    errors.push(`Delay must be between 0 and ${MAX_DELAY} ms.`);
+    errors["access-delay"] = `Delay must be between 0 and ${MAX_DELAY} ms.`;
   }
   if (caps.supportSimulation && (jitter === null || jitter < 0 || jitter > MAX_PERCENT)) {
-    errors.push("Jitter must be between 0 and 100 percent.");
+    errors["access-jitter"] = "Jitter must be between 0 and 100 percent.";
   }
   if (caps.supportSimulation && (loss === null || loss < 0 || loss > MAX_PERCENT)) {
-    errors.push("Packet loss must be between 0 and 100 percent.");
+    errors["access-loss"] = "Packet loss must be between 0 and 100 percent.";
   }
   if (caps.supportRedirect && draft.redirectEnabled && !draft.discard) {
     const url = draft.redirectUrl.trim();
@@ -583,9 +580,8 @@ const validateDraft = (draft: RuleDraft, caps: AccessCaps): string[] => {
       (!url.startsWith("http://") && !url.startsWith("https://")) ||
       url.length > MAX_REDIRECT_URL_LENGTH
     ) {
-      errors.push(
-        "Redirect URL must start with http:// or https:// and fit within 255 characters.",
-      );
+      errors["access-redirect-url"] =
+        "Redirect URL must start with http:// or https:// and fit within 255 characters.";
     }
   }
   return errors;
@@ -593,7 +589,7 @@ const validateDraft = (draft: RuleDraft, caps: AccessCaps): string[] => {
 
 const ruleFromDraft = (draft: RuleDraft, caps: AccessCaps): VPN.VpnAccess => {
   const protocol = selectedProtocol(draft);
-  const tcpOrUdp = protocol === 6 || protocol === 17;
+  const usePorts = supportsPorts(protocol);
   const pass = !draft.discard;
   const srcIp6 =
     draft.ipVersion === "ipv6" && !draft.srcAny ? parseIpv6(draft.srcIp) : new Uint8Array(16);
@@ -622,10 +618,10 @@ const ruleFromDraft = (draft: RuleDraft, caps: AccessCaps): VPN.VpnAccess => {
     DestIpAddress6_bin: destIp6 ?? new Uint8Array(16),
     DestSubnetMask6_bin: destMask6 ?? new Uint8Array(16),
     Protocol_u32: protocol,
-    SrcPortStart_u32: tcpOrUdp ? parseOptionalInteger(draft.srcPortStart) : 0,
-    SrcPortEnd_u32: tcpOrUdp ? parseOptionalInteger(draft.srcPortEnd) : 0,
-    DestPortStart_u32: tcpOrUdp ? parseOptionalInteger(draft.destPortStart) : 0,
-    DestPortEnd_u32: tcpOrUdp ? parseOptionalInteger(draft.destPortEnd) : 0,
+    SrcPortStart_u32: usePorts ? parseOptionalInteger(draft.srcPortStart) : 0,
+    SrcPortEnd_u32: usePorts ? parseOptionalInteger(draft.srcPortEnd) : 0,
+    DestPortStart_u32: usePorts ? parseOptionalInteger(draft.destPortStart) : 0,
+    DestPortEnd_u32: usePorts ? parseOptionalInteger(draft.destPortEnd) : 0,
     SrcUsername_str: draft.srcUsername.trim(),
     DestUsername_str: draft.destUsername.trim(),
     CheckSrcMac_bool: caps.supportMac && draft.checkSrcMac,
@@ -694,6 +690,19 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   const [pendingSave, setPendingSave] = React.useState<PendingSave | null>(null);
   const [editor, setEditor] = React.useState<EditorState | null>(null);
 
+  const returnFocus = React.useRef<string | null>(null);
+  const resumeEditor = React.useRef(false);
+  const dialogOpen = !!(editor || pendingDelete || pendingSave);
+  React.useEffect(() => {
+    if (dialogOpen || !returnFocus.current) return;
+    const target = returnFocus.current;
+    const frame = requestAnimationFrame(() => {
+      (document.getElementById(target) ?? document.getElementById("acl-actions"))?.focus();
+      returnFocus.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [dialogOpen]);
+
   const load = React.useCallback(() => {
     setError(null);
     api
@@ -726,6 +735,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       const revision = response.AclRevision_str;
       const guarded = hasRevision(revision);
       if (hasWriteProtection && !guarded) {
+        if (dialogOpen) returnFocus.current = "acl-actions";
         setList(response);
         setError("No changes were sent. The VPN server no longer reports ACL write protection.");
         return;
@@ -739,6 +749,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         matches.length !== 1 ||
         ruleSnapshot(current) !== ruleSnapshot(original)
       ) {
+        if (dialogOpen) returnFocus.current = "acl-actions";
         setList(response);
         setError("The rule changed, moved or was removed. Review the refreshed list.");
         return;
@@ -755,6 +766,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         );
         if (impacts.length && JSON.stringify(impacts) !== JSON.stringify(approved)) {
           setList(response);
+          if (!editor) returnFocus.current = `access-active-${original.Id_u32}`;
           confirm = { original, replacement, impacts };
           return;
         }
@@ -778,6 +790,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           await api.DeleteAccess(new VPN.VpnRpcDeleteAccess(params));
         }
       }
+      if (dialogOpen) returnFocus.current = "acl-actions";
       load();
     } catch (e) {
       setError(String(e));
@@ -788,16 +801,21 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   };
 
   const openCreate = (ipv6: boolean) => {
+    resumeEditor.current = false;
     setError(null);
     setEditor({ mode: "create", draft: draftFromRule(defaultRule(rules, ipv6)) });
   };
 
   const openEdit = (rule: VPN.VpnAccess) => {
+    resumeEditor.current = false;
+    returnFocus.current = `acl-menu-${rule.Id_u32}`;
     setError(null);
     setEditor({ mode: "edit", original: rule, draft: draftFromRule(rule) });
   };
 
   const openClone = (rule: VPN.VpnAccess) => {
+    resumeEditor.current = false;
+    returnFocus.current = `acl-menu-${rule.Id_u32}`;
     setError(null);
     const clone = normalizeRuleForSave(
       new VPN.VpnAccess({
@@ -822,6 +840,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       api
         .AddAccess(new VPN.VpnRpcAddAccess({ HubName_str: hub, AccessListSingle: [rule] }))
         .then(() => {
+          returnFocus.current = "acl-actions";
           setEditor(null);
           setBusy(false);
           load();
@@ -842,12 +861,31 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
     void mutateRule(pendingDelete, null).then(() => setPendingDelete(null));
   };
 
+  const cancelReview = () => {
+    if (busy) return;
+    resumeEditor.current = !!editor;
+    setPendingSave(null);
+  };
+
   const isLoading = rules === null && error === null;
   const canAddRule = rules === null || rules.length < caps.maxRules;
   const draft = editor?.draft;
-  const validation = draft ? validateDraft(draft, caps) : [];
+  const fieldErrors = draft ? validateDraft(draft, caps) : {};
+  const validation = Object.values(fieldErrors);
+  const invalidField = (id: string) =>
+    fieldErrors[id] ? { "aria-invalid": true as const, "aria-describedby": id + "-error" } : {};
+  const errorFor = (id: string) =>
+    fieldErrors[id] && (
+      <FormHelperText>
+        <HelperText>
+          <HelperTextItem id={id + "-error"} variant="error">
+            {fieldErrors[id]}
+          </HelperTextItem>
+        </HelperText>
+      </FormHelperText>
+    );
   const protocol = draft ? selectedProtocol(draft) : 0;
-  const showPorts = protocol === 6 || protocol === 17;
+  const showPorts = supportsPorts(protocol);
   const showTcpState = caps.supportTcpState && protocol === 6;
   const allowPassEffects = draft ? !draft.discard : false;
 
@@ -859,8 +897,8 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
   );
   const writeWarning = list && !hasWriteProtection && (
     <Alert variant="warning" title="No protection against concurrent ACL changes" isInline>
-      If someone else changes the list at the same time, you may overwrite their changes or affect
-      the wrong rule. Upgrade the VPN server to enable protection.
+      Concurrent edits can overwrite changes or affect the wrong rule. Use a server with conditional
+      ACL writes for protection.
     </Alert>
   );
 
@@ -870,7 +908,14 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       gap={{ default: "gapMd" }}
       style={{ paddingBlockStart: "var(--pf-t--global--spacer--md)" }}
     >
-      <Flex justifyContent={{ default: "justifyContentFlexEnd" }} gap={{ default: "gapSm" }}>
+      <Flex
+        id="acl-actions"
+        role="group"
+        aria-label="Access list actions"
+        tabIndex={-1}
+        justifyContent={{ default: "justifyContentFlexEnd" }}
+        gap={{ default: "gapSm" }}
+      >
         <FlexItem>
           <Button
             variant="primary"
@@ -905,39 +950,27 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           <EmptyStateBody>
             With no rules, all packets are passed. Rules are evaluated by priority.
           </EmptyStateBody>
-          <EmptyStateFooter>
-            <EmptyStateActions>
-              <Button
-                variant="primary"
-                icon={<PlusCircleIcon />}
-                onClick={() => openCreate(false)}
-                isDisabled={!canAddRule}
-              >
-                New IPv4 rule
-              </Button>
-            </EmptyStateActions>
-          </EmptyStateFooter>
         </EmptyState>
       ) : rules !== null ? (
-        <ScrollableTable aria-label="Access list" variant="compact">
+        <ScrollableTable className="acl-table" aria-label="Access list" variant="compact">
           <Thead>
             <Tr>
-              <Th>ID</Th>
+              <Th>Rule</Th>
+              <Th>Priority</Th>
               <Th>Action</Th>
               <Th>Status</Th>
-              <Th>Priority</Th>
-              <Th>Protocol</Th>
-              <Th>Source</Th>
-              <Th>Destination</Th>
-              <Th>Ports</Th>
-              <Th>Memo</Th>
+              <Th>Endpoints</Th>
+              <Th>Traffic</Th>
               <Th screenReaderText="Actions" />
             </Tr>
           </Thead>
           <Tbody>
             {rules.map((rule) => (
               <Tr key={rule.Id_u32}>
-                <Td dataLabel="ID">{rule.Id_u32}</Td>
+                <Td dataLabel="Rule">
+                  <strong>#{rule.Id_u32}</strong> <span>{rule.Note_utf}</span>
+                </Td>
+                <Td dataLabel="Priority">{rule.Priority_u32.toLocaleString()}</Td>
                 <Td dataLabel="Action">
                   <Label color={rule.Discard_bool ? "red" : "green"} isCompact>
                     {rule.Discard_bool ? "Discard" : "Pass"}
@@ -954,14 +987,29 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     }
                   />
                 </Td>
-                <Td dataLabel="Priority">{rule.Priority_u32.toLocaleString()}</Td>
-                <Td dataLabel="Protocol">{protocolLabel(rule.Protocol_u32)}</Td>
-                <Td dataLabel="Source">{endpoint(rule, "src")}</Td>
-                <Td dataLabel="Destination">{endpoint(rule, "dest")}</Td>
-                <Td dataLabel="Ports">{portSummary(rule)}</Td>
-                <Td dataLabel="Memo">{rule.Note_utf || "-"}</Td>
+                <Td dataLabel="Endpoints">
+                  <dl className="acl-match">
+                    <dt>From</dt>
+                    <dd>{endpoint(rule, "src")}</dd>
+                    <dt>To</dt>
+                    <dd>{endpoint(rule, "dest")}</dd>
+                  </dl>
+                </Td>
+                <Td dataLabel="Traffic">{trafficSummary(rule)}</Td>
                 <Td isActionCell>
                   <ActionsColumn
+                    actionsToggle={({ onToggle, isOpen, isDisabled, toggleRef }) => (
+                      <MenuToggle
+                        id={`acl-menu-${rule.Id_u32}`}
+                        ref={toggleRef}
+                        variant="plain"
+                        aria-label={`Actions for rule ${rule.Id_u32}`}
+                        isExpanded={isOpen}
+                        isDisabled={isDisabled}
+                        onClick={onToggle}
+                        icon={<EllipsisVIcon />}
+                      />
+                    )}
                     items={[
                       { title: "Edit", onClick: () => openEdit(rule) },
                       {
@@ -970,7 +1018,13 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         isAriaDisabled: !canAddRule,
                       },
                       { isSeparator: true },
-                      { title: "Delete", onClick: () => setPendingDelete(rule) },
+                      {
+                        title: "Delete",
+                        onClick: () => {
+                          returnFocus.current = `acl-menu-${rule.Id_u32}`;
+                          setPendingDelete(rule);
+                        },
+                      },
                     ]}
                     isDisabled={busy}
                   />
@@ -982,11 +1036,14 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
       ) : null}
 
       <Modal
+        aria-labelledby="acl-editor-title"
+        elementToFocus={resumeEditor.current ? "#acl-editor-save" : undefined}
         variant={ModalVariant.large}
         isOpen={editor !== null && !pendingSave}
         onClose={() => !busy && dismissEditor()}
       >
         <ModalHeader
+          labelId="acl-editor-title"
           title={
             editor?.mode === "create"
               ? "New access list rule"
@@ -997,7 +1054,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         />
         <ModalBody>
           {draft && (
-            <Form>
+            <Form className="acl-editor">
               {errorAlert}
               {editor?.mode === "edit" && writeWarning}
               {validation.length > 0 && (
@@ -1005,10 +1062,6 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   {validation[0]}
                 </Alert>
               )}
-              <Alert variant="info" title="Access list rule order" isInline>
-                Rules apply to IP packets passing through this Virtual Hub. Lower priority numbers
-                are evaluated first; packets that do not match any rule are passed.
-              </Alert>
               <Flex gap={{ default: "gapMd" }}>
                 <FlexItem flex={{ default: "flex_1" }}>
                   <FormGroup label="Action" fieldId="access-action">
@@ -1027,15 +1080,19 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   <FormGroup label="Priority" isRequired fieldId="access-priority">
                     <TextInput
                       id="access-priority"
+                      {...invalidField("access-priority")}
                       type="number"
                       min={1}
                       value={draft.priority}
                       onChange={(_event, value) => setDraft({ priority: value })}
                       aria-label="Priority"
                     />
+                    {errorFor("access-priority")}
                     <FormHelperText>
                       <HelperText>
-                        <HelperTextItem>Smaller numbers have higher priority.</HelperTextItem>
+                        <HelperTextItem>
+                          Lower numbers are evaluated first. Unmatched packets are passed.
+                        </HelperTextItem>
                       </HelperText>
                     </FormHelperText>
                   </FormGroup>
@@ -1044,6 +1101,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   <FormGroup label="IP version" fieldId="access-ip-version">
                     <FormSelect
                       id="access-ip-version"
+                      {...invalidField("access-ip-version")}
                       value={draft.ipVersion}
                       onChange={(_event, value) =>
                         setDraft({ ipVersion: value as RuleDraft["ipVersion"] })
@@ -1054,6 +1112,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                       <FormSelectOption value="ipv4" label="IPv4" />
                       <FormSelectOption value="ipv6" label="IPv6" />
                     </FormSelect>
+                    {errorFor("access-ip-version")}
                   </FormGroup>
                 </FlexItem>
               </Flex>
@@ -1061,11 +1120,13 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
               <FormGroup label="Memo" fieldId="access-note">
                 <TextInput
                   id="access-note"
+                  {...invalidField("access-note")}
                   maxLength={MAX_NOTE_LENGTH}
                   value={draft.note}
                   onChange={(_event, value) => setDraft({ note: value })}
                   aria-label="Memo"
                 />
+                {errorFor("access-note")}
               </FormGroup>
 
               <Flex gap={{ default: "gapLg" }}>
@@ -1080,22 +1141,28 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   </FormGroup>
                   <Flex gap={{ default: "gapSm" }}>
                     <FlexItem flex={{ default: "flex_1" }}>
+                      <label htmlFor="access-src-ip">Address</label>
                       <TextInput
                         id="access-src-ip"
+                        {...invalidField("access-src-ip")}
                         value={draft.srcIp}
                         isDisabled={draft.srcAny}
                         onChange={(_event, value) => setDraft({ srcIp: value })}
                         aria-label="Source IP address"
                       />
+                      {errorFor("access-src-ip")}
                     </FlexItem>
                     <FlexItem flex={{ default: "flex_1" }}>
+                      <label htmlFor="access-src-mask">Subnet mask</label>
                       <TextInput
                         id="access-src-mask"
+                        {...invalidField("access-src-mask")}
                         value={draft.srcMask}
                         isDisabled={draft.srcAny}
                         onChange={(_event, value) => setDraft({ srcMask: value })}
                         aria-label="Source subnet mask"
                       />
+                      {errorFor("access-src-mask")}
                     </FlexItem>
                   </Flex>
                   <FormHelperText>
@@ -1119,22 +1186,28 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                   </FormGroup>
                   <Flex gap={{ default: "gapSm" }}>
                     <FlexItem flex={{ default: "flex_1" }}>
+                      <label htmlFor="access-dest-ip">Address</label>
                       <TextInput
                         id="access-dest-ip"
+                        {...invalidField("access-dest-ip")}
                         value={draft.destIp}
                         isDisabled={draft.destAny}
                         onChange={(_event, value) => setDraft({ destIp: value })}
                         aria-label="Destination IP address"
                       />
+                      {errorFor("access-dest-ip")}
                     </FlexItem>
                     <FlexItem flex={{ default: "flex_1" }}>
+                      <label htmlFor="access-dest-mask">Subnet mask</label>
                       <TextInput
                         id="access-dest-mask"
+                        {...invalidField("access-dest-mask")}
                         value={draft.destMask}
                         isDisabled={draft.destAny}
                         onChange={(_event, value) => setDraft({ destMask: value })}
                         aria-label="Destination subnet mask"
                       />
+                      {errorFor("access-dest-mask")}
                     </FlexItem>
                   </Flex>
                   <FormHelperText>
@@ -1172,6 +1245,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                     <FormGroup label="Protocol number" fieldId="access-protocol-number">
                       <TextInput
                         id="access-protocol-number"
+                        {...invalidField("access-protocol-number")}
                         type="number"
                         min={0}
                         max={255}
@@ -1179,6 +1253,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                         onChange={(_event, value) => setDraft({ protocolNumber: value })}
                         aria-label="Protocol number"
                       />
+                      {errorFor("access-protocol-number")}
                     </FormGroup>
                   </FlexItem>
                 )}
@@ -1188,11 +1263,13 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 <>
                   <Flex gap={{ default: "gapLg" }}>
                     <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="Source ports" fieldId="access-src-port-start">
-                        <Flex gap={{ default: "gapSm" }}>
+                      <FormGroup role="group" label="Source ports">
+                        <Flex className="acl-port-range" gap={{ default: "gapSm" }}>
                           <FlexItem flex={{ default: "flex_1" }}>
+                            <label htmlFor="access-src-port-start">Start</label>
                             <TextInput
                               id="access-src-port-start"
+                              {...invalidField("access-src-port-start")}
                               type="number"
                               min={0}
                               max={65535}
@@ -1200,10 +1277,13 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                               onChange={(_event, value) => setDraft({ srcPortStart: value })}
                               aria-label="Source port start"
                             />
+                            {errorFor("access-src-port-start")}
                           </FlexItem>
                           <FlexItem flex={{ default: "flex_1" }}>
+                            <label htmlFor="access-src-port-end">End</label>
                             <TextInput
                               id="access-src-port-end"
+                              {...invalidField("access-src-port-end")}
                               type="number"
                               min={0}
                               max={65535}
@@ -1211,16 +1291,19 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                               onChange={(_event, value) => setDraft({ srcPortEnd: value })}
                               aria-label="Source port end"
                             />
+                            {errorFor("access-src-port-end")}
                           </FlexItem>
                         </Flex>
                       </FormGroup>
                     </FlexItem>
                     <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="Destination ports" fieldId="access-dest-port-start">
-                        <Flex gap={{ default: "gapSm" }}>
+                      <FormGroup role="group" label="Destination ports">
+                        <Flex className="acl-port-range" gap={{ default: "gapSm" }}>
                           <FlexItem flex={{ default: "flex_1" }}>
+                            <label htmlFor="access-dest-port-start">Start</label>
                             <TextInput
                               id="access-dest-port-start"
+                              {...invalidField("access-dest-port-start")}
                               type="number"
                               min={0}
                               max={65535}
@@ -1228,10 +1311,13 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                               onChange={(_event, value) => setDraft({ destPortStart: value })}
                               aria-label="Destination port start"
                             />
+                            {errorFor("access-dest-port-start")}
                           </FlexItem>
                           <FlexItem flex={{ default: "flex_1" }}>
+                            <label htmlFor="access-dest-port-end">End</label>
                             <TextInput
                               id="access-dest-port-end"
+                              {...invalidField("access-dest-port-end")}
                               type="number"
                               min={0}
                               max={65535}
@@ -1239,6 +1325,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                               onChange={(_event, value) => setDraft({ destPortEnd: value })}
                               aria-label="Destination port end"
                             />
+                            {errorFor("access-dest-port-end")}
                           </FlexItem>
                         </Flex>
                       </FormGroup>
@@ -1295,210 +1382,244 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
                 </HelperText>
               </FormHelperText>
 
-              {caps.supportMac && (
-                <>
-                  <Flex gap={{ default: "gapLg" }}>
-                    <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="Source MAC" fieldId="access-src-mac-check">
-                        <Checkbox
-                          id="access-src-mac-check"
-                          label="Match source MAC"
-                          isChecked={draft.checkSrcMac}
-                          onChange={(_event, checked) => setDraft({ checkSrcMac: checked })}
-                        />
-                      </FormGroup>
-                      <Flex gap={{ default: "gapSm" }}>
+              {(caps.supportSimulation ||
+                caps.supportRedirect ||
+                caps.supportMac ||
+                caps.supportTcpState) && (
+                <ExpandableSection toggleText="Advanced rule settings">
+                  {caps.supportMac && (
+                    <>
+                      <Flex gap={{ default: "gapLg" }}>
                         <FlexItem flex={{ default: "flex_1" }}>
-                          <TextInput
-                            id="access-src-mac"
-                            value={draft.srcMac}
-                            isDisabled={!draft.checkSrcMac}
-                            onChange={(_event, value) => setDraft({ srcMac: value })}
-                            aria-label="Source MAC address"
-                          />
+                          <FormGroup label="Source MAC" fieldId="access-src-mac-check">
+                            <Checkbox
+                              id="access-src-mac-check"
+                              label="Match source MAC"
+                              isChecked={draft.checkSrcMac}
+                              onChange={(_event, checked) => setDraft({ checkSrcMac: checked })}
+                            />
+                          </FormGroup>
+                          <Flex gap={{ default: "gapSm" }}>
+                            <FlexItem flex={{ default: "flex_1" }}>
+                              <label htmlFor="access-src-mac">Address</label>
+                              <TextInput
+                                id="access-src-mac"
+                                {...invalidField("access-src-mac")}
+                                value={draft.srcMac}
+                                isDisabled={!draft.checkSrcMac}
+                                onChange={(_event, value) => setDraft({ srcMac: value })}
+                                aria-label="Source MAC address"
+                              />
+                              {errorFor("access-src-mac")}
+                            </FlexItem>
+                            <FlexItem flex={{ default: "flex_1" }}>
+                              <label htmlFor="access-src-mac-mask">Mask</label>
+                              <TextInput
+                                id="access-src-mac-mask"
+                                {...invalidField("access-src-mac-mask")}
+                                value={draft.srcMacMask}
+                                isDisabled={!draft.checkSrcMac}
+                                onChange={(_event, value) => setDraft({ srcMacMask: value })}
+                                aria-label="Source MAC mask"
+                              />
+                              {errorFor("access-src-mac-mask")}
+                            </FlexItem>
+                          </Flex>
                         </FlexItem>
                         <FlexItem flex={{ default: "flex_1" }}>
-                          <TextInput
-                            id="access-src-mac-mask"
-                            value={draft.srcMacMask}
-                            isDisabled={!draft.checkSrcMac}
-                            onChange={(_event, value) => setDraft({ srcMacMask: value })}
-                            aria-label="Source MAC mask"
-                          />
+                          <FormGroup label="Destination MAC" fieldId="access-dst-mac-check">
+                            <Checkbox
+                              id="access-dst-mac-check"
+                              label="Match destination MAC"
+                              isChecked={draft.checkDstMac}
+                              onChange={(_event, checked) => setDraft({ checkDstMac: checked })}
+                            />
+                          </FormGroup>
+                          <Flex gap={{ default: "gapSm" }}>
+                            <FlexItem flex={{ default: "flex_1" }}>
+                              <label htmlFor="access-dst-mac">Address</label>
+                              <TextInput
+                                id="access-dst-mac"
+                                {...invalidField("access-dst-mac")}
+                                value={draft.dstMac}
+                                isDisabled={!draft.checkDstMac}
+                                onChange={(_event, value) => setDraft({ dstMac: value })}
+                                aria-label="Destination MAC address"
+                              />
+                              {errorFor("access-dst-mac")}
+                            </FlexItem>
+                            <FlexItem flex={{ default: "flex_1" }}>
+                              <label htmlFor="access-dst-mac-mask">Mask</label>
+                              <TextInput
+                                id="access-dst-mac-mask"
+                                {...invalidField("access-dst-mac-mask")}
+                                value={draft.dstMacMask}
+                                isDisabled={!draft.checkDstMac}
+                                onChange={(_event, value) => setDraft({ dstMacMask: value })}
+                                aria-label="Destination MAC mask"
+                              />
+                              {errorFor("access-dst-mac-mask")}
+                            </FlexItem>
+                          </Flex>
                         </FlexItem>
                       </Flex>
-                    </FlexItem>
-                    <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="Destination MAC" fieldId="access-dst-mac-check">
-                        <Checkbox
-                          id="access-dst-mac-check"
-                          label="Match destination MAC"
-                          isChecked={draft.checkDstMac}
-                          onChange={(_event, checked) => setDraft({ checkDstMac: checked })}
-                        />
-                      </FormGroup>
-                      <Flex gap={{ default: "gapSm" }}>
-                        <FlexItem flex={{ default: "flex_1" }}>
-                          <TextInput
-                            id="access-dst-mac"
-                            value={draft.dstMac}
-                            isDisabled={!draft.checkDstMac}
-                            onChange={(_event, value) => setDraft({ dstMac: value })}
-                            aria-label="Destination MAC address"
-                          />
-                        </FlexItem>
-                        <FlexItem flex={{ default: "flex_1" }}>
-                          <TextInput
-                            id="access-dst-mac-mask"
-                            value={draft.dstMacMask}
-                            isDisabled={!draft.checkDstMac}
-                            onChange={(_event, value) => setDraft({ dstMacMask: value })}
-                            aria-label="Destination MAC mask"
-                          />
-                        </FlexItem>
-                      </Flex>
-                    </FlexItem>
-                  </Flex>
-                  {(draft.checkSrcMac || draft.checkDstMac) && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem>
-                          MAC addresses can use FF-FF-FF-FF-FF-FF, FF:FF:FF:FF:FF:FF, or
-                          FFFFFFFFFFFF format.
-                        </HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
-              )}
-
-              {(caps.supportTcpState || caps.supportRedirect) && (
-                <Flex gap={{ default: "gapLg" }}>
-                  {caps.supportTcpState && (
-                    <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="TCP state" fieldId="access-tcp-state">
-                        <Checkbox
-                          id="access-tcp-state"
-                          label="Match TCP connection state"
-                          isChecked={draft.checkTcpState}
-                          isDisabled={!showTcpState}
-                          onChange={(_event, checked) => setDraft({ checkTcpState: checked })}
-                        />
-                        <FormSelect
-                          id="access-tcp-state-value"
-                          value={draft.established ? "established" : "unestablished"}
-                          isDisabled={!draft.checkTcpState || !showTcpState}
-                          onChange={(_event, value) =>
-                            setDraft({ established: value === "established" })
-                          }
-                          aria-label="TCP connection state"
-                        >
-                          <FormSelectOption value="established" label="Established" />
-                          <FormSelectOption value="unestablished" label="Not established" />
-                        </FormSelect>
+                      {(draft.checkSrcMac || draft.checkDstMac) && (
                         <FormHelperText>
                           <HelperText>
                             <HelperTextItem>
-                              TCP state matching is available only for TCP rules.
+                              MAC addresses can use FF-FF-FF-FF-FF-FF, FF:FF:FF:FF:FF:FF, or
+                              FFFFFFFFFFFF format.
                             </HelperTextItem>
                           </HelperText>
                         </FormHelperText>
-                      </FormGroup>
-                    </FlexItem>
+                      )}
+                    </>
                   )}
-                  {caps.supportRedirect && (
-                    <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="HTTP redirect URL" fieldId="access-redirect-enabled">
-                        <Checkbox
-                          id="access-redirect-enabled"
-                          label="Redirect matching TCP connections"
-                          isChecked={draft.redirectEnabled}
-                          isDisabled={!allowPassEffects}
-                          onChange={(_event, checked) => setDraft({ redirectEnabled: checked })}
-                        />
-                        <TextInput
-                          id="access-redirect-url"
-                          value={draft.redirectUrl}
-                          isDisabled={!draft.redirectEnabled || !allowPassEffects}
-                          onChange={(_event, value) => setDraft({ redirectUrl: value })}
-                          aria-label="HTTP redirect URL"
-                        />
-                        <FormHelperText>
-                          <HelperText>
-                            <HelperTextItem>
-                              Redirects apply only to rules with the Pass action. The URL must start
-                              with http:// or https://.
-                            </HelperTextItem>
-                          </HelperText>
-                        </FormHelperText>
-                      </FormGroup>
-                    </FlexItem>
-                  )}
-                </Flex>
-              )}
 
-              {caps.supportSimulation && (
-                <>
-                  <Flex gap={{ default: "gapMd" }}>
-                    <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="Delay (ms)" fieldId="access-delay">
-                        <TextInput
-                          id="access-delay"
-                          type="number"
-                          min={0}
-                          max={MAX_DELAY}
-                          value={draft.delay}
-                          isDisabled={!allowPassEffects}
-                          onChange={(_event, value) => setDraft({ delay: value })}
-                          aria-label="Delay (ms)"
-                        />
-                      </FormGroup>
-                    </FlexItem>
-                    <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="Jitter (%)" fieldId="access-jitter">
-                        <TextInput
-                          id="access-jitter"
-                          type="number"
-                          min={0}
-                          max={MAX_PERCENT}
-                          value={draft.jitter}
-                          isDisabled={!allowPassEffects}
-                          onChange={(_event, value) => setDraft({ jitter: value })}
-                          aria-label="Jitter (%)"
-                        />
-                      </FormGroup>
-                    </FlexItem>
-                    <FlexItem flex={{ default: "flex_1" }}>
-                      <FormGroup label="Packet loss (%)" fieldId="access-loss">
-                        <TextInput
-                          id="access-loss"
-                          type="number"
-                          min={0}
-                          max={MAX_PERCENT}
-                          value={draft.loss}
-                          isDisabled={!allowPassEffects}
-                          onChange={(_event, value) => setDraft({ loss: value })}
-                          aria-label="Packet loss (%)"
-                        />
-                      </FormGroup>
-                    </FlexItem>
-                  </Flex>
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem>
-                        Delay, jitter, and packet loss apply only to matching rules with the Pass
-                        action. Delay must be 0-10000 ms; jitter and packet loss must be 0-100
-                        percent.
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                </>
+                  {(caps.supportTcpState || caps.supportRedirect) && (
+                    <Flex gap={{ default: "gapLg" }}>
+                      {caps.supportTcpState && (
+                        <FlexItem flex={{ default: "flex_1" }}>
+                          <FormGroup label="TCP state" fieldId="access-tcp-state">
+                            <Checkbox
+                              id="access-tcp-state"
+                              {...invalidField("access-tcp-state")}
+                              label="Match TCP connection state"
+                              isChecked={draft.checkTcpState}
+                              isDisabled={!showTcpState}
+                              onChange={(_event, checked) => setDraft({ checkTcpState: checked })}
+                            />
+                            {errorFor("access-tcp-state")}
+                            <FormSelect
+                              id="access-tcp-state-value"
+                              value={draft.established ? "established" : "unestablished"}
+                              isDisabled={!draft.checkTcpState || !showTcpState}
+                              onChange={(_event, value) =>
+                                setDraft({ established: value === "established" })
+                              }
+                              aria-label="TCP connection state"
+                            >
+                              <FormSelectOption value="established" label="Established" />
+                              <FormSelectOption value="unestablished" label="Not established" />
+                            </FormSelect>
+                            <FormHelperText>
+                              <HelperText>
+                                <HelperTextItem>
+                                  TCP state matching is available only for TCP rules.
+                                </HelperTextItem>
+                              </HelperText>
+                            </FormHelperText>
+                          </FormGroup>
+                        </FlexItem>
+                      )}
+                      {caps.supportRedirect && (
+                        <FlexItem flex={{ default: "flex_1" }}>
+                          <FormGroup label="HTTP redirect URL" fieldId="access-redirect-enabled">
+                            <Checkbox
+                              id="access-redirect-enabled"
+                              label="Redirect matching TCP connections"
+                              isChecked={draft.redirectEnabled}
+                              isDisabled={!allowPassEffects}
+                              onChange={(_event, checked) => setDraft({ redirectEnabled: checked })}
+                            />
+                            <TextInput
+                              id="access-redirect-url"
+                              {...invalidField("access-redirect-url")}
+                              value={draft.redirectUrl}
+                              isDisabled={!draft.redirectEnabled || !allowPassEffects}
+                              onChange={(_event, value) => setDraft({ redirectUrl: value })}
+                              aria-label="HTTP redirect URL"
+                            />
+                            {errorFor("access-redirect-url")}
+                            <FormHelperText>
+                              <HelperText>
+                                <HelperTextItem>
+                                  Redirects apply only to rules with the Pass action. The URL must
+                                  start with http:// or https://.
+                                </HelperTextItem>
+                              </HelperText>
+                            </FormHelperText>
+                          </FormGroup>
+                        </FlexItem>
+                      )}
+                    </Flex>
+                  )}
+
+                  {caps.supportSimulation && (
+                    <>
+                      <Flex gap={{ default: "gapMd" }}>
+                        <FlexItem flex={{ default: "flex_1" }}>
+                          <FormGroup label="Delay (ms)" fieldId="access-delay">
+                            <TextInput
+                              id="access-delay"
+                              {...invalidField("access-delay")}
+                              type="number"
+                              min={0}
+                              max={MAX_DELAY}
+                              value={draft.delay}
+                              isDisabled={!allowPassEffects}
+                              onChange={(_event, value) => setDraft({ delay: value })}
+                              aria-label="Delay (ms)"
+                            />
+                            {errorFor("access-delay")}
+                          </FormGroup>
+                        </FlexItem>
+                        <FlexItem flex={{ default: "flex_1" }}>
+                          <FormGroup label="Jitter (%)" fieldId="access-jitter">
+                            <TextInput
+                              id="access-jitter"
+                              {...invalidField("access-jitter")}
+                              type="number"
+                              min={0}
+                              max={MAX_PERCENT}
+                              value={draft.jitter}
+                              isDisabled={!allowPassEffects}
+                              onChange={(_event, value) => setDraft({ jitter: value })}
+                              aria-label="Jitter (%)"
+                            />
+                            {errorFor("access-jitter")}
+                          </FormGroup>
+                        </FlexItem>
+                        <FlexItem flex={{ default: "flex_1" }}>
+                          <FormGroup label="Packet loss (%)" fieldId="access-loss">
+                            <TextInput
+                              id="access-loss"
+                              {...invalidField("access-loss")}
+                              type="number"
+                              min={0}
+                              max={MAX_PERCENT}
+                              value={draft.loss}
+                              isDisabled={!allowPassEffects}
+                              onChange={(_event, value) => setDraft({ loss: value })}
+                              aria-label="Packet loss (%)"
+                            />
+                            {errorFor("access-loss")}
+                          </FormGroup>
+                        </FlexItem>
+                      </Flex>
+                      <FormHelperText>
+                        <HelperText>
+                          <HelperTextItem>
+                            Delay, jitter, and packet loss apply only to matching rules with the
+                            Pass action. Delay must be 0-10000 ms; jitter and packet loss must be
+                            0-100 percent.
+                          </HelperTextItem>
+                        </HelperText>
+                      </FormHelperText>
+                    </>
+                  )}
+                </ExpandableSection>
               )}
             </Form>
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="primary" onClick={saveEditor} isDisabled={busy || validation.length > 0}>
+          <Button
+            id="acl-editor-save"
+            variant="primary"
+            onClick={saveEditor}
+            isDisabled={busy || validation.length > 0}
+          >
             {editor?.mode === "edit" ? "Save" : "Create"}
           </Button>
           <Button variant="link" onClick={dismissEditor} isDisabled={busy}>
@@ -1512,7 +1633,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         isOpen={pendingSave !== null}
         aria-labelledby="acl-save-impact-title"
         elementToFocus="[data-cancel-acl-save]"
-        onClose={() => !busy && setPendingSave(null)}
+        onClose={cancelReview}
       >
         <ModalHeader
           title="Review changes"
@@ -1522,15 +1643,19 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
         <ModalBody>
           <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
             <p>
-              Saving rule #{pendingSave?.original.Id_u32} will also clear these settings from other
-              rules under the current hub options:
+              <strong>
+                {editor ? "Edit" : pendingSave?.replacement.Active_bool ? "Enable" : "Disable"} rule
+                #{pendingSave?.original.Id_u32}
+              </strong>
+              {pendingSave?.original.Note_utf && `: ${pendingSave.original.Note_utf}`}
             </p>
+            {writeWarning}
+            <p>Hub options will also clear these settings:</p>
             <ul style={{ overflowWrap: "anywhere" }}>
               {pendingSave?.impacts.map((impact) => (
                 <li key={impact.snapshot}>{impact.description}</li>
               ))}
             </ul>
-            {writeWarning}
           </Flex>
         </ModalBody>
         <ModalFooter>
@@ -1545,12 +1670,7 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
           >
             Save all changes
           </Button>
-          <Button
-            variant="link"
-            data-cancel-acl-save
-            onClick={() => setPendingSave(null)}
-            isDisabled={busy}
-          >
+          <Button variant="link" data-cancel-acl-save onClick={cancelReview} isDisabled={busy}>
             Cancel
           </Button>
         </ModalFooter>
@@ -1558,18 +1678,34 @@ const AccessList: React.FunctionComponent<{ hub: string }> = ({ hub }) => {
 
       <Modal
         variant={ModalVariant.small}
+        aria-labelledby="acl-delete-title"
+        elementToFocus="[data-cancel-acl-delete]"
         isOpen={pendingDelete !== null}
         onClose={() => !busy && setPendingDelete(null)}
       >
-        <ModalHeader title="Delete rule" titleIconVariant="warning" />
+        <ModalHeader labelId="acl-delete-title" title="Delete rule" titleIconVariant="warning" />
         <ModalBody>
-          Delete access list rule #{pendingDelete?.Id_u32}?{writeWarning}
+          <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
+            <p>
+              <strong>Rule #{pendingDelete?.Id_u32}</strong>
+              {pendingDelete?.Note_utf && `: ${pendingDelete.Note_utf}`}
+              <br />
+              {pendingDelete?.Discard_bool ? "Discard" : "Pass"} | Priority{" "}
+              {pendingDelete?.Priority_u32}
+            </p>
+            {writeWarning}
+          </Flex>
         </ModalBody>
         <ModalFooter>
           <Button variant="danger" onClick={confirmDelete} isLoading={busy} isDisabled={busy}>
             Delete
           </Button>
-          <Button variant="link" onClick={() => setPendingDelete(null)} isDisabled={busy}>
+          <Button
+            variant="link"
+            data-cancel-acl-delete
+            onClick={() => setPendingDelete(null)}
+            isDisabled={busy}
+          >
             Cancel
           </Button>
         </ModalFooter>

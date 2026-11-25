@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Mock, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccessList } from "./AccessList";
@@ -73,6 +73,180 @@ describe("AccessList", () => {
     expect(screen.getByText("TCP")).toBeInTheDocument();
     expect(screen.getByText("any")).toBeInTheDocument(); // source 0.0.0.0/0
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument(); // dest /32
+  });
+
+  it("names the editor and restores keyboard focus after reviewing a deletion", async () => {
+    enumAccess.mockResolvedValue({ AccessList: [rule] });
+    const user = userEvent.setup();
+    render(<AccessList hub="DEFAULT" />);
+    const menu = await screen.findByRole("button", { name: "Actions for rule 1" });
+    await user.click(menu);
+    await user.click(await screen.findByText("Edit"));
+    expect(
+      await screen.findByRole("dialog", { name: "Edit access list rule #1" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(menu).toHaveFocus());
+    await user.click(menu);
+    await user.click(await screen.findByText("Delete"));
+    const dialog = await screen.findByRole("dialog", { name: /Delete rule/ });
+    expect(dialog).toHaveTextContent("block guests");
+    expect(dialog).toHaveTextContent("Priority 100");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(menu).toHaveFocus());
+    expect(api.DeleteAccess).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "focuses stable actions after a save renumbers a full ACL (patched: %s)",
+    async (patched) => {
+      serverState.capsList = fullCaps.map((cap) =>
+        cap.CapsName_str === "i_max_access_lists" ? { ...cap, CapsValue_u32: 2 } : cap,
+      );
+      const other = { ...rule, Id_u32: 2, Priority_u32: 200, Note_utf: "other rule" };
+      const original = {
+        AccessList: [rule, other],
+        AclRevision_str: patched ? "rev-a" : undefined,
+      };
+      enumAccess
+        .mockResolvedValueOnce(original)
+        .mockResolvedValueOnce(original)
+        .mockResolvedValue({
+          ...original,
+          AccessList: [
+            { ...other, Id_u32: 1 },
+            { ...rule, Id_u32: 2, Priority_u32: 300 },
+          ],
+        });
+      const user = userEvent.setup();
+      render(<AccessList hub="DEFAULT" />);
+      await user.click(await screen.findByRole("button", { name: "Actions for rule 1" }));
+      await user.click(await screen.findByText("Edit"));
+      const priority = screen.getByLabelText("Priority");
+      await user.clear(priority);
+      await user.type(priority, "300");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() =>
+        expect(screen.getByRole("group", { name: "Access list actions" })).toHaveFocus(),
+      );
+      expect(
+        within(screen.getByRole("row", { name: /other rule/ })).getByRole("button", {
+          name: "Actions for rule 1",
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "New IPv4 rule" })).toBeDisabled();
+      expect(patched ? conditionalWrite : setAccessList).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("shows only applicable port constraints directly in each Traffic cell", async () => {
+    const cases = [
+      [0, 0, 0, 0, 0, "Any"],
+      [0, 0, 0, 443, 443, "TCP/UDP dst 443"],
+      [6, 0, 0, 22, 22, "TCP dst 22"],
+      [6, 0, 0, 443, 0, "TCP dst 443"],
+      [17, 1024, 2048, 53, 54, "UDP src 1024-2048 dst 53-54"],
+      [17, 53, 0, 0, 0, "UDP src 53"],
+      [6, 0, 0, 0, 0, "TCP"],
+      [1, 0, 0, 22, 22, "ICMPv4"],
+    ] as const;
+    enumAccess.mockResolvedValue({
+      AccessList: cases.map(
+        (
+          [Protocol_u32, SrcPortStart_u32, SrcPortEnd_u32, DestPortStart_u32, DestPortEnd_u32],
+          i,
+        ) => ({
+          ...rule,
+          Id_u32: i + 1,
+          Protocol_u32,
+          SrcPortStart_u32,
+          SrcPortEnd_u32,
+          DestPortStart_u32,
+          DestPortEnd_u32,
+        }),
+      ),
+    });
+    render(<AccessList hub="DEFAULT" />);
+    for (const [, , , , , summary] of cases) {
+      expect(await screen.findByRole("cell", { name: summary })).toBeVisible();
+    }
+  });
+
+  it("labels invalid input beside the field and preserves a non-contiguous mask", async () => {
+    enumAccess.mockResolvedValue({
+      AccessList: [
+        {
+          ...rule,
+          SrcIpAddress_ip: "192.0.2.0",
+          SrcSubnetMask_ip: "255.255.255.240",
+          DestSubnetMask_ip: "255.0.255.0",
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<AccessList hub="DEFAULT" />);
+    expect(await screen.findByText("192.0.2.0/28")).toBeInTheDocument();
+    expect(screen.getByText("10.0.0.5/255.0.255.0")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Actions for rule 1" }));
+    await user.click(await screen.findByText("Edit"));
+    const mask = screen.getByLabelText("Destination subnet mask");
+    await user.clear(mask);
+    expect(mask).toHaveAttribute("aria-invalid", "true");
+    expect(mask).toHaveAccessibleDescription(/Destination IPv4 subnet mask must be valid/);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it.each(["IPv4", "IPv6"])(
+    "flags both invalid %s address and mask, then clears only the repaired field",
+    async (version) => {
+      enumAccess.mockResolvedValue({ AccessList: [] });
+      const user = userEvent.setup();
+      render(<AccessList hub="DEFAULT" />);
+      await screen.findByText("No access list rules");
+      await user.click(screen.getByRole("button", { name: `New ${version} rule` }));
+      const side = version === "IPv4" ? "Source" : "Destination";
+      await user.click(screen.getByLabelText(`Any ${side.toLowerCase()}`));
+      const ip = screen.getByLabelText(`${side} IP address`);
+      const mask = screen.getByLabelText(`${side} subnet mask`);
+      await user.clear(ip);
+      await user.clear(mask);
+      expect(ip).toHaveAttribute("aria-invalid", "true");
+      expect(ip).toHaveAccessibleDescription(
+        new RegExp(`${side} ${version} address must be valid`),
+      );
+      expect(mask).toHaveAttribute("aria-invalid", "true");
+      expect(mask).toHaveAccessibleDescription(
+        new RegExp(`${side} ${version} subnet mask must be valid`),
+      );
+      await user.type(ip, version === "IPv4" ? "10.0.0.1" : "::1");
+      expect(ip).not.toHaveAttribute("aria-invalid", "true");
+      expect(mask).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+    },
+  );
+
+  it("marks both out-of-range ports and both invalid MAC fields", async () => {
+    enumAccess.mockResolvedValue({ AccessList: [rule] });
+    const user = userEvent.setup();
+    render(<AccessList hub="DEFAULT" />);
+    await user.click(await screen.findByRole("button", { name: "Actions for rule 1" }));
+    await user.click(await screen.findByText("Edit"));
+    for (const bound of ["start", "end"]) {
+      await user.type(screen.getByLabelText(`Destination port ${bound}`), "65536");
+    }
+    await user.click(screen.getByRole("button", { name: "Advanced rule settings" }));
+    await user.click(screen.getByLabelText("Match source MAC"));
+    for (const name of [
+      "Destination port start",
+      "Destination port end",
+      "Source MAC address",
+      "Source MAC mask",
+    ]) {
+      const field = screen.getByLabelText(name);
+      expect(field).toHaveAttribute("aria-invalid", "true");
+      expect(field).toHaveAccessibleDescription(/must be/);
+    }
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("toggles a rule with a revision-checked list replacement", async () => {
@@ -171,7 +345,7 @@ describe("AccessList", () => {
 
       render(<AccessList hub="DEFAULT" />);
       const row = await screen.findByRole("row", { name: /block guests/ });
-      await user.click(within(row).getByRole("button", { name: /kebab toggle/i }));
+      await user.click(within(row).getByRole("button", { name: /actions for rule/i }));
       await user.click(await screen.findByText("Edit"));
       expect(Boolean(within(screen.getByRole("dialog")).queryByText(warning))).toBe(
         !protectedWrite,
@@ -216,7 +390,7 @@ describe("AccessList", () => {
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
     await user.click(await screen.findByText("Edit"));
     const dialog = within(await screen.findByRole("dialog"));
     await user.clear(dialog.getByLabelText("Memo"));
@@ -252,7 +426,7 @@ describe("AccessList", () => {
 
     render(<AccessList hub="DEFAULT" />);
     await screen.findByText("block guests");
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
     await user.click(await screen.findByText("Clone"));
     await user.click(screen.getByRole("button", { name: "Create" }));
 
@@ -265,6 +439,32 @@ describe("AccessList", () => {
       Discard_bool: true,
       Protocol_u32: 6,
     });
+  });
+
+  it.each(["Edit", "Clone"])("preserves wildcard port constraints on %s", async (action) => {
+    const ports = {
+      Protocol_u32: 0,
+      SrcPortStart_u32: 1000,
+      SrcPortEnd_u32: 2000,
+      DestPortStart_u32: 443,
+      DestPortEnd_u32: 443,
+    };
+    enumAccess.mockResolvedValue({ AccessList: [{ ...rule, ...ports }] });
+    addAccess.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<AccessList hub="DEFAULT" />);
+    await user.click(await screen.findByRole("button", { name: "Actions for rule 1" }));
+    await user.click(await screen.findByText(action));
+    expect(screen.getByLabelText("Destination port start")).toHaveValue(443);
+    const memo = screen.getByLabelText("Memo");
+    await user.clear(memo);
+    await user.type(memo, "new memo");
+    await user.click(screen.getByRole("button", { name: action === "Edit" ? "Save" : "Create" }));
+    const sent =
+      action === "Edit"
+        ? setAccessList.mock.calls[0][0].AccessList
+        : addAccess.mock.calls[0][0].AccessListSingle;
+    expect(sent).toEqual([expect.objectContaining({ ...ports, Note_utf: "new memo" })]);
   });
 
   it("hides unsupported advanced fields from the editor", async () => {
@@ -283,7 +483,7 @@ describe("AccessList", () => {
     await screen.findByText("block guests");
     expect(screen.getByRole("button", { name: "New IPv6 rule" })).toBeDisabled();
 
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
     await user.click(await screen.findByText("Edit"));
 
     expect(screen.getByLabelText("Source user")).toBeInTheDocument();
@@ -305,7 +505,7 @@ describe("AccessList", () => {
     expect(screen.getByRole("button", { name: "New IPv4 rule" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "New IPv6 rule" })).toBeDisabled();
 
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
     expect(
       (await screen.findByText("Clone")).closest('[aria-disabled="true"]'),
     ).toBeInTheDocument();
@@ -321,7 +521,7 @@ describe("AccessList", () => {
 
     render(<AccessList hub="DEFAULT" />);
     await screen.findByText("block guests");
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
     await user.click(await screen.findByText("Delete"));
 
     const dialog = await screen.findByRole("dialog");
@@ -341,7 +541,7 @@ describe("AccessList", () => {
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
     await user.click(await screen.findByText("Delete"));
     const dialog = within(await screen.findByRole("dialog"));
     expect(dialog.getByText(warning)).toBeInTheDocument();
@@ -369,12 +569,15 @@ describe("AccessList", () => {
       const user = userEvent.setup();
 
       render(<AccessList hub="DEFAULT" />);
-      await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+      await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
       await user.click(await screen.findByText("Delete"));
       const dialog = within(await screen.findByRole("dialog"));
       await user.click(dialog.getByRole("button", { name: "Delete" }));
       expect(await screen.findByText(/Review the refreshed list/)).toBeInTheDocument();
       expect(screen.getByText("new occupant")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByRole("group", { name: "Access list actions" })).toHaveFocus(),
+      );
       expect(conditionalWrite).not.toHaveBeenCalled();
       expect(api.DeleteAccess).not.toHaveBeenCalled();
     },
@@ -403,7 +606,7 @@ describe("AccessList", () => {
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
     await user.click(await screen.findByText("Edit"));
     const dialog = within(await screen.findByRole("dialog"));
     await user.clear(dialog.getByLabelText("Memo"));
@@ -421,7 +624,7 @@ describe("AccessList", () => {
     const user = userEvent.setup();
 
     render(<AccessList hub="DEFAULT" />);
-    await user.click(await screen.findByRole("button", { name: /kebab toggle/i }));
+    await user.click(await screen.findByRole("button", { name: /actions for rule/i }));
     await user.click(await screen.findByText("Delete"));
     const dialog = within(await screen.findByRole("dialog"));
     await user.click(dialog.getByRole("button", { name: "Delete" }));
@@ -462,7 +665,7 @@ describe("AccessList", () => {
     };
     const editRule = async (user: ReturnType<typeof userEvent.setup>, memo: string) => {
       const row = await screen.findByRole("row", { name: /block guests/ });
-      await user.click(within(row).getByRole("button", { name: /kebab toggle/i }));
+      await user.click(within(row).getByRole("button", { name: /actions for rule/i }));
       await user.click(await screen.findByText("Edit"));
       await user.clear(screen.getByLabelText("Memo"));
       await user.type(screen.getByLabelText("Memo"), memo);
@@ -483,6 +686,7 @@ describe("AccessList", () => {
       expect(dialog.getByRole("listitem")).not.toHaveTextContent("delay");
       await user.click(dialog.getByRole("button", { name: "Cancel" }));
       expect(screen.getByLabelText("Memo")).toHaveValue("edited");
+      await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).toHaveFocus());
       noWrites();
       await user.click(screen.getByRole("button", { name: "Save" }));
       dialog = within(await confirmDialog());
@@ -555,7 +759,7 @@ describe("AccessList", () => {
       const user = userEvent.setup();
       render(<AccessList hub="DEFAULT" />);
       const row = await screen.findByRole("row", { name: /last rule/ });
-      await user.click(within(row).getByRole("button", { name: /kebab toggle/i }));
+      await user.click(within(row).getByRole("button", { name: /actions for rule/i }));
       await user.click(await screen.findByText("Delete"));
       await user.click(
         within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }),

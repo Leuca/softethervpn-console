@@ -1,0 +1,39 @@
+.acl-match {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--pf-t--global--spacer--sm);
+}
+
+.acl-match dt {
+  color: var(--pf-t--global--text--color--subtle);
+}
+
+.acl-editor .pf-v6-c-expandable-section__content:not([hidden]) {
+  display: grid;
+  gap: var(--pf-t--global--spacer--md);
+}
+
+@media (max-width: 767px) {
+  .acl-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .acl-editor :is(.pf-v6-l-flex, .pf-v6-l-flex__item, .pf-v6-c-form__group) {
+    min-inline-size: 0;
+  }
+
+  .acl-editor .pf-v6-l-flex:not(.acl-port-range) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .acl-match {
+    min-inline-size: 10.5rem;
+  }
+
+  .acl-table :is(th, td) {
+    padding-inline: var(--pf-t--global--spacer--sm);
+  }
+}
