@@ -158,6 +158,7 @@ jobs:
           SRPM_NAME: ${{ needs.srpm.outputs.filename }}
           IMMUTABLE_RELEASES_CONFIRMED: ${{ vars.IMMUTABLE_RELEASES_CONFIRMED }}
         run: |
+          trap 'printf "Publish release failed at shell line %d (exit %d).\n" "$LINENO" "$?" >&2' ERR
           if [[ "$IMMUTABLE_RELEASES_CONFIRMED" != true ]]; then
             echo "Repository immutable releases must be enabled and confirmed (docs/VERSIONING.md)." >&2
             exit 1
@@ -210,8 +211,14 @@ jobs:
             id="$(gh api "$releases" -f tag_name="$GITHUB_REF_NAME" -F draft=true \
               -F prerelease="$prerelease" -f name="SoftEther VPN Console $GITHUB_REF_NAME" \
               "${notes_option[@]}" | jq -er '.id')"
-            current="$(lookup_draft)"
-            [[ "$current" == "$id" ]]
+            # The listing may briefly lag behind a successful draft creation.
+            for attempt in 1 2 3 4 5; do
+              current="$(lookup_draft)"
+              if [[ "$current" == "$id" ]]; then break; fi
+              echo "Draft lookup $attempt/5 for $GITHUB_REF_NAME: expected $id, observed $current." >&2
+              if [[ "$current" != missing || "$attempt" == 5 ]]; then exit 1; fi
+              sleep 2
+            done
           fi
           [[ "$id" =~ ^[1-9][0-9]*$ ]]
 

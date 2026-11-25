@@ -61,6 +61,7 @@ function checkPublication({ tag = "v1.2.3", notes = false, confirmed = true, suc
   try {
     for (const subdir of ["bin", "release-bundles", "release-srpm"]) mkdirSync(join(dir, subdir));
     for (const cmd of ["jq", "sha256sum", "cmp"]) symlinkSync("/usr/bin/" + cmd, join(dir, "bin", cmd));
+    symlinkSync("/usr/bin/true", join(dir, "bin", "sleep"));
     const version = tag.slice(1);
     const rpm = "softethervpn-console-" + version.replace("-", ".") + "-1.fc42.src.rpm";
     const paths = [
@@ -128,6 +129,7 @@ function checkPublication({ tag = "v1.2.3", notes = false, confirmed = true, suc
     expect(result.error).toBeUndefined();
     expect(success ? [0] : [1, 5], result.stderr).toContain(result.status);
     expect(readFileSync(join(dir, "calls"), "utf8")).toBe(calls.map((c) => c + "\n").join(""));
+    return result.stderr;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -137,6 +139,7 @@ it.each(["v1.2.3", "v1.2.3-rc.1"])("creates a draft and verifies all six assets 
   checkPublication({ tag, notes: tag.includes("-"), success: true }, ({ assets, draft, list, create, read, upload, publish }) => {
     list([[]]);
     create();
+    if (tag.includes("-")) list([[]]);
     list([[draft]]);
     for (let i = 0; i < assets.length; ++i) {
       read(assets.slice(0, i));
@@ -146,6 +149,19 @@ it.each(["v1.2.3", "v1.2.3-rc.1"])("creates a draft and verifies all six assets 
     read(assets);
     publish();
   });
+});
+
+it.each(["still missing", "different ID", "API failure"])("stops before upload when the new draft lookup reports %s", (scenario) => {
+  const stderr = checkPublication({}, ({ draft, list, create }) => {
+    list([[]]);
+    create();
+    if (scenario === "different ID") return list([[{ ...draft, id: 42 }]]);
+    if (scenario === "API failure") return list([[]], true);
+    for (let i = 0; i < 5; i++) list([[]]);
+  });
+  if (scenario === "different ID") expect(stderr).toContain("expected 41, observed 42");
+  if (scenario === "still missing") expect(stderr).toContain("5/5 for v1.2.3: expected 41, observed missing");
+  if (scenario === "API failure") expect(stderr).toMatch(/Publish release failed at shell line \d+ \(exit 1\)/);
 });
 
 it("resumes a paginated draft, uploading only its missing sidecar", () => {
